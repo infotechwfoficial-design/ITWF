@@ -22,6 +22,7 @@ import Notifications from './pages/Notifications';
 import Admin from './pages/Admin';
 import AdminLogin from './pages/AdminLogin';
 import RequestContent from './pages/RequestContent';
+import UpdatePassword from './pages/UpdatePassword';
 import PWAInstallModal from './components/PWAInstallModal';
 
 import { ThemeProvider } from './context/ThemeContext';
@@ -111,6 +112,7 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<Login onLogin={() => setIsAuthenticated(true)} />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/update-password" element={<UpdatePassword />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route

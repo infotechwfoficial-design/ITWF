@@ -2,28 +2,45 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Mail, ArrowLeft, ShieldCheck, Send, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { supabase } from '../utils/supabase';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
   const [isSent, setIsSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email) {
+    if (!email) return;
+
+    setLoading(true);
+    setErrorMsg('');
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/update-password`,
+      });
+
+      if (error) throw error;
       setIsSent(true);
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Erro ao enviar o e-mail de recuperação.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-background-dark relative overflow-hidden font-sans">
       {/* Background Image with Blur */}
-      <div 
+      <div
         className="absolute inset-0 z-0 opacity-10 dark:opacity-30 bg-cover bg-center"
         style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&q=80)' }}
       />
       <div className="absolute inset-0 bg-white/50 dark:bg-black/70 z-0" />
 
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         className="relative z-10 w-full max-w-md p-6"
@@ -42,13 +59,18 @@ export default function ForgotPassword() {
                 <p className="text-slate-500 dark:text-slate-400 text-sm mb-8 leading-relaxed">Não se preocupe! Insira seu e-mail abaixo e enviaremos as instruções para você criar uma nova senha.</p>
 
                 <form onSubmit={handleSubmit} className="w-full space-y-6">
+                  {errorMsg && (
+                    <div className="bg-rose-500/10 text-rose-500 p-3 rounded-xl text-center text-xs font-bold border border-rose-500/20">
+                      {errorMsg}
+                    </div>
+                  )}
                   <div className="space-y-2 text-left">
                     <label className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">E-mail de Recuperação</label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                         <Mail className="text-primary w-5 h-5" />
                       </div>
-                      <input 
+                      <input
                         type="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
@@ -59,17 +81,18 @@ export default function ForgotPassword() {
                     </div>
                   </div>
 
-                  <button 
+                  <button
                     type="submit"
-                    className="w-full bg-primary hover:bg-primary/90 text-white font-black py-4 px-4 rounded-2xl transition-all shadow-xl shadow-primary/20 flex items-center justify-center gap-2 group active:scale-95"
+                    disabled={loading}
+                    className="w-full bg-primary hover:bg-primary/90 text-white font-black py-4 px-4 rounded-2xl transition-all shadow-xl shadow-primary/20 flex items-center justify-center gap-2 group active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
                   >
-                    RECUPERAR SENHA
-                    <Send size={18} className="group-hover:translate-x-1 transition-transform" />
+                    {loading ? 'ENVIANDO...' : 'RECUPERAR SENHA'}
+                    {!loading && <Send size={18} className="group-hover:translate-x-1 transition-transform" />}
                   </button>
                 </form>
               </>
             ) : (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="flex flex-col items-center"
@@ -79,7 +102,7 @@ export default function ForgotPassword() {
                 </div>
                 <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">E-mail Enviado!</h2>
                 <p className="text-slate-500 dark:text-slate-400 text-sm mb-8">Enviamos um link de recuperação para <strong className="text-slate-900 dark:text-white">{email}</strong>. Verifique sua caixa de entrada e spam.</p>
-                <button 
+                <button
                   onClick={() => setIsSent(false)}
                   className="text-primary font-bold hover:underline"
                 >
@@ -89,8 +112,8 @@ export default function ForgotPassword() {
             )}
 
             <div className="mt-10 pt-8 border-t border-black/5 dark:border-white/5 w-full">
-              <Link 
-                to="/login" 
+              <Link
+                to="/login"
                 className="flex items-center justify-center gap-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors font-medium text-sm group"
               >
                 <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
