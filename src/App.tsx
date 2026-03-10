@@ -72,7 +72,7 @@ export default function App() {
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
 
       if (!hasDismissed && !isStandalone && isAuthenticated) {
-        setTimeout(() => setShowInstallModal(true), 3000);
+        setShowInstallModal(true);
       }
     };
 
@@ -85,7 +85,7 @@ export default function App() {
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
 
     if (isIOS && !isStandalone && !hasDismissed && isAuthenticated) {
-      setTimeout(() => setShowInstallModal(true), 4000);
+      setShowInstallModal(true);
     }
 
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
