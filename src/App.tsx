@@ -71,7 +71,7 @@ export default function App() {
       const hasDismissed = localStorage.getItem('pwa_install_dismissed');
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
 
-      if (!hasDismissed && !isStandalone && isAuthenticated) {
+      if (!hasDismissed && !isStandalone) {
         setShowInstallModal(true);
       }
     };
@@ -84,12 +84,12 @@ export default function App() {
     const hasDismissed = localStorage.getItem('pwa_install_dismissed');
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
 
-    if (isIOS && !isStandalone && !hasDismissed && isAuthenticated) {
+    if (isIOS && !isStandalone && !hasDismissed) {
       setShowInstallModal(true);
     }
 
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-  }, [isAuthenticated]);
+  }, []);
 
   // Show a loading screen while resolving initial session
   if (isAuthenticated === null) {
