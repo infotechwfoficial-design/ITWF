@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Mail, ShieldCheck, Instagram, Send, Lock } from 'lucide-react';
 import { supabase } from '../utils/supabase';
@@ -136,6 +136,14 @@ export default function Login({ onLogin }: LoginProps) {
                 minLength={6}
               />
             </div>
+
+            {isLogin && (
+              <div className="flex justify-end pt-1">
+                <Link to="/forgot-password" className="text-sm font-bold text-primary hover:underline transition-all">
+                  Esqueci a senha?
+                </Link>
+              </div>
+            )}
 
             {errorMsg && (
               <p className="text-rose-500 text-xs font-bold text-center mt-2">{errorMsg}</p>
