@@ -140,7 +140,7 @@ export default function Login({ onLogin }: LoginProps) {
             {isLogin && (
               <div className="flex justify-end pt-1">
                 <Link to="/forgot-password" className="text-sm font-bold text-primary hover:underline transition-all">
-                  Esqueci a senha?
+                  Esqueceu a senha?
                 </Link>
               </div>
             )}
