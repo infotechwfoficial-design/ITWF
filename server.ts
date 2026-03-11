@@ -326,8 +326,8 @@ async function startServer() {
     const payload = JSON.stringify({
       title,
       body: message,
-      icon: reqHost ? `${reqHost}/logo.png?v=2` : undefined,
-      badge: reqHost ? `${reqHost}/logo.png?v=2` : undefined
+
+      
     });
 
     const promises = subscriptions.map(sub => {

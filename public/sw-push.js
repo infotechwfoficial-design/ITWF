@@ -11,13 +11,13 @@ self.addEventListener('push', function (event) {
   }
 
   const baseUrl = self.location.origin || '';
-  const iconUrl = `${baseUrl}/logo.png?v=4`;
-  const badgeUrl = `${baseUrl}/logo.png?v=4`;
+  const iconUrl = `${baseUrl}/logo.png`;
+  const badgeUrl = `${baseUrl}/badge.png`;
 
   const options = {
     body: data.body || 'Você tem uma nova atualização no seu painel.',
     icon: data.icon || iconUrl,
-    badge: data.badge || badgeUrl,
+
     image: data.image || null,
     data: {
       url: data.url || '/'

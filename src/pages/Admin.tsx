@@ -430,7 +430,7 @@ export default function Admin() {
                       <td className="px-6 py-4 font-mono text-sm text-primary">{client.username}</td>
                       <td className="px-6 py-4 font-bold">{client.name}</td>
                       <td className="px-6 py-4 text-slate-500">{client.expiration_date}</td>
-                      <td className="px-6 py-4 font-black">R$ {client.balance.toFixed(2)}</td>
+                      <td className="px-6 py-4 font-black">R$ {Number(client.balance || 0).toFixed(2)}</td>
                       <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-end gap-2">
                           <button
@@ -626,7 +626,7 @@ export default function Admin() {
                   {plans.map((plan) => (
                     <tr key={plan.id} className="hover:bg-black/[0.01] dark:hover:bg-white/[0.01] transition-colors">
                       <td className="px-6 py-4 font-bold">{plan.name}</td>
-                      <td className="px-6 py-4 font-black text-primary">R$ {plan.price.toFixed(2)}</td>
+                      <td className="px-6 py-4 font-black text-primary">R$ {Number(plan.price || 0).toFixed(2)}</td>
                       <td className="px-6 py-4 text-slate-500">{plan.duration}</td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-2">
@@ -827,7 +827,7 @@ export default function Admin() {
                       <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Valor do Plano</p>
                       <p className="font-black text-lg flex items-center gap-2">
                         <DollarSign size={16} className="text-emerald-500" />
-                        R$ {viewingClient.balance.toFixed(2)}
+                        R$ {Number(viewingClient.balance || 0).toFixed(2)}
                       </p>
                     </div>
                   </div>

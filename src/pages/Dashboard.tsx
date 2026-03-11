@@ -144,7 +144,7 @@ export default function Dashboard() {
               <Link to="/plans" className="text-sm font-bold text-primary hover:underline transition-colors">Ver todos</Link>
             </div>
             <div className="z-10 relative">
-              {[{ name: 'Assinatura', plan: client?.name || 'Renovação', price: client?.balance ? client.balance.toFixed(2).replace('.', ',') : '0,00', icon: Cloud, color: 'text-blue-500', bg: 'bg-blue-500/10' }].map((item, idx) => (
+              {[{ name: 'Assinatura', plan: client?.name || 'Renovação', price: client?.balance ? Number(client.balance).toFixed(2).replace('.', ',') : '0,00', icon: Cloud, color: 'text-blue-500', bg: 'bg-blue-500/10' }].map((item, idx) => (
                 <div key={idx} className="bg-white/5 border border-white/10 rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
 
                   <div className="flex items-center gap-4 w-full md:w-auto">

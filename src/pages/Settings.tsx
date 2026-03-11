@@ -216,7 +216,7 @@ export default function Settings() {
               <h3 className="text-xl font-bold text-slate-900 dark:text-white">{profile?.name || 'Usuário'}</h3>
               <p className="text-slate-500 dark:text-slate-400 text-sm">@{profile?.username || 'user'}</p>
               <div className="mt-4 px-3 py-1 bg-primary/10 text-primary text-xs font-bold rounded-full border border-primary/20 uppercase tracking-wider">
-                ID: {profile?.id?.split('-')[0].toUpperCase() || '---'}
+                ID: {profile?.id ? String(profile.id).split('-')[0].toUpperCase() : '---'}
               </div>
             </div>
 
