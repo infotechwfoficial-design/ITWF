@@ -4,29 +4,34 @@
  */
 
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { supabase } from './utils/supabase';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import Checkout from './pages/Checkout';
-import Success from './pages/Success';
-import Invoices from './pages/Invoices';
-import Support from './pages/Support';
-import Settings from './pages/Settings';
-import ForgotPassword from './pages/ForgotPassword';
-import Plans from './pages/Plans';
-import Tutorials from './pages/Tutorials';
-import Terms from './pages/Terms';
-import Maintenance from './pages/Maintenance';
-import Notifications from './pages/Notifications';
-import Admin from './pages/Admin';
-import AdminLogin from './pages/AdminLogin';
-import RequestContent from './pages/RequestContent';
-import UpdatePassword from './pages/UpdatePassword';
-import PWAInstallModal from './components/PWAInstallModal';
-
 import { ThemeProvider } from './context/ThemeContext';
 import { useRegisterSW } from 'virtual:pwa-register/react';
+import PWAInstallModal from './components/PWAInstallModal';
+
+// Autenticação carrega primeiro, o resto é baixo sob demanda (Lazy Loading)
+import Login from './pages/Login';
+
+const Dashboard = React.lazy(() => import('./pages/Dashboard'));
+const Checkout = React.lazy(() => import('./pages/Checkout'));
+const Success = React.lazy(() => import('./pages/Success'));
+const Invoices = React.lazy(() => import('./pages/Invoices'));
+const Support = React.lazy(() => import('./pages/Support'));
+const Settings = React.lazy(() => import('./pages/Settings'));
+const ForgotPassword = React.lazy(() => import('./pages/ForgotPassword'));
+const Plans = React.lazy(() => import('./pages/Plans'));
+const Tutorials = React.lazy(() => import('./pages/Tutorials'));
+const Terms = React.lazy(() => import('./pages/Terms'));
+const Maintenance = React.lazy(() => import('./pages/Maintenance'));
+const Notifications = React.lazy(() => import('./pages/Notifications'));
+const Admin = React.lazy(() => import('./pages/Admin'));
+const AdminLogin = React.lazy(() => import('./pages/AdminLogin'));
+const RequestContent = React.lazy(() => import('./pages/RequestContent'));
+const UpdatePassword = React.lazy(() => import('./pages/UpdatePassword'));
+
+
+
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
@@ -69,7 +74,7 @@ export default function App() {
       setDeferredPrompt(e);
 
       // Delay showing the modal for better UX (3 seconds after load)
-      const hasDismissed = localStorage.getItem('pwa_install_dismissed');
+      const hasDismissed = sessionStorage.getItem('pwa_install_dismissed');
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
 
       if (!hasDismissed && !isStandalone) {
@@ -82,7 +87,7 @@ export default function App() {
     // Also check for iOS (which doesn't fire beforeinstallprompt)
     const userAgent = window.navigator.userAgent.toLowerCase();
     const isIOS = /iphone|ipad|ipod/.test(userAgent);
-    const hasDismissed = localStorage.getItem('pwa_install_dismissed');
+    const hasDismissed = sessionStorage.getItem('pwa_install_dismissed');
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
 
     if (isIOS && !isStandalone && !hasDismissed) {
@@ -109,60 +114,67 @@ export default function App() {
   return (
     <ThemeProvider>
       <Router>
-        <Routes>
-          <Route path="/login" element={<Login onLogin={() => setIsAuthenticated(true)} />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/update-password" element={<UpdatePassword />} />
-          <Route path="/terms" element={<Terms />} />
-          <Route path="/admin/login" element={<AdminLogin />} />
-          <Route
-            path="/admin"
-            element={isAdmin ? <Admin /> : <Navigate to="/admin/login" />}
-          />
+        <Suspense fallback={
+          <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 gap-6">
+            <img src="/logo.png" alt="Logo" className="w-24 h-24 object-contain animate-pulse" />
+            <p className="text-primary font-bold animate-pulse uppercase tracking-widest text-sm">Carregando Tela...</p>
+          </div>
+        }>
+          <Routes>
+            <Route path="/login" element={<Login onLogin={() => setIsAuthenticated(true)} />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/update-password" element={<UpdatePassword />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route
+              path="/admin"
+              element={isAdmin ? <Admin /> : <Navigate to="/admin/login" />}
+            />
 
-          <Route
-            path="/"
-            element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />}
-          />
-          <Route
-            path="/checkout"
-            element={isAuthenticated ? <Checkout /> : <Navigate to="/login" />}
-          />
-          <Route
-            path="/success"
-            element={isAuthenticated ? <Success /> : <Navigate to="/login" />}
-          />
-          <Route
-            path="/invoices"
-            element={isAuthenticated ? <Invoices /> : <Navigate to="/login" />}
-          />
-          <Route
-            path="/support"
-            element={isAuthenticated ? <Support /> : <Navigate to="/login" />}
-          />
-          <Route
-            path="/settings"
-            element={isAuthenticated ? <Settings /> : <Navigate to="/login" />}
-          />
-          <Route
-            path="/plans"
-            element={isAuthenticated ? <Plans /> : <Navigate to="/login" />}
-          />
-          <Route
-            path="/tutorials"
-            element={isAuthenticated ? <Tutorials /> : <Navigate to="/login" />}
-          />
-          <Route
-            path="/notifications"
-            element={isAuthenticated ? <Notifications /> : <Navigate to="/login" />}
-          />
-          <Route
-            path="/request-content"
-            element={isAuthenticated ? <RequestContent /> : <Navigate to="/login" />}
-          />
+            <Route
+              path="/"
+              element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />}
+            />
+            <Route
+              path="/checkout"
+              element={isAuthenticated ? <Checkout /> : <Navigate to="/login" />}
+            />
+            <Route
+              path="/success"
+              element={isAuthenticated ? <Success /> : <Navigate to="/login" />}
+            />
+            <Route
+              path="/invoices"
+              element={isAuthenticated ? <Invoices /> : <Navigate to="/login" />}
+            />
+            <Route
+              path="/support"
+              element={isAuthenticated ? <Support /> : <Navigate to="/login" />}
+            />
+            <Route
+              path="/settings"
+              element={isAuthenticated ? <Settings /> : <Navigate to="/login" />}
+            />
+            <Route
+              path="/plans"
+              element={isAuthenticated ? <Plans /> : <Navigate to="/login" />}
+            />
+            <Route
+              path="/tutorials"
+              element={isAuthenticated ? <Tutorials /> : <Navigate to="/login" />}
+            />
+            <Route
+              path="/notifications"
+              element={isAuthenticated ? <Notifications /> : <Navigate to="/login" />}
+            />
+            <Route
+              path="/request-content"
+              element={isAuthenticated ? <RequestContent /> : <Navigate to="/login" />}
+            />
 
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
+        </Suspense>
       </Router>
 
       {/* PWA Toast Notification */}
@@ -199,7 +211,7 @@ export default function App() {
           deferredPrompt={deferredPrompt}
           onClose={() => {
             setShowInstallModal(false);
-            localStorage.setItem('pwa_install_dismissed', 'true');
+            sessionStorage.setItem('pwa_install_dismissed', 'true');
           }}
         />
       )}

@@ -35,7 +35,6 @@ export default function PWAInstallModal({ deferredPrompt, onClose }: PWAInstallM
         try {
             const { data: { session } } = await supabase.auth.getSession();
             if (session?.user?.email) {
-                // Using email as fallback for username in push mapping
                 await subscribeUserToPush(session.user.email);
             }
             setStep(3);
@@ -48,7 +47,7 @@ export default function PWAInstallModal({ deferredPrompt, onClose }: PWAInstallM
 
     return (
         <AnimatePresence>
-            <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
                 <motion.div
                     initial={{ opacity: 0, y: 100 }}
                     animate={{ opacity: 1, y: 0 }}

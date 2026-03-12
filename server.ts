@@ -238,15 +238,17 @@ async function startServer() {
               }
 
               // Send Push Notification
-              const { data: subscriptions } = await supabase.from('push_subscriptions').select('subscription_json').eq('username', username);
+              const { data: subscriptions } = await supabase.from('push_subscriptions').select('subscription_json').eq('email', client.email);
               if (subscriptions && subscriptions.length > 0) {
                 const payload = JSON.stringify({
                   title: 'Pagamento Aprovado! 🎉',
-                  body: `Seu plano "${plan.name}" foi ativado/renovado. Novo vencimento: ${newExpDate}`
+                  body: `Seu plano "${plan.name}" foi ativado/renovado. Novo vencimento: ${newExpDate}`,
+                  url: `/dashboard`
                 });
                 subscriptions.forEach(sub => {
                   try {
-                    webpush.sendNotification(JSON.parse(sub.subscription_json), payload).catch(() => { });
+                    const options = { TTL: 86400, urgency: 'high' };
+                    webpush.sendNotification(JSON.parse(sub.subscription_json), payload, options).catch(() => { });
                   } catch (e) { }
                 });
               }
@@ -298,10 +300,10 @@ async function startServer() {
   });
 
   app.post('/api/subscribe', async (req, res) => {
-    const { username, subscription } = req.body;
+    const { email, subscription } = req.body;
     try {
       await supabase.from('push_subscriptions').upsert([{
-        username,
+        email,
         subscription_json: JSON.stringify(subscription)
       }], { onConflict: 'subscription_json' });
       res.status(201).json({});
@@ -311,11 +313,11 @@ async function startServer() {
   });
 
   app.post('/api/send-push', async (req, res) => {
-    const { title, message, username } = req.body;
+    const { title, message, email } = req.body;
 
     let query = supabase.from('push_subscriptions').select('subscription_json');
-    if (username) {
-      query = query.eq('username', username);
+    if (email) {
+      query = query.eq('email', email);
     }
     const { data: subscriptions, error } = await query;
     if (error || !subscriptions) {
@@ -326,15 +328,15 @@ async function startServer() {
     const payload = JSON.stringify({
       title,
       body: message,
-
-      
+      url: `${reqHost}/dashboard`
     });
 
     const promises = subscriptions.map(sub => {
       const pushSubscription = JSON.parse(sub.subscription_json);
-      return webpush.sendNotification(pushSubscription, payload)
+      const options = { TTL: 86400, urgency: 'high' };
+      return webpush.sendNotification(pushSubscription, payload, options)
         .catch(err => {
-          console.error(`Push error for user ${username || 'all'}:`, err.statusCode, err.body || err.message);
+          console.error(`Push error for user ${email || 'all'}:`, err.statusCode, err.body || err.message);
           if (err.statusCode === 404 || err.statusCode === 410) {
             supabase.from('push_subscriptions').delete().eq('subscription_json', sub.subscription_json).then();
           }
@@ -376,13 +378,19 @@ async function startServer() {
       }
 
       if (message) {
-        const { data: subscriptions } = await supabase.from('push_subscriptions').select('subscription_json').eq('username', client.username);
+        const { data: subscriptions } = await supabase.from('push_subscriptions').select('subscription_json').eq('email', client.email);
         if (subscriptions) {
-          const payload = JSON.stringify({ title: 'Aviso de Assinatura', body: message });
+          const reqHost = process.env.VITE_API_URL || '';
+          const payload = JSON.stringify({ 
+            title: 'Aviso de Assinatura', 
+            body: message,
+            url: `${reqHost}/dashboard`
+          });
 
           const promises = subscriptions.map(sub => {
             const pushSubscription = JSON.parse(sub.subscription_json);
-            return webpush.sendNotification(pushSubscription, payload).catch(err => {
+            const options = { TTL: 86400, urgency: 'high' };
+            return webpush.sendNotification(pushSubscription, payload, options).catch(err => {
               if (err.statusCode === 404 || err.statusCode === 410) {
                 supabase.from('push_subscriptions').delete().eq('subscription_json', sub.subscription_json).then();
               }

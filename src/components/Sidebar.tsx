@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  ShieldCheck,
   LayoutDashboard,
   CreditCard,
   ReceiptText,
@@ -9,18 +8,36 @@ import {
   Sun,
   Moon,
   Film,
-  LogOut
+  LogOut,
+  LucideIcon
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { supabase } from '../utils/supabase';
 
-export default function Sidebar() {
+export interface NavItem {
+  id?: string;
+  path?: string;
+  icon: LucideIcon;
+  label: string;
+  separator?: boolean;
+  onClick?: () => void;
+}
+
+interface SidebarProps {
+  items?: NavItem[];
+  title?: string;
+  logoUrl?: string;
+  onLogout?: () => void;
+  activeId?: string;
+}
+
+export default function Sidebar({ items, title = "ITWF", logoUrl = "/logo.png", onLogout, activeId }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
 
-  const navItems = [
+  const defaultItems: NavItem[] = [
     { path: '/', icon: LayoutDashboard, label: 'Painel Geral' },
     { path: '/request-content', icon: Film, label: 'Pedir Conteúdo' },
     { path: '/plans', icon: CreditCard, label: 'Assinaturas' },
@@ -29,31 +46,56 @@ export default function Sidebar() {
     { path: '/settings', icon: SettingsIcon, label: 'Configurações' },
   ];
 
+  const currentItems = items || defaultItems;
+
+  const handleLogout = onLogout || (async () => {
+    await supabase.auth.signOut();
+    navigate('/login');
+  });
+
   return (
     <aside className="hidden md:flex w-64 flex-col border-r border-black/5 dark:border-white/5 bg-slate-50 dark:bg-slate-900/50 backdrop-blur-sm p-4 h-full overflow-y-auto transition-colors duration-300">
       <div className="flex items-center gap-4 text-slate-900 dark:text-white mb-8 px-2 cursor-pointer" onClick={() => navigate('/')}>
-        <img src="/logo.png" alt="Logo" className="w-12 h-12 object-contain" />
-        <h2 className="text-xl font-bold tracking-tight">ITWF</h2>
+        <img src={logoUrl} alt="Logo" className="w-12 h-12 object-contain" />
+        <h2 className="text-xl font-black tracking-tight font-display">{title}</h2>
       </div>
 
       <nav className="flex flex-col gap-2 flex-1">
-        {navItems.map((item) => {
-          const isActive = location.pathname === item.path;
+        {currentItems.map((item, idx) => {
+          const isActive = item.path ? location.pathname === item.path : activeId === item.id;
           const Icon = item.icon;
 
+          const content = (
+            <>
+              <Icon size={20} className={isActive ? 'text-primary' : 'group-hover:text-primary'} strokeWidth={isActive ? 2.5 : 2} />
+              <span className={`text-sm ${isActive ? 'font-black' : 'font-medium'}`}>{item.label}</span>
+            </>
+          );
+
           return (
-            <React.Fragment key={item.path}>
+            <React.Fragment key={item.path || item.id || idx}>
               {item.separator && <div className="mt-6 border-t border-black/5 dark:border-white/5 pt-6" />}
-              <Link
-                to={item.path}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive
-                  ? 'bg-primary/10 text-primary border border-primary/20'
-                  : 'text-slate-500 dark:text-slate-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-              >
-                <Icon size={20} className={isActive ? 'text-primary' : 'group-hover:text-primary'} />
-                <span className="text-sm font-medium">{item.label}</span>
-              </Link>
+              {item.path ? (
+                <Link
+                  to={item.path}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all group ${isActive
+                    ? 'bg-primary/10 text-primary border border-primary/20'
+                    : 'text-slate-500 dark:text-slate-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                >
+                  {content}
+                </Link>
+              ) : (
+                <button
+                  onClick={item.onClick}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all group ${isActive
+                    ? 'bg-primary text-white shadow-lg shadow-primary/20'
+                    : 'text-slate-500 dark:text-slate-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                >
+                  {content}
+                </button>
+              )}
             </React.Fragment>
           );
         })}
@@ -62,29 +104,26 @@ export default function Sidebar() {
       <div className="mt-auto pt-4 border-t border-black/5 dark:border-white/5 space-y-1">
         <button
           onClick={toggleTheme}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white transition-all group"
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white transition-all group font-medium"
         >
           {theme === 'light' ? (
             <>
               <Moon size={20} className="group-hover:text-primary" />
-              <span className="text-sm font-medium">Modo Escuro</span>
+              <span className="text-sm">Modo Escuro</span>
             </>
           ) : (
             <>
               <Sun size={20} className="group-hover:text-primary" />
-              <span className="text-sm font-medium">Modo Claro</span>
+              <span className="text-sm">Modo Claro</span>
             </>
           )}
         </button>
         <button
-          onClick={async () => {
-            await supabase.auth.signOut();
-            navigate('/login');
-          }}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-rose-500 hover:bg-rose-500/10 transition-all font-bold"
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-rose-500 hover:bg-rose-500/10 transition-all font-black uppercase text-xs tracking-widest mt-2"
         >
           <LogOut size={20} />
-          <span className="text-sm">Sair da Conta</span>
+          <span>Sair da Conta</span>
         </button>
       </div>
     </aside>

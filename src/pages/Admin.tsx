@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { motion } from 'motion/react';
+import { useNavigate } from 'react-router-dom';
+import Layout from '../components/Layout';
 import {
   Users,
   Bell,
   Plus,
   Trash2,
   Edit2,
+  Edit,
   Save,
   X,
   ArrowLeft,
@@ -16,9 +18,11 @@ import {
   User as UserIcon,
   Mail,
   ExternalLink,
-  MessageSquare
+  MessageSquare,
+  Film,
+  Zap
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { Client, Notification, Plan } from '../types';
 import { supabase } from '../utils/supabase';
 import Toast from '../components/Toast';
@@ -192,7 +196,7 @@ export default function Admin() {
           body: JSON.stringify({
             title: 'Aviso de Vencimento',
             message,
-            username: client.username
+            email: client.email
           })
         });
         showToast('Notificação enviada!', 'success');
@@ -202,19 +206,34 @@ export default function Admin() {
     }
   };
 
-  const deleteClient = async (id: number | string) => {
-    if (window.confirm('Tem certeza que deseja excluir este cliente?')) {
-      const { error } = await supabase.from('clients').delete().eq('id', id);
-      if (error) {
-        showToast('Erro ao excluir cliente.', 'error');
-      } else {
-        showToast('Cliente excluído com sucesso!', 'success');
+  const deleteClient = async (client: Client) => {
+    if (window.confirm(`Tem certeza que deseja excluir o cliente ${client.name}? Esta ação apagará permanentemente todos os pedidos, faturas e registros de notificação vinculados.`)) {
+      try {
+        // 1. Delete push subscriptions
+        await supabase.from('push_subscriptions').delete().eq('email', client.email);
+        
+        // 2. Delete requests
+        await supabase.from('requests').delete().eq('username', client.username);
+        
+        // 3. Delete invoices
+        if (client.user_id) {
+          await supabase.from('invoices').delete().eq('user_id', client.user_id);
+        }
+
+        // 4. Delete the client itself
+        const { error } = await supabase.from('clients').delete().eq('id', client.id);
+        
+        if (error) throw error;
+
+        showToast('Cliente e todos os dados vinculados excluídos!', 'success');
         fetchClients();
+      } catch (err: any) {
+        showToast('Erro ao excluir dados do cliente: ' + err.message, 'error');
       }
     }
   };
 
-  const updateRequestStatus = async (id: number | string, status: string, username: string, title: string) => {
+  const updateRequestStatus = async (id: number | string, status: string, email: string, title: string) => {
     await supabase.from('requests').update({ status }).eq('id', id);
 
     // Send push notification to client
@@ -225,7 +244,7 @@ export default function Admin() {
       body: JSON.stringify({
         title: 'Status do seu Pedido',
         message: `O status do seu pedido "${title}" mudou para: ${status}`,
-        username
+        email
       })
     });
 
@@ -317,99 +336,48 @@ export default function Admin() {
     navigate('/admin/login');
   };
 
+  const adminItems = [
+    { id: 'clients', label: 'Clientes', icon: Users, onClick: () => setActiveTab('clients') },
+    { id: 'notifications', label: 'Avisos', icon: Bell, onClick: () => setActiveTab('notifications') },
+    { id: 'requests', label: 'Pedidos', icon: MessageSquare, onClick: () => setActiveTab('requests') },
+    { id: 'plans', label: 'Planos', icon: DollarSign, onClick: () => setActiveTab('plans') },
+  ];
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-background-dark text-slate-900 dark:text-slate-100 p-4 md:p-8 font-sans">
+    <Layout 
+      sidebarItems={adminItems}
+      bottomNavItems={adminItems}
+      mobileHeaderTitle="Painel Admin"
+      activeTab={activeTab}
+      onLogout={handleLogout}
+    >
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-      <div className="max-w-6xl mx-auto">
-        <header className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate('/login')}
-              className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-xl transition-colors"
-            >
-              <ArrowLeft size={24} />
-            </button>
+      
+      {activeTab === 'clients' && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-black/5 dark:border-white/5 rounded-[2rem] overflow-hidden shadow-sm dark:shadow-xl"
+        >
+          <div className="p-6 md:p-8 border-b border-black/5 dark:border-white/5 flex justify-between items-center bg-white/20 dark:bg-white/5">
             <div>
-              <h1 className="text-3xl font-black tracking-tight flex items-center gap-3">
-                <img src="/logo.png" alt="Logo" className="w-16 h-16 object-contain" />
-                Painel Administrativo
-              </h1>
-              <p className="text-slate-500 dark:text-slate-400">Gerencie clientes e notificações do sistema.</p>
+              <h3 className="text-xl font-bold tracking-tight font-display">Lista de Clientes</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Gerencie seus usuários ativos.</p>
             </div>
+            <button
+              onClick={() => {
+                setEditingClient(null);
+                setClientForm({ username: '', name: '', email: '', expiration_date: '', balance: 0, renewal_link: '' });
+                setIsClientModalOpen(true);
+              }}
+              className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-5 py-2.5 rounded-2xl text-sm font-black uppercase tracking-wider shadow-lg shadow-primary/20 transition-all active:scale-95"
+            >
+              <Plus size={18} />
+              Novo
+            </button>
           </div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 px-4 py-2 text-slate-500 hover:text-rose-500 font-bold transition-colors"
-          >
-            <LogOut size={20} />
-            Sair
-          </button>
-        </header>
-
-        <div className="flex gap-4 mb-8">
-          <button
-            onClick={() => setActiveTab('clients')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all ${activeTab === 'clients'
-              ? 'bg-primary text-white shadow-lg shadow-primary/20'
-              : 'bg-white dark:bg-slate-900/40 text-slate-500 border border-black/5 dark:border-white/10'
-              }`}
-          >
-            <Users size={20} />
-            Clientes
-          </button>
-          <button
-            onClick={() => setActiveTab('notifications')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all ${activeTab === 'notifications'
-              ? 'bg-primary text-white shadow-lg shadow-primary/20'
-              : 'bg-white dark:bg-slate-900/40 text-slate-500 border border-black/5 dark:border-white/10'
-              }`}
-          >
-            <Bell size={20} />
-            Notificações Push
-          </button>
-          <button
-            onClick={() => setActiveTab('requests')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all ${activeTab === 'requests'
-              ? 'bg-primary text-white shadow-lg shadow-primary/20'
-              : 'bg-white dark:bg-slate-900/40 text-slate-500 border border-black/5 dark:border-white/10'
-              }`}
-          >
-            <MessageSquare size={20} />
-            Pedidos de Conteúdo
-          </button>
-          <button
-            onClick={() => setActiveTab('plans')}
-            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all ${activeTab === 'plans'
-              ? 'bg-primary text-white shadow-lg shadow-primary/20'
-              : 'bg-white dark:bg-slate-900/40 text-slate-500 border border-black/5 dark:border-white/10'
-              }`}
-          >
-            <DollarSign size={20} />
-            Planos
-          </button>
-        </div>
-
-        {activeTab === 'clients' && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white dark:bg-slate-900/40 border border-black/5 dark:border-white/10 rounded-3xl overflow-hidden shadow-sm"
-          >
-            <div className="p-6 border-b border-black/5 dark:border-white/5 flex justify-between items-center">
-              <h3 className="text-xl font-bold">Lista de Clientes</h3>
-              <button
-                onClick={() => {
-                  setEditingClient(null);
-                  setClientForm({ username: '', name: '', email: '', expiration_date: '', balance: 0, renewal_link: '' });
-                  setIsClientModalOpen(true);
-                }}
-                className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all"
-              >
-                <Plus size={18} />
-                Novo Cliente
-              </button>
-            </div>
-            <div className="overflow-x-auto">
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-x-auto custom-scrollbar">
               <table className="w-full text-left">
                 <thead>
                   <tr className="bg-black/[0.02] dark:bg-white/5 text-slate-500 text-xs uppercase tracking-widest">
@@ -447,7 +415,7 @@ export default function Admin() {
                             <Edit2 size={18} />
                           </button>
                           <button
-                            onClick={() => deleteClient(client.id)}
+                            onClick={() => deleteClient(client)}
                             className="p-2 text-slate-400 hover:text-rose-500 transition-colors"
                           >
                             <Trash2 size={18} />
@@ -456,16 +424,65 @@ export default function Admin() {
                       </td>
                     </tr>
                   ))}
-                  {clients.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-12 text-center text-slate-500 italic">
-                        Nenhum cliente cadastrado.
-                      </td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
             </div>
+
+            {/* Mobile Cards */}
+            <div className="md:hidden divide-y divide-black/5 dark:divide-white/5">
+              {clients.map((client, idx) => (
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: idx * 0.05 }}
+                  key={client.id}
+                  className="p-5 active:bg-black/5 dark:active:bg-white/5 transition-colors cursor-pointer relative overflow-hidden"
+                  onClick={() => openViewClient(client)}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="size-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-black text-lg">
+                        {client.name?.charAt(0) || client.username?.charAt(0) || 'C'}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-slate-900 dark:text-white leading-tight">{client.name}</h4>
+                        <p className="text-xs font-mono text-primary/70">{client.username}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Vence em</p>
+                      <p className="text-sm font-black text-slate-900 dark:text-white">{client.expiration_date}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between mt-4">
+                    <div className="flex items-center gap-2">
+                       <span className="text-xs font-bold text-slate-400">Saldo:</span>
+                       <span className="text-sm font-black text-slate-900 dark:text-white">R$ {Number(client.balance || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); openEditClient(client); }}
+                        className="p-2 bg-slate-100 dark:bg-white/10 rounded-xl text-slate-600 dark:text-slate-400"
+                      >
+                        <Edit size={16} />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteClient(client.id); }}
+                        className="p-2 bg-rose-500/10 rounded-xl text-rose-500"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+
+            {clients.length === 0 && (
+              <div className="px-6 py-12 text-center text-slate-500 italic">
+                Nenhum cliente cadastrado.
+              </div>
+            )}
           </motion.div>
         )}
 
@@ -473,16 +490,19 @@ export default function Admin() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white dark:bg-slate-900/40 border border-black/5 dark:border-white/10 rounded-3xl overflow-hidden shadow-sm"
+            className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-black/5 dark:border-white/5 rounded-[2rem] overflow-hidden shadow-sm dark:shadow-xl"
           >
-            <div className="p-6 border-b border-black/5 dark:border-white/5 flex justify-between items-center">
-              <h3 className="text-xl font-bold">Notificações Enviadas</h3>
+            <div className="p-6 md:p-8 border-b border-black/5 dark:border-white/5 flex justify-between items-center bg-white/20 dark:bg-white/5">
+              <div>
+                <h3 className="text-xl font-bold tracking-tight">Avisos e Informativos</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Envie notificações push em massa.</p>
+              </div>
               <button
                 onClick={() => setIsNotifModalOpen(true)}
-                className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all"
+                className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-5 py-2.5 rounded-2xl text-sm font-black uppercase tracking-wider shadow-lg shadow-primary/20 transition-all active:scale-95"
               >
                 <Plus size={18} />
-                Nova Notificação
+                Criar
               </button>
             </div>
             <div className="p-6 space-y-4">
@@ -525,12 +545,14 @@ export default function Admin() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white dark:bg-slate-900/40 border border-black/5 dark:border-white/10 rounded-3xl overflow-hidden shadow-sm"
+            className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-black/5 dark:border-white/5 rounded-[2rem] overflow-hidden shadow-sm dark:shadow-xl"
           >
-            <div className="p-6 border-b border-black/5 dark:border-white/5 flex justify-between items-center">
-              <h3 className="text-xl font-bold">Pedidos de Clientes</h3>
+            <div className="p-6 md:p-8 border-b border-black/5 dark:border-white/5 bg-white/20 dark:bg-white/5">
+              <h3 className="text-xl font-bold tracking-tight font-display">Pedidos Pendentes</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Filmes e séries solicitados pelos usuários.</p>
             </div>
-            <div className="overflow-x-auto">
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-x-auto custom-scrollbar">
               <table className="w-full text-left">
                 <thead>
                   <tr className="bg-black/[0.02] dark:bg-white/5 text-slate-500 text-xs uppercase tracking-widest">
@@ -569,7 +591,7 @@ export default function Admin() {
                         <select
                           className="bg-slate-50 dark:bg-slate-800 border border-black/5 dark:border-white/10 rounded-lg px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-primary"
                           value={req.status}
-                          onChange={(e) => updateRequestStatus(req.id, e.target.value, req.username, req.content_title)}
+                          onChange={(e) => updateRequestStatus(req.id, e.target.value, req.email || '', req.content_title)}
                         >
                           <option value="AGUARDE">AGUARDE</option>
                           <option value="EM BUSCA DO SEU PEDIDO">EM BUSCA</option>
@@ -579,16 +601,56 @@ export default function Admin() {
                       </td>
                     </tr>
                   ))}
-                  {requests.length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="px-6 py-12 text-center text-slate-500 italic">
-                        Nenhum pedido encontrado.
-                      </td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
             </div>
+
+            {/* Mobile Cards */}
+            <div className="md:hidden divide-y divide-black/5 dark:divide-white/5">
+              {requests.map((request, idx) => (
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: idx * 0.05 }}
+                  key={request.id}
+                  className="p-5 active:bg-black/5 dark:active:bg-white/5 transition-colors"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="size-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-black">
+                        {request.type === 'movie' ? <Film size={22} /> : <Zap size={22} />}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-slate-900 dark:text-white leading-tight">{request.title}</h4>
+                        <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${request.status === 'Concluído' ? 'bg-green-500/10 text-green-500' : 'bg-amber-500/10 text-amber-500'}`}>
+                          {request.status}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between mt-4">
+                    <div className="text-xs text-slate-500 font-medium">
+                      Pedido por: <span className="font-bold text-slate-700 dark:text-slate-300">@{request.username || 'Sistema'}</span>
+                    </div>
+                    <button
+                      onClick={() => updateRequestStatus(request.id, request.status === 'Concluído' ? 'AGUARDE' : 'PEDIDO ADICIONADO', request.email || '', request.content_title)}
+                      className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-tighter transition-all active:scale-95 ${request.status === 'PEDIDO ADICIONADO'
+                        ? 'bg-slate-100 dark:bg-white/10 text-slate-500'
+                        : 'bg-primary text-white shadow-lg shadow-primary/20'
+                        }`}
+                    >
+                      {request.status === 'PEDIDO ADICIONADO' ? 'Reabrir' : 'Concluir'}
+                    </button>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+
+            {requests.length === 0 && (
+              <div className="px-6 py-12 text-center text-slate-500 italic">
+                Nenhum pedido encontrado.
+              </div>
+            )}
           </motion.div>
         )}
 
@@ -596,23 +658,27 @@ export default function Admin() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white dark:bg-slate-900/40 border border-black/5 dark:border-white/10 rounded-3xl overflow-hidden shadow-sm"
+            className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-black/5 dark:border-white/5 rounded-[2rem] overflow-hidden shadow-sm dark:shadow-xl"
           >
-            <div className="p-6 border-b border-black/5 dark:border-white/5 flex justify-between items-center">
-              <h3 className="text-xl font-bold">Gerenciar Planos</h3>
+            <div className="p-6 md:p-8 border-b border-black/5 dark:border-white/5 flex justify-between items-center bg-white/20 dark:bg-white/5">
+              <div>
+                <h3 className="text-xl font-bold tracking-tight font-display">Envio de Notificação</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Configure as ofertas do seu sistema.</p>
+              </div>
               <button
                 onClick={() => {
                   setEditingPlan(null);
                   setPlanForm({ name: '', price: 0, duration: '', features: '' });
                   setIsPlanModalOpen(true);
                 }}
-                className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-xl text-sm font-bold transition-all"
+                className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-5 py-2.5 rounded-2xl text-sm font-black uppercase tracking-wider shadow-lg shadow-primary/20 transition-all active:scale-95"
               >
                 <Plus size={18} />
-                Novo Plano
+                Novo
               </button>
             </div>
-            <div className="overflow-x-auto">
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-x-auto custom-scrollbar">
               <table className="w-full text-left">
                 <thead>
                   <tr className="bg-black/[0.02] dark:bg-white/5 text-slate-500 text-xs uppercase tracking-widest">
@@ -646,26 +712,51 @@ export default function Admin() {
                       </td>
                     </tr>
                   ))}
-                  {plans.length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="px-6 py-12 text-center text-slate-500 italic">
-                        Nenhum plano cadastrado.
-                      </td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
             </div>
+
+            {/* Mobile Cards */}
+            <div className="md:hidden divide-y divide-black/5 dark:divide-white/5">
+              {plans.map((plan) => (
+                <div key={plan.id} className="p-4 flex items-center justify-between">
+                  <div>
+                    <h4 className="font-bold text-base">{plan.name}</h4>
+                    <p className="text-sm font-black text-primary">R$ {Number(plan.price || 0).toFixed(2)} <span className="text-[10px] text-slate-400 font-normal">/ {plan.duration}</span></p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => openEditPlan(plan)}
+                      className="p-2 bg-primary/10 text-primary rounded-lg"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                    <button
+                      onClick={() => deletePlan(plan.id)}
+                      className="p-2 bg-rose-500/10 text-rose-500 rounded-lg"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {plans.length === 0 && (
+              <div className="px-6 py-12 text-center text-slate-500 italic">
+                Nenhum plano cadastrado.
+              </div>
+            )}
           </motion.div>
         )}
 
         {/* Client Modal */}
         {isClientModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm md:p-4">
             <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="bg-white dark:bg-slate-900 border border-black/10 dark:border-white/10 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl"
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              className="bg-white dark:bg-slate-900 border border-black/10 dark:border-white/10 w-full h-full md:h-auto md:max-w-2xl md:rounded-3xl overflow-y-auto shadow-2xl safe-p-bottom"
             >
               <div className="p-6 border-b border-black/5 dark:border-white/5 flex justify-between items-center">
                 <h3 className="text-xl font-bold">{editingClient ? 'Editar Cliente' : 'Novo Cliente'}</h3>
@@ -1018,7 +1109,6 @@ export default function Admin() {
             </motion.div>
           </div>
         )}
-      </div>
-    </div>
+    </Layout>
   );
 }
