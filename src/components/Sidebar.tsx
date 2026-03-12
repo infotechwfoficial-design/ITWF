@@ -9,6 +9,7 @@ import {
   Moon,
   Film,
   LogOut,
+  Bell,
   LucideIcon
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -55,9 +56,18 @@ export default function Sidebar({ items, title = "ITWF", logoUrl = "/logo.png", 
 
   return (
     <aside className="hidden md:flex w-64 flex-col border-r border-black/5 dark:border-white/5 bg-slate-50 dark:bg-slate-900/50 backdrop-blur-sm p-4 h-full overflow-y-auto transition-colors duration-300">
-      <div className="flex items-center gap-4 text-slate-900 dark:text-white mb-8 px-2 cursor-pointer" onClick={() => navigate('/')}>
-        <img src={logoUrl} alt="Logo" className="w-12 h-12 object-contain" />
-        <h2 className="text-xl font-black tracking-tight font-display">{title}</h2>
+      <div className="flex items-center justify-between mb-8 px-2">
+        <div className="flex items-center gap-4 text-slate-900 dark:text-white cursor-pointer" onClick={() => navigate('/')}>
+          <img src={logoUrl} alt="Logo" className="w-12 h-12 object-contain" />
+          <h2 className="text-xl font-black tracking-tight font-display">{title}</h2>
+        </div>
+        <button 
+          onClick={() => navigate('/notifications')}
+          className="p-2.5 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition-all"
+          title="Notificações"
+        >
+          <Bell size={20} />
+        </button>
       </div>
 
       <nav className="flex flex-col gap-2 flex-1">

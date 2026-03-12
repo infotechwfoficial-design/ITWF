@@ -13,6 +13,7 @@ interface LayoutProps {
   mobileHeaderOnBack?: () => void;
   onLogout?: () => void;
   activeTab?: string;
+  showNotifications?: boolean;
 }
 
 export default function Layout({ 
@@ -23,7 +24,8 @@ export default function Layout({
   mobileHeaderShowBack,
   mobileHeaderOnBack,
   onLogout,
-  activeTab
+  activeTab,
+  showNotifications = true
 }: LayoutProps) {
   return (
     <div className="flex flex-col md:flex-row h-screen bg-white dark:bg-background-dark text-slate-900 dark:text-slate-100 font-sans overflow-hidden transition-colors duration-300">
@@ -34,6 +36,7 @@ export default function Layout({
           showBackButton={mobileHeaderShowBack}
           onBack={mobileHeaderOnBack}
           onLogout={onLogout}
+          showNotifications={showNotifications}
         />
         <main className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-10 pb-24 md:pb-8 custom-scrollbar">
           {children}
