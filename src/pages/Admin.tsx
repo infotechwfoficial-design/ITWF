@@ -190,7 +190,7 @@ export default function Admin() {
     if (message) {
       try {
         const apiUrl = import.meta.env.VITE_API_URL || '';
-        await fetch(`${apiUrl}/api/send-push`, {
+        const res = await fetch(`${apiUrl}/api/send-push`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -199,9 +199,14 @@ export default function Admin() {
             email: client.email
           })
         });
+        
+        const data = await res.json();
+        
+        if (!res.ok) throw new Error(data.error || 'Falha ao enviar push');
+        
         showToast('Notificação enviada!', 'success');
-      } catch {
-        showToast('Erro ao enviar notificação.', 'error');
+      } catch (err: any) {
+        showToast(`Erro ao enviar notificação: ${err.message}`, 'error');
       }
     }
   };
