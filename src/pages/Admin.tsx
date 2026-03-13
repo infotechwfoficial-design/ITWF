@@ -223,6 +223,10 @@ export default function Admin() {
         // 3. Delete invoices
         if (client.user_id) {
           await supabase.from('invoices').delete().eq('user_id', client.user_id);
+          
+          // Delete from official Auth system via Backend server
+          const apiUrl = import.meta.env.VITE_API_URL || '';
+          await fetch(`${apiUrl}/api/delete-user/${client.user_id}`, { method: 'DELETE' });
         }
 
         // 4. Delete the client itself
@@ -230,11 +234,12 @@ export default function Admin() {
         
         if (error) throw error;
 
-        showToast('Cliente e todos os dados vinculados excluídos!', 'success');
+        showToast('Cliente e acesso ao App completamente excluídos!', 'success');
         fetchClients();
       } catch (err: any) {
-        showToast('Erro ao excluir dados do cliente: ' + err.message, 'error');
+        showToast('Erro crítico ao excluir conta do cliente: ' + err.message, 'error');
       }
+
     }
   };
 

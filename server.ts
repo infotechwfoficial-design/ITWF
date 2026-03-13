@@ -99,6 +99,22 @@ async function startServer() {
     }
   });
 
+  // Admin: Delete User entirely from Auth
+  app.delete('/api/delete-user/:id', async (req, res) => {
+    const userId = req.params.id;
+    if (!userId) return res.status(400).json({ error: 'User ID missing' });
+    
+    try {
+      // Deleta o usuário permanentemente do sistema de autenticação do Supabase
+      const { data, error } = await supabase.auth.admin.deleteUser(userId);
+      if (error) throw error;
+      res.json({ success: true, message: 'Usuário deletado da autenticação' });
+    } catch (err: any) {
+      console.error('Delete auth user error:', err);
+      res.status(500).json({ error: `Erro ao deletar autenticação: ${err.message}` });
+    }
+  });
+
   app.put('/api/plans/:id', async (req, res) => {
     const { id } = req.params;
     const { name, price, duration, features } = req.body;

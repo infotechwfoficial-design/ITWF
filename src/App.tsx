@@ -60,9 +60,22 @@ export default function App() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setIsAuthenticated(!!session);
       setIsAdmin(session?.user?.email === 'info.tech.wf.oficial@gmail.com');
+      
+      if (!session) {
+        // Clear any local caches on forced logout
+        sessionStorage.clear();
+      } else {
+        // Verifica se a conta do usuário ainda existe na base de dados de Auth oficial (impedindo sessão "fantasma")
+        const { error } = await supabase.auth.getUser();
+        if (error) {
+          await supabase.auth.signOut();
+          setIsAuthenticated(false);
+          setIsAdmin(false);
+        }
+      }
     });
 
     return () => subscription.unsubscribe();
