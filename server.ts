@@ -415,9 +415,9 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    app.use(express.static(path.join(__dirname, 'dist')));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+    // Em produção (Render), servimos apenas a API e pulamos o frontend
+    app.get('/', (req, res) => {
+      res.json({ message: 'ITWF Backend API Running Successfully' });
     });
   }
 
