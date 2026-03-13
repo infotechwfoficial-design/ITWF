@@ -1,4 +1,4 @@
-// SW Version: 1.5
+// SW Version: 1.6
 self.addEventListener('push', function (event) {
   let data = {};
   try {
