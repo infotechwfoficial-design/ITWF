@@ -298,10 +298,10 @@ async function startServer() {
   });
 
   app.post('/api/subscribe', async (req, res) => {
-    const { username, subscription } = req.body;
+    const { email, subscription } = req.body;
     try {
       await supabase.from('push_subscriptions').upsert([{
-        username,
+        email,
         subscription_json: JSON.stringify(subscription)
       }], { onConflict: 'subscription_json' });
       res.status(201).json({});
@@ -311,11 +311,11 @@ async function startServer() {
   });
 
   app.post('/api/send-push', async (req, res) => {
-    const { title, message, username } = req.body;
+    const { title, message, email } = req.body;
 
     let query = supabase.from('push_subscriptions').select('subscription_json');
-    if (username) {
-      query = query.eq('username', username);
+    if (email) {
+      query = query.eq('email', email);
     }
     const { data: subscriptions, error } = await query;
     if (error || !subscriptions) {
@@ -334,7 +334,7 @@ async function startServer() {
       const pushSubscription = JSON.parse(sub.subscription_json);
       return webpush.sendNotification(pushSubscription, payload)
         .catch(err => {
-          console.error(`Push error for user ${username || 'all'}:`, err.statusCode, err.body || err.message);
+          console.error(`Push error for user ${email || 'all'}:`, err.statusCode, err.body || err.message);
           if (err.statusCode === 404 || err.statusCode === 410) {
             supabase.from('push_subscriptions').delete().eq('subscription_json', sub.subscription_json).then();
           }
