@@ -320,8 +320,12 @@ async function startServer() {
       query = query.eq('email', email);
     }
     const { data: subscriptions, error } = await query;
-    if (error || !subscriptions) {
-      return res.status(400).json({ error: 'Failed to fetch subscriptions' });
+    if (error) {
+      console.error('Falha ao buscar assinaturas no db:', error);
+      return res.status(400).json({ error: `Falha ao buscar assinaturas: ${error.message}` });
+    }
+    if (!subscriptions) {
+      return res.status(400).json({ error: 'Nenhuma assinatura de push encontrada' });
     }
 
     const reqHost = req.get('host') ? `https://${req.get('host')}` : '';
