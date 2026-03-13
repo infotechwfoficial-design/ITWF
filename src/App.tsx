@@ -62,6 +62,12 @@ export default function App() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       console.log('App: Mudança de estado Auth:', _event, !!session);
+      
+      if (_event === 'PASSWORD_RECOVERY') {
+        window.location.href = '/update-password';
+        return;
+      }
+
       setIsAuthenticated(!!session);
       setIsAdmin(session?.user?.email === 'info.tech.wf.oficial@gmail.com');
     });
