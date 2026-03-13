@@ -47,6 +47,19 @@ export default function Login({ onLogin }: LoginProps) {
         });
 
         if (error) throw error;
+        
+        if (data.user) {
+          // Cria registro do usuário na tabela clients para o dashboard
+          const baseName = email.split('@')[0];
+          await supabase.from('clients').insert([{
+            user_id: data.user.id,
+            username: baseName,
+            name: baseName, // Default name based on email
+            email: email,
+            expiration_date: ''
+          }]);
+        }
+
         setSuccessMsg('Conta criada com sucesso! Você já pode fazer login.');
         setIsLogin(true);
       }

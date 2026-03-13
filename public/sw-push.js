@@ -12,12 +12,12 @@ self.addEventListener('push', function (event) {
 
   const baseUrl = self.location.origin || '';
   const iconUrl = `${baseUrl}/logo.png`;
-  const badgeUrl = `${baseUrl}/badge.png`;
+  const badgeUrl = `${baseUrl}/logo.png`; // Reutilizando a mesma foto por compatibilidade
 
   const options = {
     body: data.body || 'Você tem uma nova atualização no seu painel.',
     icon: data.icon || iconUrl,
-
+    badge: badgeUrl,
     image: data.image || null,
     data: {
       url: data.url || '/'

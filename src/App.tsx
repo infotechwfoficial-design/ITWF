@@ -48,14 +48,20 @@ export default function App() {
   };
 
   useEffect(() => {
+    console.log('App: Verificando sessão do Supabase...');
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('App: Sessão recuperada:', !!session);
       setIsAuthenticated(!!session);
       setIsAdmin(session?.user?.email === 'info.tech.wf.oficial@gmail.com');
+    }).catch(err => {
+      console.error('App: Erro ao recuperar sessão:', err);
+      setIsAuthenticated(false); // Fallback para não ficar carregando infinito
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log('App: Mudança de estado Auth:', _event, !!session);
       setIsAuthenticated(!!session);
       setIsAdmin(session?.user?.email === 'info.tech.wf.oficial@gmail.com');
     });
