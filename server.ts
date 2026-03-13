@@ -19,7 +19,7 @@ const mpClient = new MercadoPagoConfig({ accessToken: mpAccessToken || '' });
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Configure web-push
@@ -96,22 +96,6 @@ async function startServer() {
       res.status(201).json({ id: data.id });
     } catch (err: any) {
       res.status(400).json({ error: err.message });
-    }
-  });
-
-  // Admin: Delete User entirely from Auth
-  app.delete('/api/delete-user/:id', async (req, res) => {
-    const userId = req.params.id;
-    if (!userId) return res.status(400).json({ error: 'User ID missing' });
-    
-    try {
-      // Deleta o usuário permanentemente do sistema de autenticação do Supabase
-      const { data, error } = await supabase.auth.admin.deleteUser(userId);
-      if (error) throw error;
-      res.json({ success: true, message: 'Usuário deletado da autenticação' });
-    } catch (err: any) {
-      console.error('Delete auth user error:', err);
-      res.status(500).json({ error: `Erro ao deletar autenticação: ${err.message}` });
     }
   });
 
@@ -254,17 +238,15 @@ async function startServer() {
               }
 
               // Send Push Notification
-              const { data: subscriptions } = await supabase.from('push_subscriptions').select('subscription_json').eq('email', client.email);
+              const { data: subscriptions } = await supabase.from('push_subscriptions').select('subscription_json').eq('username', username);
               if (subscriptions && subscriptions.length > 0) {
                 const payload = JSON.stringify({
                   title: 'Pagamento Aprovado! 🎉',
-                  body: `Seu plano "${plan.name}" foi ativado/renovado. Novo vencimento: ${newExpDate}`,
-                  url: `/dashboard`
+                  body: `Seu plano "${plan.name}" foi ativado/renovado. Novo vencimento: ${newExpDate}`
                 });
                 subscriptions.forEach(sub => {
                   try {
-                    const options = { TTL: 86400, urgency: 'high' };
-                    webpush.sendNotification(JSON.parse(sub.subscription_json), payload, options).catch(() => { });
+                    webpush.sendNotification(JSON.parse(sub.subscription_json), payload).catch(() => { });
                   } catch (e) { }
                 });
               }
@@ -316,10 +298,10 @@ async function startServer() {
   });
 
   app.post('/api/subscribe', async (req, res) => {
-    const { email, subscription } = req.body;
+    const { username, subscription } = req.body;
     try {
       await supabase.from('push_subscriptions').upsert([{
-        email,
+        username,
         subscription_json: JSON.stringify(subscription)
       }], { onConflict: 'subscription_json' });
       res.status(201).json({});
@@ -329,34 +311,30 @@ async function startServer() {
   });
 
   app.post('/api/send-push', async (req, res) => {
-    const { title, message, email } = req.body;
+    const { title, message, username } = req.body;
 
     let query = supabase.from('push_subscriptions').select('subscription_json');
-    if (email) {
-      query = query.eq('email', email);
+    if (username) {
+      query = query.eq('username', username);
     }
     const { data: subscriptions, error } = await query;
-    if (error) {
-      console.error('Falha ao buscar assinaturas no db:', error);
-      return res.status(400).json({ error: `Falha ao buscar assinaturas: ${error.message}` });
-    }
-    if (!subscriptions) {
-      return res.status(400).json({ error: 'Nenhuma assinatura de push encontrada' });
+    if (error || !subscriptions) {
+      return res.status(400).json({ error: 'Failed to fetch subscriptions' });
     }
 
     const reqHost = req.get('host') ? `https://${req.get('host')}` : '';
     const payload = JSON.stringify({
       title,
       body: message,
-      url: `${reqHost}/dashboard`
+
+      
     });
 
     const promises = subscriptions.map(sub => {
       const pushSubscription = JSON.parse(sub.subscription_json);
-      const options = { TTL: 86400, urgency: 'high' };
-      return webpush.sendNotification(pushSubscription, payload, options)
+      return webpush.sendNotification(pushSubscription, payload)
         .catch(err => {
-          console.error(`Push error for user ${email || 'all'}:`, err.statusCode, err.body || err.message);
+          console.error(`Push error for user ${username || 'all'}:`, err.statusCode, err.body || err.message);
           if (err.statusCode === 404 || err.statusCode === 410) {
             supabase.from('push_subscriptions').delete().eq('subscription_json', sub.subscription_json).then();
           }
@@ -398,19 +376,13 @@ async function startServer() {
       }
 
       if (message) {
-        const { data: subscriptions } = await supabase.from('push_subscriptions').select('subscription_json').eq('email', client.email);
+        const { data: subscriptions } = await supabase.from('push_subscriptions').select('subscription_json').eq('username', client.username);
         if (subscriptions) {
-          const reqHost = process.env.VITE_API_URL || '';
-          const payload = JSON.stringify({ 
-            title: 'Aviso de Assinatura', 
-            body: message,
-            url: `${reqHost}/dashboard`
-          });
+          const payload = JSON.stringify({ title: 'Aviso de Assinatura', body: message });
 
           const promises = subscriptions.map(sub => {
             const pushSubscription = JSON.parse(sub.subscription_json);
-            const options = { TTL: 86400, urgency: 'high' };
-            return webpush.sendNotification(pushSubscription, payload, options).catch(err => {
+            return webpush.sendNotification(pushSubscription, payload).catch(err => {
               if (err.statusCode === 404 || err.statusCode === 410) {
                 supabase.from('push_subscriptions').delete().eq('subscription_json', sub.subscription_json).then();
               }
@@ -431,9 +403,9 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    // Em produção (Render), servimos apenas a API e pulamos o frontend
-    app.get('/', (req, res) => {
-      res.json({ message: 'ITWF Backend API Running Successfully' });
+    app.use(express.static(path.join(__dirname, 'dist')));
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(__dirname, 'dist', 'index.html'));
     });
   }
 

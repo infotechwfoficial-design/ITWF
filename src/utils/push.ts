@@ -15,8 +15,8 @@ function urlBase64ToUint8Array(base64String: string) {
   return outputArray;
 }
 
-export async function subscribeUserToPush(email: string) {
-  if (!email) return;
+export async function subscribeUserToPush(username: string) {
+  if (!username) return;
 
   if ('serviceWorker' in navigator && 'PushManager' in window) {
     try {
@@ -31,23 +31,22 @@ export async function subscribeUserToPush(email: string) {
       // 2. Wait for the service worker to be ready
       const register = await navigator.serviceWorker.ready;
 
-      // 3. Subscribe (Force fresh subscription to bypass cache)
+      // 3. Subscribe (Try fresh subscription)
       try {
         let subscription = await register.pushManager.getSubscription();
-        if (subscription) {
-           await subscription.unsubscribe();
-        }
 
-        subscription = await register.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
-        });
+        if (!subscription) {
+          subscription = await register.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
+          });
+        }
 
         // 4. Send to server
         const apiUrl = import.meta.env.VITE_API_URL || '';
         await fetch(`${apiUrl}/api/subscribe`, {
           method: 'POST',
-          body: JSON.stringify({ email, subscription }),
+          body: JSON.stringify({ username, subscription }),
           headers: {
             'Content-Type': 'application/json'
           }

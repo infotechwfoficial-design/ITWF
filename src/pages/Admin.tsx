@@ -223,10 +223,6 @@ export default function Admin() {
         // 3. Delete invoices
         if (client.user_id) {
           await supabase.from('invoices').delete().eq('user_id', client.user_id);
-          
-          // Delete from official Auth system via Backend server
-          const apiUrl = import.meta.env.VITE_API_URL || '';
-          await fetch(`${apiUrl}/api/delete-user/${client.user_id}`, { method: 'DELETE' });
         }
 
         // 4. Delete the client itself
