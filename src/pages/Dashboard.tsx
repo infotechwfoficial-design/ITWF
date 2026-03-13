@@ -58,10 +58,7 @@ export default function Dashboard() {
 
         if (clientData) {
           setClient(clientData);
-          console.log('Iniciando registro de push para:', clientData.email);
           subscribeUserToPush(clientData.email);
-        } else {
-          console.warn('clientData não encontrado para o usuário:', user.id);
         }
 
         // Fetch Requests
