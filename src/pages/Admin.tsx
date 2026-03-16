@@ -1110,15 +1110,17 @@ export default function Admin() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Duração</label>
-                    <input
-                      type="text"
+                    <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Duração do Plano</label>
+                    <select
                       required
-                      className="w-full bg-slate-50 dark:bg-slate-800 border border-black/5 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                      className="w-full bg-slate-50 dark:bg-slate-800 border border-black/5 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none"
                       value={planForm.duration}
                       onChange={(e) => setPlanForm({ ...planForm, duration: e.target.value })}
-                      placeholder="Ex: 1 Mês"
-                    />
+                    >
+                      <option value="" disabled>Selecione a Duração</option>
+                      <option value="Mensal">Mensal</option>
+                      <option value="Anual">Anual</option>
+                    </select>
                   </div>
                 </div>
                 <div>

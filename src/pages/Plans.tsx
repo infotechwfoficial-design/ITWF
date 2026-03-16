@@ -14,6 +14,7 @@ import { Plan } from '../types';
 export default function Plans() {
   const navigate = useNavigate();
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [isAnnual, setIsAnnual] = useState(false);
 
   useEffect(() => {
     const apiUrl = import.meta.env.VITE_API_URL || '';
@@ -31,19 +32,25 @@ export default function Plans() {
           <p className="text-slate-500 dark:text-slate-400 text-lg max-w-2xl mx-auto">Potencialize sua experiência com recursos exclusivos e suporte dedicado.</p>
 
           <div className="flex items-center justify-center gap-4 mt-8">
-            <span className="text-sm font-bold text-slate-900 dark:text-white">Mensal</span>
-            <div className="w-12 h-6 bg-primary rounded-full relative cursor-pointer">
-              <div className="absolute right-1 top-1 size-4 bg-white rounded-full shadow-md"></div>
+            <span className={`text-sm font-bold transition-colors ${!isAnnual ? 'text-slate-900 dark:text-white' : 'text-slate-500'}`}>Mensal</span>
+            <div 
+              className={`w-12 h-6 rounded-full relative cursor-pointer transition-colors duration-300 ${isAnnual ? 'bg-emerald-500' : 'bg-primary'}`}
+              onClick={() => setIsAnnual(!isAnnual)}
+            >
+              <div className={`absolute top-1 size-4 bg-white rounded-full shadow-md transition-all duration-300 ${isAnnual ? 'left-7' : 'left-1'}`}></div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-slate-500 dark:text-slate-400">Anual</span>
+              <span className={`text-sm transition-colors ${isAnnual ? 'font-bold text-slate-900 dark:text-white' : 'font-medium text-slate-500 dark:text-slate-400'}`}>Anual</span>
               <span className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider border border-emerald-500/20">Economize 20%</span>
             </div>
           </div>
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {plans.map((plan, i) => {
+          {plans.filter(p => {
+            const isPlanAnnual = p.duration.toLowerCase().includes('anual') || p.duration.toLowerCase().includes('ano') || p.duration.toLowerCase().includes('12 meses');
+            return isAnnual ? isPlanAnnual : !isPlanAnnual;
+          }).map((plan, i) => {
             const isPopular = i === 1; // Highlight the middle plan
             const planFeatures = plan.features ? JSON.parse(plan.features) : [];
             const Icons = [<Zap className="text-blue-500" key="1" />, <Star className="text-amber-500" key="2" />, <Crown className="text-purple-500" key="3" />];
