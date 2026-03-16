@@ -58,6 +58,18 @@ export default function Login({ onLogin }: LoginProps) {
             email: email,
             expiration_date: ''
           }]);
+
+          // Notificar Administrador sobre novo cadastro
+          const apiUrl = import.meta.env.VITE_API_URL || '';
+          fetch(`${apiUrl}/api/send-push`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              title: 'Novo Cadastro! 🆕',
+              message: `O usuário ${email} acabou de se cadastrar no sistema.`,
+              email: 'info.tech.wf.oficial@gmail.com'
+            })
+          }).catch(console.error);
         }
 
         setSuccessMsg('Conta criada com sucesso! Você já pode fazer login.');

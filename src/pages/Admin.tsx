@@ -239,8 +239,18 @@ export default function Admin() {
     }
   };
 
-  const updateRequestStatus = async (id: number | string, status: string, email: string, title: string) => {
+  const updateRequestStatus = async (id: number | string, status: string, reqUserId: string, title: string) => {
     await supabase.from('requests').update({ status }).eq('id', id);
+
+    // Find the correct client's email based on user_id
+    const targetClient = clients.find(c => c.user_id === reqUserId);
+    const email = targetClient?.email;
+
+    if (!email) {
+      console.warn('Não foi possível enviar push: Cliente sem email ou não encontrado.');
+      fetchRequests();
+      return;
+    }
 
     // Send push notification to client
     const apiUrl = import.meta.env.VITE_API_URL || '';
@@ -569,19 +579,21 @@ export default function Admin() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-black/5 dark:divide-white/5">
-                  {requests.map((req) => (
+                  {requests.map((req) => {
+                    const reqClient = clients.find(c => c.user_id === req.user_id);
+                    return (
                     <tr key={req.id} className="hover:bg-black/[0.01] dark:hover:bg-white/[0.01] transition-colors">
                       <td className="px-6 py-4">
-                        <div className="font-bold">{req.client_name}</div>
-                        <div className="text-xs text-slate-500 font-mono">@{req.username}</div>
+                        <div className="font-bold">{reqClient?.name || 'Sistema'}</div>
+                        <div className="text-xs text-slate-500 font-mono">@{reqClient?.username || 'user'}</div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="font-bold">{req.content_title}</div>
                         <div className="text-xs text-slate-500 flex items-center gap-2">
                           {req.content_type} • {req.content_year}
-                          <a href={req.tmdb_link} target="_blank" rel="noreferrer" className="text-primary hover:underline flex items-center gap-1">
+                          {req.tmdb_link && <a href={req.tmdb_link} target="_blank" rel="noreferrer" className="text-primary hover:underline flex items-center gap-1">
                             TMDB <ExternalLink size={10} />
-                          </a>
+                          </a>}
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -597,7 +609,7 @@ export default function Admin() {
                         <select
                           className="bg-slate-50 dark:bg-slate-800 border border-black/5 dark:border-white/10 rounded-lg px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-primary"
                           value={req.status}
-                          onChange={(e) => updateRequestStatus(req.id, e.target.value, req.email || '', req.content_title)}
+                          onChange={(e) => updateRequestStatus(req.id, e.target.value, req.user_id, req.content_title)}
                         >
                           <option value="AGUARDE">AGUARDE</option>
                           <option value="EM BUSCA DO SEU PEDIDO">EM BUSCA</option>
@@ -606,14 +618,17 @@ export default function Admin() {
                         </select>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
 
             {/* Mobile Cards */}
             <div className="md:hidden divide-y divide-black/5 dark:divide-white/5">
-              {requests.map((request, idx) => (
+              {requests.map((request, idx) => {
+                const reqClient = clients.find(c => c.user_id === request.user_id);
+                return (
                 <motion.div
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -636,13 +651,13 @@ export default function Admin() {
                   </div>
                   <div className="flex flex-col gap-4 mt-4">
                     <div className="text-xs text-slate-500 font-medium">
-                      Pedido por: <span className="font-bold text-slate-700 dark:text-slate-300">@{request.username || 'Sistema'}</span>
+                      Pedido por: <span className="font-bold text-slate-700 dark:text-slate-300">@{reqClient?.username || 'user'}</span>
                     </div>
                     <div className="flex gap-2">
                        <select
                           className="flex-1 bg-slate-50 dark:bg-slate-800 border border-black/5 dark:border-white/10 rounded-xl px-3 py-2 text-xs outline-none focus:ring-1 focus:ring-primary font-bold"
                           value={request.status}
-                          onChange={(e) => updateRequestStatus(request.id, e.target.value, request.email || '', request.content_title)}
+                          onChange={(e) => updateRequestStatus(request.id, e.target.value, request.user_id, request.content_title)}
                         >
                           <option value="AGUARDE">AGUARDE</option>
                           <option value="EM BUSCA DO SEU PEDIDO">EM BUSCA</option>
@@ -650,7 +665,7 @@ export default function Admin() {
                           <option value="NÃO DISPONIVEL PARA ADIÇÃO">NÃO DISPONÍVEL</option>
                         </select>
                         <button
-                          onClick={() => updateRequestStatus(request.id, request.status === 'PEDIDO ADICIONADO' ? 'AGUARDE' : 'PEDIDO ADICIONADO', request.email || '', request.content_title)}
+                          onClick={() => updateRequestStatus(request.id, request.status === 'PEDIDO ADICIONADO' ? 'AGUARDE' : 'PEDIDO ADICIONADO', request.user_id, request.content_title)}
                           className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-tighter transition-all active:scale-95 ${request.status === 'PEDIDO ADICIONADO'
                             ? 'bg-slate-100 dark:bg-white/10 text-slate-500'
                             : 'bg-primary text-white shadow-lg shadow-primary/20'
@@ -661,7 +676,8 @@ export default function Admin() {
                     </div>
                   </div>
                 </motion.div>
-              ))}
+                );
+              })}
             </div>
 
             {requests.length === 0 && (

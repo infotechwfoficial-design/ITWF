@@ -164,16 +164,19 @@ export default function RequestContent() {
     const username = client.username || user.email?.split('@')[0];
 
     // Save to DB
-    await supabase.from('requests').insert([{
+    const { error: insertError } = await supabase.from('requests').insert([{
       user_id: user.id,
-      username,
-      client_name: client.name,
       content_title: title,
       content_type: type,
       content_year: year,
       tmdb_link: tmdbLink,
       status: 'AGUARDE'
     }]);
+
+    if (insertError) {
+      console.error('Error inserting request:', insertError);
+      alert('Erro ao salvar no seu histórico. Porém, a janela do WhatsApp abrirá para você solicitar à nossa equipe.');
+    }
 
     // WhatsApp Message
     const whatsappMessage = `*Novo Pedido de Conteúdo*\n\n` +

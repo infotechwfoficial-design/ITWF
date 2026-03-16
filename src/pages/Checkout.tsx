@@ -99,12 +99,6 @@ export default function Checkout() {
                   {loading ? 'Gerando...' : 'Prosseguir para Pagamento'}
                 </button>
 
-                <button
-                  onClick={() => navigate('/success')}
-                  className="mt-4 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 underline"
-                >
-                  (Opção apenas para o teste: Pular direto para Sucesso)
-                </button>
               </div>
             </motion.div>
           </div>
