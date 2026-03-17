@@ -37,7 +37,7 @@ export default function Login({ onLogin }: LoginProps) {
           // If needed, we can set local state, but App.tsx will eventually listen to Auth State
           localStorage.setItem('currentUser', data.user.email || ''); // Keeping fallback for the Dashboard requests for now
           onLogin();
-          navigate('/');
+          navigate('/dashboard');
         }
       } else {
         // Sign Up
