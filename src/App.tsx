@@ -31,8 +31,12 @@ import { useRegisterSW } from 'virtual:pwa-register/react';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [isMaintenance, setIsMaintenance] = useState(false);
+
+  // Lógica de Subdomínio (Opção A para Vercel)
+  const hostname = window.location.hostname;
+  const isSubdomain = hostname.startsWith('painel.') || hostname.startsWith('app.');
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallModal, setShowInstallModal] = useState(false);
 
@@ -128,7 +132,7 @@ export default function App() {
           <Route path="/update-password" element={<UpdatePassword />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/admin/login" element={<AdminLogin />} />
-          <Route path="/" element={<SaaS />} />
+          <Route path="/" element={isSubdomain ? <Navigate to="/login" /> : <SaaS />} />
           <Route path="/revenda" element={<Navigate to="/" />} />
           <Route path="/saas" element={<Navigate to="/" />} />
 
