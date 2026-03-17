@@ -477,14 +477,30 @@ export default function Admin() {
                     </div>
                     <div className="flex gap-2">
                       <button
+                        onClick={(e) => { e.stopPropagation(); sendDirectPush(client); }}
+                        className="p-2 bg-amber-500/10 rounded-xl text-amber-500"
+                        title="Enviar Notificação Push"
+                      >
+                        <Bell size={16} />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); window.open(client.renewal_link, '_blank'); }}
+                        className="p-2 bg-primary/10 rounded-xl text-primary"
+                        title="Link de Renovação"
+                      >
+                        <LinkIcon size={16} />
+                      </button>
+                      <button
                         onClick={(e) => { e.stopPropagation(); openEditClient(client); }}
                         className="p-2 bg-slate-100 dark:bg-white/10 rounded-xl text-slate-600 dark:text-slate-400"
+                        title="Editar"
                       >
                         <Edit size={16} />
                       </button>
                       <button
-                        onClick={(e) => { e.stopPropagation(); deleteClient(client.id); }}
+                        onClick={(e) => { e.stopPropagation(); deleteClient(client); }}
                         className="p-2 bg-rose-500/10 rounded-xl text-rose-500"
+                        title="Excluir"
                       >
                         <Trash2 size={16} />
                       </button>
