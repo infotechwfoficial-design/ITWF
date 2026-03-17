@@ -122,7 +122,17 @@ export default function App() {
     <ThemeProvider>
       <Router>
         <Routes>
-          <Route path="/login" element={<Login onLogin={() => setIsAuthenticated(true)} />} />
+          <Route
+            path="/"
+            element={
+              isAuthenticated ? (
+                <Dashboard />
+              ) : (
+                <Login onLogin={() => setIsAuthenticated(true)} />
+              )
+            }
+          />
+          <Route path="/login" element={<Navigate to="/" replace />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/update-password" element={<UpdatePassword />} />
           <Route path="/terms" element={<Terms />} />
@@ -133,44 +143,40 @@ export default function App() {
           />
 
           <Route
-            path="/"
-            element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />}
-          />
-          <Route
             path="/checkout"
-            element={isAuthenticated ? <Checkout /> : <Navigate to="/login" />}
+            element={isAuthenticated ? <Checkout /> : <Navigate to="/" />}
           />
           <Route
             path="/success"
-            element={isAuthenticated ? <Success /> : <Navigate to="/login" />}
+            element={isAuthenticated ? <Success /> : <Navigate to="/" />}
           />
           <Route
             path="/invoices"
-            element={isAuthenticated ? <Invoices /> : <Navigate to="/login" />}
+            element={isAuthenticated ? <Invoices /> : <Navigate to="/" />}
           />
           <Route
             path="/support"
-            element={isAuthenticated ? <Support /> : <Navigate to="/login" />}
+            element={isAuthenticated ? <Support /> : <Navigate to="/" />}
           />
           <Route
             path="/settings"
-            element={isAuthenticated ? <Settings /> : <Navigate to="/login" />}
+            element={isAuthenticated ? <Settings /> : <Navigate to="/" />}
           />
           <Route
             path="/plans"
-            element={isAuthenticated ? <Plans /> : <Navigate to="/login" />}
+            element={isAuthenticated ? <Plans /> : <Navigate to="/" />}
           />
           <Route
             path="/tutorials"
-            element={isAuthenticated ? <Tutorials /> : <Navigate to="/login" />}
+            element={isAuthenticated ? <Tutorials /> : <Navigate to="/" />}
           />
           <Route
             path="/notifications"
-            element={isAuthenticated ? <Notifications /> : <Navigate to="/login" />}
+            element={isAuthenticated ? <Notifications /> : <Navigate to="/" />}
           />
           <Route
             path="/request-content"
-            element={isAuthenticated ? <RequestContent /> : <Navigate to="/login" />}
+            element={isAuthenticated ? <RequestContent /> : <Navigate to="/" />}
           />
 
           <Route path="*" element={<Navigate to="/" />} />
