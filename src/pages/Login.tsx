@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { Mail, ShieldCheck, Instagram, Send, Lock } from 'lucide-react';
+import { Mail, ShieldCheck, Instagram, Send, Lock, ArrowRight } from 'lucide-react';
 import { supabase } from '../utils/supabase';
 
 interface LoginProps {
@@ -185,6 +185,19 @@ export default function Login({ onLogin }: LoginProps) {
               {loading ? 'Aguarde...' : isLogin ? 'ENTRAR NO PAINEL' : 'CRIAR CONTA'}
             </button>
           </form>
+
+          <div className="w-full border-t border-black/5 dark:border-white/10 my-4" />
+
+          <Link 
+            to="/revenda"
+            className="w-full group p-4 border border-primary/20 bg-primary/5 rounded-2xl flex items-center justify-between transition-all hover:bg-primary/10 mb-2"
+          >
+            <div className="flex flex-col items-start">
+              <span className="text-xs font-black text-primary uppercase tracking-widest">Oportunidade</span>
+              <span className="text-sm font-bold text-slate-900 dark:text-white">Seja nosso revendedor</span>
+            </div>
+            <ArrowRight size={20} className="text-primary group-hover:translate-x-1 transition-transform" />
+          </Link>
 
           <div className="w-full border-t border-black/5 dark:border-white/10 my-4" />
 

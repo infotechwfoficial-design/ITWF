@@ -20,7 +20,9 @@ import {
   ExternalLink,
   MessageSquare,
   Film,
-  Zap
+  Zap,
+  ShieldCheck,
+  UserCheck
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Client, Notification, Plan } from '../types';
@@ -42,6 +44,13 @@ export default function Admin() {
   const [toast, setToast] = useState<ToastState | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [currentAdmin, setCurrentAdmin] = useState<{ id: string; role: string } | null>(null);
+  const [resellers, setResellers] = useState<any[]>([]);
+  const [isResellerModalOpen, setIsResellerModalOpen] = useState(false);
+  const [resellerForm, setResellerForm] = useState({
+    email: '',
+    name: '',
+    role: 'admin'
+  });
 
   // Plan Form State
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
@@ -98,8 +107,19 @@ export default function Admin() {
       fetchNotifications();
       fetchRequests();
       fetchPlans();
+      if (currentAdmin.role === 'master') {
+        fetchResellers();
+      }
     }
   }, [currentAdmin]);
+
+  const fetchResellers = async () => {
+    const { data } = await supabase
+      .from('admins')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (data) setResellers(data);
+  };
 
   const fetchPlans = async () => {
     try {
@@ -379,6 +399,57 @@ export default function Admin() {
     setIsViewModalOpen(true);
   };
 
+  const handleResellerSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (submitting) return;
+    try {
+      setSubmitting(true);
+      
+      // Buscar o user_id baseado no e-mail (O usuário precisa já ter se cadastrado no sistema)
+      const { data: userData, error: userError } = await supabase
+        .from('clients')
+        .select('user_id')
+        .eq('email', resellerForm.email.trim().toLowerCase())
+        .single();
+
+      if (userError || !userData?.user_id) {
+        throw new Error('Usuário não encontrado. Peça para o revendedor se cadastrar no site como cliente primeiro.');
+      }
+
+      const { error } = await supabase
+        .from('admins')
+        .insert([{ 
+          user_id: userData.user_id, 
+          email: resellerForm.email.trim().toLowerCase(),
+          name: resellerForm.name,
+          role: resellerForm.role 
+        }]);
+
+      if (error) throw error;
+
+      showToast('Revendedor adicionado com sucesso!', 'success');
+      setIsResellerModalOpen(false);
+      setResellerForm({ email: '', name: '', role: 'admin' });
+      fetchResellers();
+    } catch (err: any) {
+      showToast('Erro: ' + err.message, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const deleteReseller = async (id: string) => {
+    if (window.confirm('Remover acesso de revendedor desta conta?')) {
+      const { error } = await supabase.from('admins').delete().eq('id', id);
+      if (error) {
+        showToast('Erro ao remover: ' + error.message, 'error');
+      } else {
+        showToast('Revendedor removido.', 'success');
+        fetchResellers();
+      }
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('isAdminAuthenticated');
     navigate('/admin/login');
@@ -389,6 +460,9 @@ export default function Admin() {
     { id: 'notifications', label: 'Avisos', icon: Bell, onClick: () => setActiveTab('notifications') },
     { id: 'requests', label: 'Pedidos', icon: MessageSquare, onClick: () => setActiveTab('requests') },
     { id: 'plans', label: 'Planos', icon: DollarSign, onClick: () => setActiveTab('plans') },
+    ...(currentAdmin?.role === 'master' ? [
+      { id: 'resellers', label: 'Revendedores', icon: ShieldCheck, onClick: () => setActiveTab('resellers' as any) }
+    ] : []),
   ];
 
   return (
@@ -830,6 +904,74 @@ export default function Admin() {
           </motion.div>
         )}
 
+        {currentAdmin?.role === 'master' && activeTab === 'resellers' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-black/5 dark:border-white/5 rounded-[2rem] overflow-hidden shadow-sm dark:shadow-xl"
+          >
+            <div className="p-6 md:p-8 border-b border-black/5 dark:border-white/5 flex justify-between items-center bg-white/20 dark:bg-white/5">
+              <div>
+                <h3 className="text-xl font-bold tracking-tight font-display text-primary">Gestão de Revendedores</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Controle quem tem acesso ao painel administrativo.</p>
+              </div>
+              <button
+                onClick={() => setIsResellerModalOpen(true)}
+                className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-5 py-2.5 rounded-2xl text-sm font-black uppercase tracking-wider shadow-lg shadow-primary/20 transition-all active:scale-95"
+              >
+                <Plus size={18} />
+                Novo Revendedor
+              </button>
+            </div>
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-black/[0.02] dark:bg-white/5 text-slate-500 text-xs uppercase tracking-widest">
+                    <th className="px-6 py-4 font-bold">Revendedor</th>
+                    <th className="px-6 py-4 font-bold">E-mail</th>
+                    <th className="px-6 py-4 font-bold">Tipo</th>
+                    <th className="px-6 py-4 font-bold">Desde</th>
+                    <th className="px-6 py-4 font-bold text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-black/5 dark:divide-white/5">
+                  {resellers.map((reseller) => (
+                    <tr key={reseller.id} className="hover:bg-black/[0.01] dark:hover:bg-white/[0.01] transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold">
+                            {reseller.name?.charAt(0) || 'R'}
+                          </div>
+                          <span className="font-bold">{reseller.name || 'Sem Nome'}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-slate-500">{reseller.email}</td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${reseller.role === 'master' ? 'bg-amber-500/10 text-amber-500' : 'bg-primary/10 text-primary'}`}>
+                          {reseller.role}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-xs text-slate-400">
+                        {new Date(reseller.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        {reseller.role !== 'master' && (
+                          <button
+                            onClick={() => deleteReseller(reseller.id)}
+                            className="p-2 text-slate-400 hover:text-rose-500 transition-colors"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+        )}
+
         {/* Client Modal */}
         {isClientModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm md:p-4">
@@ -1187,6 +1329,88 @@ export default function Admin() {
                   <Save size={20} />
                   {submitting ? 'Salvando...' : 'Salvar Plano'}
                 </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Reseller Modal */}
+        {isResellerModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white dark:bg-slate-900 border border-black/10 dark:border-white/10 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl"
+            >
+              <div className="p-6 border-b border-black/5 dark:border-white/5 flex justify-between items-center bg-slate-50 dark:bg-white/5">
+                <h3 className="text-xl font-bold">Cadastrar Revendedor</h3>
+                <button onClick={() => setIsResellerModalOpen(false)} className="p-2 hover:bg-black/5 dark:hover:bg-white/5 rounded-xl transition-colors">
+                  <X size={24} />
+                </button>
+              </div>
+              <form onSubmit={handleResellerSubmit} className="p-6 space-y-6">
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-500">E-mail do Revendedor</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input
+                      required
+                      type="email"
+                      value={resellerForm.email}
+                      onChange={e => setResellerForm({ ...resellerForm, email: e.target.value })}
+                      className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-black/5 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-primary"
+                      placeholder="email@do-revendedor.com"
+                    />
+                  </div>
+                  <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium italic">
+                    * O revendedor já deve estar cadastrado como usuário comum no site.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-500">Nome da Empresa/Revendedor</label>
+                  <div className="relative">
+                    <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input
+                      required
+                      type="text"
+                      value={resellerForm.name}
+                      onChange={e => setResellerForm({ ...resellerForm, name: e.target.value })}
+                      className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-black/5 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-primary"
+                      placeholder="Nome do Revendedor"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-slate-500">Nível de Acesso</label>
+                  <select
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-black/5 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-primary appearance-none font-bold"
+                    value={resellerForm.role}
+                    onChange={e => setResellerForm({ ...resellerForm, role: e.target.value })}
+                  >
+                    <option value="admin">Administrador (Revendedor)</option>
+                    <option value="master">Super Admin (ITWF)</option>
+                  </select>
+                </div>
+
+                <div className="flex justify-end gap-4 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsResellerModalOpen(false)}
+                    className="px-6 py-3 rounded-xl font-bold text-slate-500 hover:bg-black/5 dark:hover:bg-white/5 transition-all"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-primary/20 transition-all disabled:opacity-50"
+                  >
+                    <ShieldCheck size={20} />
+                    {submitting ? 'Salvando...' : 'Liberar Acesso'}
+                  </button>
+                </div>
               </form>
             </motion.div>
           </div>

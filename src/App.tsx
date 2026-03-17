@@ -23,6 +23,7 @@ import Admin from './pages/Admin';
 import AdminLogin from './pages/AdminLogin';
 import RequestContent from './pages/RequestContent';
 import UpdatePassword from './pages/UpdatePassword';
+import SaaS from './pages/SaaS';
 import PWAInstallModal from './components/PWAInstallModal';
 
 import { ThemeProvider } from './context/ThemeContext';
@@ -131,6 +132,8 @@ export default function App() {
             path="/admin"
             element={isAdmin ? <Admin /> : <Navigate to="/admin/login" />}
           />
+          <Route path="/revenda" element={<SaaS />} />
+          <Route path="/saas" element={<Navigate to="/revenda" />} />
 
           <Route
             path="/"
