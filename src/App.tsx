@@ -57,7 +57,16 @@ export default function App() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       console.log('App: Sessão recuperada:', !!session);
       setIsAuthenticated(!!session);
-      setIsAdmin(session?.user?.email === 'info.tech.wf.oficial@gmail.com');
+      if (session?.user) {
+        supabase
+          .from('admins')
+          .select('id')
+          .eq('user_id', session.user.id)
+          .single()
+          .then(({ data }) => setIsAdmin(!!data));
+      } else {
+        setIsAdmin(false);
+      }
     }).catch(err => {
       console.error('App: Erro ao recuperar sessão:', err);
       setIsAuthenticated(false); // Fallback para não ficar carregando infinito
@@ -74,7 +83,16 @@ export default function App() {
       }
 
       setIsAuthenticated(!!session);
-      setIsAdmin(session?.user?.email === 'info.tech.wf.oficial@gmail.com');
+      if (session?.user) {
+        supabase
+          .from('admins')
+          .select('id')
+          .eq('user_id', session.user.id)
+          .single()
+          .then(({ data }) => setIsAdmin(!!data));
+      } else {
+        setIsAdmin(false);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -139,6 +157,10 @@ export default function App() {
           <Route
             path="/dashboard"
             element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />}
+          />
+          <Route
+            path="/admin"
+            element={isAuthenticated && isAdmin ? <Admin /> : <Navigate to="/admin/login" />}
           />
           <Route
             path="/checkout"
