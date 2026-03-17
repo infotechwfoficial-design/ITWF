@@ -101,12 +101,21 @@ export default function SaaS() {
             <a href="#recursos" className="text-sm font-bold hover:text-primary transition-colors uppercase tracking-widest">Recursos</a>
             <a href="#precos" className="text-sm font-bold hover:text-primary transition-colors uppercase tracking-widest">Preços</a>
             <a href="#faq" className="text-sm font-bold hover:text-primary transition-colors uppercase tracking-widest">FAQ</a>
-            <button 
-              onClick={() => navigate('/login')}
-              className="bg-primary text-white px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
-            >
-              Começar Agora
-            </button>
+            
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => navigate('/login')}
+                className="px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 transition-all"
+              >
+                Área do Cliente
+              </button>
+              <button 
+                onClick={() => navigate('/admin/login')}
+                className="bg-primary text-white px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
+              >
+                Painel Revenda
+              </button>
+            </div>
           </div>
 
           <button className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)}>
@@ -154,11 +163,23 @@ export default function SaaS() {
             transition={{ delay: 0.3 }}
             className="flex flex-col md:flex-row items-center justify-center gap-4"
           >
-            <button className="w-full md:w-auto bg-primary text-white px-10 py-5 rounded-2xl text-lg font-black shadow-2xl shadow-primary/40 flex items-center justify-center gap-2 group transition-all hover:translate-y-[-2px]">
+            <button 
+              onClick={() => {
+                const msg = encodeURIComponent("Olá! Vim pela Landing Page e quero saber mais sobre como ser um revendedor ITWF.");
+                window.open(`https://wa.me/5584996764125?text=${msg}`, '_blank');
+              }}
+              className="w-full md:w-auto bg-primary text-white px-10 py-5 rounded-2xl text-lg font-black shadow-2xl shadow-primary/40 flex items-center justify-center gap-2 group transition-all hover:translate-y-[-2px]"
+            >
               Quero ser um Revendedor
               <ArrowRight className="group-hover:translate-x-2 transition-transform" />
             </button>
-            <button className="w-full md:w-auto px-10 py-5 rounded-2xl text-lg font-bold border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center gap-2 transition-all">
+            <button 
+              onClick={() => {
+                const msg = encodeURIComponent("Olá! Gostaria de ver uma demonstração do painel administrativo ITWF.");
+                window.open(`https://wa.me/5584996764125?text=${msg}`, '_blank');
+              }}
+              className="w-full md:w-auto px-10 py-5 rounded-2xl text-lg font-bold border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center gap-2 transition-all"
+            >
               <Play fill="currentColor" size={20} />
               Ver Demonstração
             </button>
@@ -259,7 +280,13 @@ export default function SaaS() {
                   ))}
                 </div>
 
-                <button className={`w-full py-4 rounded-2xl font-black transition-all ${p.popular ? 'bg-primary text-white shadow-lg shadow-primary/30 hover:scale-105' : 'bg-slate-100 dark:bg-slate-800 hover:bg-primary hover:text-white dark:hover:bg-primary'}`}>
+                <button 
+                  onClick={() => {
+                    const msg = encodeURIComponent(`Olá! Gostaria de saber mais sobre o Plano ${p.name} do ITWF SaaS.`);
+                    window.open(`https://wa.me/5584996764125?text=${msg}`, '_blank');
+                  }}
+                  className={`w-full py-4 rounded-2xl font-black transition-all ${p.popular ? 'bg-primary text-white shadow-lg shadow-primary/30 hover:scale-105' : 'bg-slate-100 dark:bg-slate-800 hover:bg-primary hover:text-white dark:hover:bg-primary'}`}
+                >
                   Assinar {p.name}
                 </button>
               </motion.div>
@@ -298,7 +325,13 @@ export default function SaaS() {
           <h2 className="text-4xl md:text-6xl font-black mb-8 leading-tight tracking-tight">Pronto para dar o próximo passo <br /> na sua carreira?</h2>
           <p className="text-white/80 text-lg mb-12 max-w-xl mx-auto">Junte-se a centenas de revendedores que já estão faturando com o ITWF SaaS.</p>
           <div className="flex flex-col md:flex-row items-center justify-center gap-6">
-            <button className="w-full md:w-auto bg-white text-primary px-12 py-5 rounded-2xl text-xl font-black hover:scale-105 transition-all">
+            <button 
+              onClick={() => {
+                const msg = encodeURIComponent("Olá! Já li tudo e estou pronto para garantir meu painel SaaS do ITWF.");
+                window.open(`https://wa.me/5584996764125?text=${msg}`, '_blank');
+              }}
+              className="w-full md:w-auto bg-white text-primary px-12 py-5 rounded-2xl text-xl font-black hover:scale-105 transition-all"
+            >
               Garantir Meu Painel
             </button>
             <div className="flex items-center gap-4 text-white/80 font-bold">
@@ -360,12 +393,21 @@ export default function SaaS() {
           <a href="#recursos" onClick={() => setIsMenuOpen(false)} className="text-4xl font-black tracking-tighter">Recursos</a>
           <a href="#precos" onClick={() => setIsMenuOpen(false)} className="text-4xl font-black tracking-tighter">Preços</a>
           <a href="#faq" onClick={() => setIsMenuOpen(false)} className="text-4xl font-black tracking-tighter">FAQ</a>
-          <button 
-            onClick={() => { navigate('/login'); setIsMenuOpen(false); }}
-            className="w-full bg-primary text-white py-6 rounded-3xl text-2xl font-black shadow-2xl shadow-primary/40"
-          >
-            Começar Agora
-          </button>
+          
+          <div className="w-full flex flex-col gap-4">
+            <button 
+              onClick={() => { navigate('/login'); setIsMenuOpen(false); }}
+              className="w-full bg-slate-100 dark:bg-slate-800 py-5 rounded-2xl text-xl font-black"
+            >
+              Área do Cliente
+            </button>
+            <button 
+              onClick={() => { navigate('/admin/login'); setIsMenuOpen(false); }}
+              className="w-full bg-primary text-white py-5 rounded-2xl text-xl font-black shadow-2xl shadow-primary/40"
+            >
+              Painel Revenda
+            </button>
+          </div>
         </div>
       )}
 

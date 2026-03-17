@@ -128,15 +128,12 @@ export default function App() {
           <Route path="/update-password" element={<UpdatePassword />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/admin/login" element={<AdminLogin />} />
-          <Route
-            path="/admin"
-            element={isAdmin ? <Admin /> : <Navigate to="/admin/login" />}
-          />
-          <Route path="/revenda" element={<SaaS />} />
-          <Route path="/saas" element={<Navigate to="/revenda" />} />
+          <Route path="/" element={<SaaS />} />
+          <Route path="/revenda" element={<Navigate to="/" />} />
+          <Route path="/saas" element={<Navigate to="/" />} />
 
           <Route
-            path="/"
+            path="/dashboard"
             element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />}
           />
           <Route
