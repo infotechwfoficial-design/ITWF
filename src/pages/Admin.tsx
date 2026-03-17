@@ -41,6 +41,7 @@ export default function Admin() {
   const [activeTab, setActiveTab] = useState<'clients' | 'notifications' | 'requests' | 'plans'>('clients');
   const [toast, setToast] = useState<ToastState | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [currentAdmin, setCurrentAdmin] = useState<{ id: string; role: string } | null>(null);
 
   // Plan Form State
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
@@ -79,11 +80,26 @@ export default function Admin() {
   });
 
   useEffect(() => {
-    fetchClients();
-    fetchNotifications();
-    fetchRequests();
-    fetchPlans();
-  }, []);
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const role = localStorage.getItem('adminRole') || 'admin';
+        setCurrentAdmin({ id: user.id, role });
+      } else {
+        navigate('/admin/login');
+      }
+    };
+    checkUser();
+  }, [navigate]);
+
+  useEffect(() => {
+    if (currentAdmin) {
+      fetchClients();
+      fetchNotifications();
+      fetchRequests();
+      fetchPlans();
+    }
+  }, [currentAdmin]);
 
   const fetchPlans = async () => {
     try {
@@ -97,10 +113,15 @@ export default function Admin() {
   };
 
   const fetchClients = async () => {
-    const { data } = await supabase
-      .from('clients')
-      .select('*')
-      .order('created_at', { ascending: false });
+    if (!currentAdmin) return;
+    
+    let query = supabase.from('clients').select('*');
+    
+    if (currentAdmin.role !== 'master') {
+      query = query.eq('admin_id', currentAdmin.id);
+    }
+    
+    const { data } = await query.order('created_at', { ascending: false });
     if (data) setClients(data);
   };
 
@@ -112,10 +133,15 @@ export default function Admin() {
   };
 
   const fetchRequests = async () => {
-    const { data } = await supabase
-      .from('requests')
-      .select('*')
-      .order('created_at', { ascending: false });
+    if (!currentAdmin) return;
+
+    let query = supabase.from('requests').select('*');
+    
+    if (currentAdmin.role !== 'master') {
+      query = query.eq('admin_id', currentAdmin.id);
+    }
+
+    const { data } = await query.order('created_at', { ascending: false });
     if (data) setRequests(data);
   };
 
@@ -135,7 +161,7 @@ export default function Admin() {
       } else {
         const { error } = await supabase
           .from('clients')
-          .insert([clientForm]);
+          .insert([{ ...clientForm, admin_id: currentAdmin?.id }]);
 
         if (error) throw error;
         showToast('Cliente cadastrado com sucesso!', 'success');
@@ -209,6 +235,12 @@ export default function Admin() {
         showToast(`Erro ao enviar notificação: ${err.message}`, 'error');
       }
     }
+  };
+
+  const copyAccessLink = (client: Client) => {
+    const loginUrl = `${window.location.origin}/login?email=${encodeURIComponent(client.email)}`;
+    navigator.clipboard.writeText(loginUrl);
+    showToast('Link de acesso copiado!', 'success');
   };
 
   const deleteClient = async (client: Client) => {
@@ -431,6 +463,13 @@ export default function Admin() {
                             <Edit2 size={18} />
                           </button>
                           <button
+                            onClick={() => copyAccessLink(client)}
+                            className="p-2 text-slate-400 hover:text-emerald-500 transition-colors"
+                            title="Copiar Link de Acesso"
+                          >
+                            <LinkIcon size={18} />
+                          </button>
+                          <button
                             onClick={() => deleteClient(client)}
                             className="p-2 text-slate-400 hover:text-rose-500 transition-colors"
                           >
@@ -483,7 +522,14 @@ export default function Admin() {
                         <Edit size={16} />
                       </button>
                       <button
-                        onClick={(e) => { e.stopPropagation(); deleteClient(client.id); }}
+                        onClick={(e) => { e.stopPropagation(); copyAccessLink(client); }}
+                        className="p-2 bg-emerald-500/10 rounded-xl text-emerald-500"
+                        title="Copiar Link de Acesso"
+                      >
+                        <LinkIcon size={16} />
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteClient(client); }}
                         className="p-2 bg-rose-500/10 rounded-xl text-rose-500"
                       >
                         <Trash2 size={16} />

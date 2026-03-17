@@ -166,6 +166,7 @@ export default function RequestContent() {
     // Save to DB
     const { error: insertError } = await supabase.from('requests').insert([{
       user_id: user.id,
+      admin_id: client.admin_id,
       content_title: title,
       content_type: type,
       content_year: year,

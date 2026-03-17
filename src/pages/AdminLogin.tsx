@@ -18,10 +18,7 @@ export default function AdminLogin() {
 
     try {
       const normalizedEmail = email.trim().toLowerCase();
-      if (normalizedEmail !== 'info.tech.wf.oficial@gmail.com') {
-        throw new Error('Acesso negado. Apenas o administrador oficial tem permissão de acesso.');
-      }
-
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email: normalizedEmail,
         password
@@ -30,7 +27,20 @@ export default function AdminLogin() {
       if (error) throw error;
 
       if (data.user) {
+        // Verificar se o usuário está na tabela de admins
+        const { data: adminData, error: adminError } = await supabase
+          .from('admins')
+          .select('role')
+          .eq('user_id', data.user.id)
+          .single();
+
+        if (adminError || !adminData) {
+          await supabase.auth.signOut();
+          throw new Error('Acesso negado. Você não tem permissão administrativa para acessar este painel.');
+        }
+
         localStorage.setItem('isAdminAuthenticated', 'true');
+        localStorage.setItem('adminRole', adminData.role);
         navigate('/admin');
       }
     } catch (err: any) {
