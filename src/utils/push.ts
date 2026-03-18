@@ -21,7 +21,7 @@ export async function subscribeUserToPush(email: string, username?: string, admi
 
   if ('serviceWorker' in navigator && 'PushManager' in window) {
     try {
-      // 1. Request Permission explicitly if not granted
+      // 1. Solicitar permissão se ainda não foi concedida
       if (Notification.permission === 'default') {
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') return;
@@ -29,41 +29,36 @@ export async function subscribeUserToPush(email: string, username?: string, admi
         return;
       }
 
-      // 2. Wait for the service worker to be ready
+      // 2. Aguardar o service worker ficar pronto
       const register = await navigator.serviceWorker.ready;
 
-      // 3. Subscribe (Try fresh subscription)
-      try {
-        let subscription = await register.pushManager.getSubscription();
+      // 3. Verificar se já existe uma subscription válida — REUTILIZAR se houver
+      let subscription = await register.pushManager.getSubscription();
 
-        if (subscription) {
-           await subscription.unsubscribe();
-        }
-
+      if (!subscription) {
+        // Só cria nova subscription se ainda não existe uma
         subscription = await register.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
         });
-
-        // 4. Send to server
-        const apiUrl = import.meta.env.VITE_API_URL || '';
-        try {
-          await fetch(`${apiUrl}/api/subscribe`, {
-            method: 'POST',
-            body: JSON.stringify({ email, username, subscription, adminId }),
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          });
-        } catch (fetchErr) {
-          console.warn('Não foi possível registrar push no servidor:', fetchErr);
-        }
-
-      } catch (subErr: any) {
-        console.error('Subscription error:', subErr);
       }
+
+      // 4. Enviar (ou re-confirmar) ao servidor
+      const apiUrl = import.meta.env.VITE_API_URL || '';
+      try {
+        await fetch(`${apiUrl}/api/subscribe`, {
+          method: 'POST',
+          body: JSON.stringify({ email, username, subscription, adminId }),
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+      } catch (fetchErr) {
+        console.warn('Não foi possível registrar push no servidor:', fetchErr);
+      }
+
     } catch (err: any) {
-      console.error('General push error:', err);
+      console.error('Erro no push:', err);
     }
   }
 }

@@ -62,7 +62,7 @@ export default function App() {
           .from('admins')
           .select('id')
           .eq('user_id', session.user.id)
-          .single()
+          .maybeSingle()
           .then(({ data }) => setIsAdmin(!!data));
       } else {
         setIsAdmin(false);
@@ -88,7 +88,7 @@ export default function App() {
           .from('admins')
           .select('id')
           .eq('user_id', session.user.id)
-          .single()
+          .maybeSingle()
           .then(({ data }) => setIsAdmin(!!data));
       } else {
         setIsAdmin(false);

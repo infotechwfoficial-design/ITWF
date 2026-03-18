@@ -21,7 +21,8 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+// Backend usa service_role key para não ser afetado por RLS
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Configure web-push
@@ -37,8 +38,15 @@ webpush.setVapidDetails(
 async function startServer() {
   const app = express();
 
-  // Enable CORS for all routes (important for split frontend/backend)
-  app.use(cors());
+  // CORS configurado para aceitar frontend na Vercel e localhost (dev)
+  app.use(cors({
+    origin: [
+      'https://itwf.vercel.app',
+      'http://localhost:5173',
+      'http://localhost:3000'
+    ],
+    credentials: true
+  }));
 
   app.use(express.json());
 
@@ -305,9 +313,13 @@ async function startServer() {
       // Send Push Notification
       const { data: subscriptions } = await supabase.from('push_subscriptions').select('subscription_json').eq('username', username);
       if (subscriptions && subscriptions.length > 0) {
+        const appUrl = process.env.VITE_APP_URL || 'https://itwf.vercel.app';
         const payload = JSON.stringify({
           title: 'Pagamento Aprovado! 🎉',
-          body: `Seu plano "${plan.name}" foi ativado/renovado. Novo vencimento: ${newExpDate}`
+          body: `Seu plano "${plan.name}" foi ativado/renovado. Novo vencimento: ${newExpDate}`,
+          icon: `${appUrl}/logo.png`,
+          badge: `${appUrl}/logo.png`,
+          url: '/invoices'
         });
         subscriptions.forEach(sub => {
           try {
@@ -459,12 +471,17 @@ async function startServer() {
       return res.status(400).json({ error: 'Failed to fetch subscriptions' });
     }
 
-    const reqHost = req.get('host') ? `https://${req.get('host')}` : '';
+    const reqHost = req.headers['x-forwarded-host']
+      ? `https://${req.headers['x-forwarded-host']}`
+      : req.get('host')
+        ? (req.get('host')!.includes('localhost') ? `http://${req.get('host')}` : `https://${req.get('host')}`)
+        : '';
     const payload = JSON.stringify({
       title,
       body: message,
-
-      
+      icon: `${reqHost}/logo.png`,
+      badge: `${reqHost}/logo.png`,
+      url: '/dashboard'
     });
 
     const promises = subscriptions.map(sub => {
@@ -515,7 +532,14 @@ async function startServer() {
       if (message) {
         const { data: subscriptions } = await supabase.from('push_subscriptions').select('subscription_json').eq('username', client.username);
         if (subscriptions) {
-          const payload = JSON.stringify({ title: 'Aviso de Assinatura', body: message });
+          const appUrl = process.env.VITE_APP_URL || 'https://itwf.vercel.app';
+          const payload = JSON.stringify({
+            title: 'Aviso de Assinatura',
+            body: message,
+            icon: `${appUrl}/logo.png`,
+            badge: `${appUrl}/logo.png`,
+            url: '/dashboard'
+          });
 
           const promises = subscriptions.map(sub => {
             const pushSubscription = JSON.parse(sub.subscription_json);
