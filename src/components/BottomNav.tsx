@@ -26,7 +26,7 @@ export default function BottomNav({ items, activeId }: BottomNavProps) {
     const location = useLocation();
 
     const defaultItems: BottomNavItem[] = [
-        { path: '/', icon: LayoutDashboard, label: 'Painel' },
+        { path: '/dashboard', icon: LayoutDashboard, label: 'Painel' },
         { path: '/request-content', icon: Film, label: 'Pedir' },
         { path: '/plans', icon: CreditCard, label: 'Planos' },
         { path: '/support', icon: LifeBuoy, label: 'Suporte' },

@@ -113,7 +113,7 @@ export default function ForgotPassword() {
 
             <div className="mt-10 pt-8 border-t border-black/5 dark:border-white/5 w-full">
               <Link
-                to="/login"
+                to="/"
                 className="flex items-center justify-center gap-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors font-medium text-sm group"
               >
                 <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />

@@ -39,7 +39,7 @@ export default function Sidebar({ items, title = "ITWF", logoUrl = "/logo.png", 
   const { theme, toggleTheme } = useTheme();
 
   const defaultItems: NavItem[] = [
-    { path: '/', icon: LayoutDashboard, label: 'Painel Geral' },
+    { path: '/dashboard', icon: LayoutDashboard, label: 'Painel Geral' },
     { path: '/request-content', icon: Film, label: 'Pedir Conteúdo' },
     { path: '/plans', icon: CreditCard, label: 'Assinaturas' },
     { path: '/invoices', icon: ReceiptText, label: 'Faturas' },
@@ -51,13 +51,13 @@ export default function Sidebar({ items, title = "ITWF", logoUrl = "/logo.png", 
 
   const handleLogout = onLogout || (async () => {
     await supabase.auth.signOut();
-    navigate('/login');
+    navigate('/');
   });
 
   return (
     <aside className="hidden md:flex w-64 flex-col border-r border-black/5 dark:border-white/5 bg-slate-50 dark:bg-slate-900/50 backdrop-blur-sm p-4 h-full overflow-y-auto transition-colors duration-300">
       <div className="flex items-center justify-between mb-8 px-2">
-        <div className="flex items-center gap-4 text-slate-900 dark:text-white cursor-pointer" onClick={() => navigate('/')}>
+        <div className="flex items-center gap-4 text-slate-900 dark:text-white cursor-pointer" onClick={() => navigate('/dashboard')}>
           <img src={logoUrl} alt="Logo" className="w-12 h-12 object-contain" />
           <h2 className="text-xl font-black tracking-tight font-display">{title}</h2>
         </div>

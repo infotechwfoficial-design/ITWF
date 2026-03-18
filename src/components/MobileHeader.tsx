@@ -24,7 +24,7 @@ export default function MobileHeader({
 
     const handleLogout = onLogout || (async () => {
         await supabase.auth.signOut();
-        navigate('/login');
+        navigate('/');
     });
 
     return (
@@ -36,7 +36,7 @@ export default function MobileHeader({
                     </button>
                 )}
                 {!showBackButton && (
-                    <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
+                    <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/dashboard')}>
                         <img src={logoUrl} alt="Logo" className="w-10 h-10 object-contain" />
                         <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white uppercase font-display">{title}</h1>
                     </div>

@@ -116,7 +116,7 @@ export default function AdminLogin() {
         </form>
 
         <button
-          onClick={() => navigate('/login')}
+          onClick={() => navigate('/')}
           className="w-full mt-6 flex items-center justify-center gap-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-medium transition-colors"
         >
           <ArrowLeft size={16} />
