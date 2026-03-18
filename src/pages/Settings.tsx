@@ -51,7 +51,7 @@ export default function Settings() {
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session) {
-        navigate('/login');
+        navigate('/');
         return;
       }
 
@@ -127,7 +127,7 @@ export default function Settings() {
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session) {
-        navigate('/login');
+        navigate('/');
         return;
       }
 
@@ -245,7 +245,7 @@ export default function Settings() {
               <button
                 onClick={async () => {
                   await supabase.auth.signOut();
-                  navigate('/login');
+                  navigate('/');
                 }}
                 className="w-full flex items-center justify-between px-5 py-4 text-rose-500 hover:bg-rose-500/10 transition-colors font-bold text-sm border-t border-black/5 dark:border-white/5"
               >

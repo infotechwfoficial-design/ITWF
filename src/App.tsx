@@ -124,15 +124,13 @@ export default function App() {
         <Routes>
           <Route
             path="/"
-            element={
-              isAuthenticated ? (
-                <Dashboard />
-              ) : (
-                <Login onLogin={() => setIsAuthenticated(true)} />
-              )
-            }
+            element={<Login onLogin={() => setIsAuthenticated(true)} />}
           />
           <Route path="/login" element={<Navigate to="/" replace />} />
+          <Route
+            path="/dashboard"
+            element={isAuthenticated ? <Dashboard /> : <Navigate to="/" />}
+          />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/update-password" element={<UpdatePassword />} />
           <Route path="/terms" element={<Terms />} />

@@ -60,7 +60,7 @@ export default function UpdatePassword() {
             setSuccess(true);
             // Wait a few seconds and redirect to login
             setTimeout(() => {
-                navigate('/login');
+                navigate('/');
             }, 3000);
 
         } catch (err: any) {
