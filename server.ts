@@ -298,10 +298,12 @@ async function startServer() {
   });
 
   app.post('/api/subscribe', async (req, res) => {
-    const { email, subscription } = req.body;
+    const { email, username, subscription, adminId } = req.body;
     try {
       await supabase.from('push_subscriptions').upsert([{
         email,
+        username,
+        admin_id: adminId,
         subscription_json: JSON.stringify(subscription)
       }], { onConflict: 'subscription_json' });
       res.status(201).json({});
@@ -311,14 +313,18 @@ async function startServer() {
   });
 
   app.post('/api/send-push', async (req, res) => {
-    const { title, message, email } = req.body;
+    const { title, message, email, username } = req.body;
+    console.log(`Sending push for: ${username || email || 'all'}`);
 
     let query = supabase.from('push_subscriptions').select('subscription_json');
-    if (email) {
+    if (username) {
+      query = query.eq('username', username);
+    } else if (email) {
       query = query.eq('email', email);
     }
     const { data: subscriptions, error } = await query;
     if (error || !subscriptions) {
+      console.error('Push fetch error:', error);
       return res.status(400).json({ error: 'Failed to fetch subscriptions' });
     }
 

@@ -20,7 +20,7 @@ self.addEventListener('push', function (event) {
     badge: badgeUrl,
     image: data.image || null,
     data: {
-      url: data.url || '/'
+      url: data.url || '/dashboard'
     },
     vibrate: [100, 50, 100],
   };

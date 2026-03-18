@@ -16,7 +16,7 @@ function urlBase64ToUint8Array(base64String: string) {
   return outputArray;
 }
 
-export async function subscribeUserToPush(email: string, adminId?: string) {
+export async function subscribeUserToPush(email: string, username?: string, adminId?: string) {
   if (!email) return;
 
   if ('serviceWorker' in navigator && 'PushManager' in window) {
@@ -49,7 +49,7 @@ export async function subscribeUserToPush(email: string, adminId?: string) {
         const apiUrl = import.meta.env.VITE_API_URL || '';
         await fetch(`${apiUrl}/api/subscribe`, {
           method: 'POST',
-          body: JSON.stringify({ email, subscription, adminId }),
+          body: JSON.stringify({ email, username, subscription, adminId }),
           headers: {
             'Content-Type': 'application/json'
           }
