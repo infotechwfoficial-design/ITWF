@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Mail, ShieldCheck, Instagram, Send, Lock, ArrowRight } from 'lucide-react';
 import { supabase } from '../utils/supabase';
@@ -16,6 +16,8 @@ export default function Login({ onLogin }: LoginProps) {
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const referralId = searchParams.get('ref');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,7 +58,8 @@ export default function Login({ onLogin }: LoginProps) {
             username: baseName,
             name: baseName, // Default name based on email
             email: email,
-            expiration_date: ''
+            expiration_date: '',
+            admin_id: referralId || null // Vincula ao revendedor se houver indicação
           }]);
 
           // Notificar Administrador sobre novo cadastro

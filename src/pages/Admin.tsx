@@ -27,7 +27,11 @@ import {
   Globe,
   Wallet,
   CheckCircle2,
-  Lock
+  Lock,
+  Smartphone,
+  Download,
+  Copy,
+  Check
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Client, Notification, Plan } from '../types';
@@ -513,11 +517,47 @@ export default function Admin() {
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       
       {activeTab === 'clients' && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-black/5 dark:border-white/5 rounded-[2rem] overflow-hidden shadow-sm dark:shadow-xl"
-        >
+        <div className="space-y-6">
+          {/* Referral Link Section for Resellers */}
+          {currentAdmin && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-primary/5 border border-primary/20 rounded-3xl p-6 flex flex-col md:flex-row items-center justify-between gap-6"
+            >
+              <div className="flex items-center gap-4">
+                <div className="size-12 rounded-2xl bg-primary text-white flex items-center justify-center shadow-lg shadow-primary/20">
+                  <ExternalLink size={24} />
+                </div>
+                <div>
+                  <h4 className="font-bold text-slate-900 dark:text-white">Seu Link de Cadastro</h4>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Envie este link para novos clientes se vincularem ao seu painel.</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 w-full md:w-auto">
+                <div className="flex-1 md:w-64 bg-white dark:bg-slate-800 border border-black/5 dark:border-white/10 px-4 py-2.5 rounded-xl text-xs font-mono text-slate-500 truncate">
+                  {window.location.origin}/?ref={currentAdmin.id}
+                </div>
+                <button
+                  onClick={() => {
+                    const link = `${window.location.origin}/?ref=${currentAdmin.id}`;
+                    navigator.clipboard.writeText(link);
+                    showToast('Link copiado com sucesso!', 'success');
+                  }}
+                  className="bg-primary hover:bg-primary/90 text-white p-2.5 rounded-xl transition-all shadow-md active:scale-95"
+                  title="Copiar Link"
+                >
+                  <Copy size={18} />
+                </button>
+              </div>
+            </motion.div>
+          )}
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-black/5 dark:border-white/5 rounded-[2rem] overflow-hidden shadow-sm dark:shadow-xl"
+          >
           <div className="p-6 md:p-8 border-b border-black/5 dark:border-white/5 flex justify-between items-center bg-white/20 dark:bg-white/5">
             <div>
               <h3 className="text-xl font-bold tracking-tight font-display">Lista de Clientes</h3>
@@ -673,7 +713,8 @@ export default function Admin() {
               </div>
             )}
           </motion.div>
-        )}
+        </div>
+      )}
 
         {activeTab === 'notifications' && (
           <motion.div
