@@ -9,12 +9,14 @@ import cron from 'node-cron';
 import { GoogleGenAI } from '@google/genai';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 import { createClient } from '@supabase/supabase-js';
+import Stripe from 'stripe';
 
 dotenv.config();
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
-const mpAccessToken = process.env.MERCADOPAGO_ACCESS_TOKEN;
-const mpClient = new MercadoPagoConfig({ accessToken: mpAccessToken || '' });
+
+// Note: Payment clients will be initialized dynamically per request
+// using data from the 'payment_settings' table in Supabase.
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -127,138 +129,267 @@ async function startServer() {
   // Create Mercado Pago Preference
   app.post('/api/create-preference', async (req, res) => {
     try {
-      const { plan_id, username } = req.body;
+      const { plan_id, username, provider = 'mercadopago' } = req.body;
 
-      if (!mpAccessToken) {
-        return res.status(500).json({ error: 'Mercado Pago não configurado no servidor (.env).' });
+      // 1. Buscar configurações do provedor no Banco de Dados
+      const { data: setting, error: settingError } = await supabase
+        .from('payment_settings')
+        .select('*')
+        .eq('provider', provider)
+        .single();
+
+      if (settingError || !setting || !setting.active) {
+        return res.status(400).json({ error: `O provedor de pagamento ${provider} não está configurado ou ativo.` });
       }
 
+      const credentials = setting.credentials || {};
+      const token = credentials.token;
+
+      if (!token) {
+        return res.status(500).json({ error: `Credenciais do ${provider} não encontradas.` });
+      }
+
+      // 2. Buscar o plano
       const { data: plan, error: planError } = await supabase.from('plans').select('*').eq('id', plan_id).single();
       if (planError || !plan) return res.status(404).json({ error: 'Plano não encontrado no banco de dados' });
 
+      // 3. Buscar o cliente (opcional)
       let client = null;
       if (username) {
         const { data: c } = await supabase.from('clients').select('*').eq('username', username).single();
         client = c;
       }
 
-      const preference = new Preference(mpClient);
-      const reqHost = req.get('host') ? `https://${req.get('host')}` : '';
+      const reqHost = req.get('host') ? (req.secure || req.get('host')?.includes('localhost') ? `http://${req.get('host')}` : `https://${req.get('host')}`) : '';
+      const externalReference = username ? `${username}|${plan.id}` : `guest|${plan.id}`;
 
-      const response = await preference.create({
-        body: {
-          items: [
-            {
-              id: plan.id.toString(),
-              title: plan.name,
-              quantity: 1,
-              unit_price: Number(plan.price)
-            }
-          ],
-          payer: {
-            email: client?.email || 'admin@itwf.com',
-            name: client?.name || 'Cliente ITWF'
+      // --- LOGICA POR PROVEDOR ---
+
+      if (provider === 'mercadopago') {
+        const localMpClient = new MercadoPagoConfig({ accessToken: token });
+        const preference = new Preference(localMpClient);
+
+        const response = await preference.create({
+          body: {
+            items: [
+              {
+                id: plan.id.toString(),
+                title: plan.name,
+                quantity: 1,
+                unit_price: Number(plan.price)
+              }
+            ],
+            payer: {
+              email: client?.email || 'admin@itwf.com',
+              name: client?.name || 'Cliente ITWF'
+            },
+            external_reference: externalReference,
+            back_urls: {
+              success: `${reqHost}/success`,
+              failure: `${reqHost}/checkout`,
+              pending: `${reqHost}/checkout`
+            },
+            auto_return: "approved",
+            notification_url: `${reqHost}/api/webhooks/mercadopago`
+          }
+        });
+
+        return res.json({ init_point: response.init_point });
+      }
+
+      if (provider === 'stripe') {
+        const stripe = new Stripe(token);
+        const session = await stripe.checkout.sessions.create({
+          payment_method_types: ['card'],
+          line_items: [{
+            price_data: {
+              currency: 'brl',
+              product_data: {
+                name: plan.name,
+                description: `Assinatura ITWF - ${plan.duration}`,
+              },
+              unit_amount: Math.round(Number(plan.price) * 100),
+            },
+            quantity: 1,
+          }],
+          mode: 'payment',
+          success_url: `${reqHost}/success?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${reqHost}/checkout`,
+          client_reference_id: externalReference,
+          customer_email: client?.email || undefined,
+        });
+
+        return res.json({ init_point: session.url });
+      }
+
+      if (provider === 'asaas') {
+        // Asaas API v3
+        const asaasUrl = setting.is_sandbox ? 'https://sandbox.asaas.com/api/v3' : 'https://www.asaas.com/api/v3';
+        
+        const response = await fetch(`${asaasUrl}/payments`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'access_token': token
           },
-          external_reference: username ? `${username}|${plan.id}` : `guest|${plan.id}`,
-          back_urls: {
-            success: `${reqHost}/success`,
-            failure: `${reqHost}/checkout`,
-            pending: `${reqHost}/checkout`
-          },
-          auto_return: "approved",
-          notification_url: `${reqHost}/api/webhooks/mercadopago`
+          body: JSON.stringify({
+            billingType: 'UNDEFINED', // Permite que o cliente escolha no checkout do Asaas
+            value: Number(plan.price),
+            dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], // 1 dia de vencimento
+            description: `Plano ${plan.name} - ITWF`,
+            externalReference: externalReference,
+            customer: undefined // O Asaas exige criar um cliente antes se quiser faturar direto, 
+            // mas podemos usar o Checkout deles se tivermos o e-mail
+          })
+        });
+
+        const data = await response.json();
+        if (data.invoiceUrl) {
+          return res.json({ init_point: data.invoiceUrl });
+        } else {
+          throw new Error(data.errors?.[0]?.description || 'Erro no Asaas');
         }
-      });
+      }
 
-      res.json({ init_point: response.init_point });
+      res.status(400).json({ error: 'Provedor não suportado para criação de preferência' });
     } catch (err: any) {
-      console.error('Error creating preference:', err);
-      res.status(500).json({ error: 'Erro ao criar preferência de pagamento' });
+      console.error('Error creating payment session:', err);
+      res.status(500).json({ error: err.message || 'Erro ao criar sessão de pagamento' });
     }
   });
+
+  // Helper para processar pagamentos de qualquer gateway
+  async function processApprovedPayment(externalRef: string, providerName: string) {
+    if (!externalRef || !externalRef.includes('|')) return;
+
+    const [username, planId] = externalRef.split('|');
+
+    const { data: client } = await supabase.from('clients').select('*').eq('username', username).single();
+    const { data: plan } = await supabase.from('plans').select('*').eq('id', planId).single();
+
+    if (client && plan) {
+      let monthsToAdd = 1;
+      const durStr = (plan.duration || '').toLowerCase();
+      if (durStr.includes('3') || durStr.includes('trimestral')) monthsToAdd = 3;
+      else if (durStr.includes('6') || durStr.includes('semestral')) monthsToAdd = 6;
+      else if (durStr.includes('12') || durStr.includes('anual')) monthsToAdd = 12;
+
+      let baseDate = new Date();
+      if (client.expiration_date) {
+        const [day, month, year] = client.expiration_date.split('/');
+        const expDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        if (expDate > baseDate) baseDate = expDate;
+      }
+
+      baseDate.setMonth(baseDate.getMonth() + monthsToAdd);
+      const newExpDate = `${String(baseDate.getDate()).padStart(2, '0')}/${String(baseDate.getMonth() + 1).padStart(2, '0')}/${baseDate.getFullYear()}`;
+
+      // Update Client expiration in Supabase
+      await supabase.from('clients').update({ expiration_date: newExpDate }).eq('username', username);
+
+      // Create Invoice Record
+      const invoiceDate = `${String(new Date().getDate()).padStart(2, '0')}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${new Date().getFullYear()}`;
+
+      if (client.user_id) {
+        await supabase.from('invoices').insert([{
+          user_id: client.user_id,
+          description: `Renovação de Planos - ${plan.name}`,
+          value: Number(plan.price),
+          date: invoiceDate,
+          type: 'premium',
+          sub: `${providerName} (Automático)`,
+          status: 'Pago'
+        }]);
+      }
+
+      // Send Push Notification
+      const { data: subscriptions } = await supabase.from('push_subscriptions').select('subscription_json').eq('username', username);
+      if (subscriptions && subscriptions.length > 0) {
+        const payload = JSON.stringify({
+          title: 'Pagamento Aprovado! 🎉',
+          body: `Seu plano "${plan.name}" foi ativado/renovado. Novo vencimento: ${newExpDate}`
+        });
+        subscriptions.forEach(sub => {
+          try {
+            webpush.sendNotification(JSON.parse(sub.subscription_json), payload).catch(() => { });
+          } catch (e) { }
+        });
+      }
+    }
+  }
 
   // Webhook Mercado Pago
   app.post('/api/webhooks/mercadopago', async (req, res) => {
     try {
       const { action, data, type } = req.body;
 
-      if (type === 'payment' || action === 'payment.created') {
+      if (type === 'payment' || action === 'payment.created' || action === 'payment.updated') {
         const paymentId = data?.id;
         if (!paymentId) return res.sendStatus(200);
 
+        // Buscar token no banco
+        const { data: setting } = await supabase.from('payment_settings').select('*').eq('provider', 'mercadopago').single();
+        const token = setting?.credentials?.token;
+
+        if (!token) return res.sendStatus(200);
+
         const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-          headers: { Authorization: `Bearer ${mpAccessToken}` }
+          headers: { Authorization: `Bearer ${token}` }
         });
 
         if (!response.ok) return res.sendStatus(200);
-
         const paymentData = await response.json();
 
         if (paymentData.status === 'approved') {
-          const externalRef = paymentData.external_reference;
-          if (externalRef && externalRef.includes('|')) {
-            const [username, planId] = externalRef.split('|');
-
-            const { data: client } = await supabase.from('clients').select('*').eq('username', username).single();
-            const { data: plan } = await supabase.from('plans').select('*').eq('id', planId).single();
-
-            if (client && plan) {
-              let monthsToAdd = 1;
-              const durStr = (plan.duration || '').toLowerCase();
-              if (durStr.includes('3') || durStr.includes('trimestral')) monthsToAdd = 3;
-              else if (durStr.includes('6') || durStr.includes('semestral')) monthsToAdd = 6;
-              else if (durStr.includes('12') || durStr.includes('anual')) monthsToAdd = 12;
-
-              let baseDate = new Date();
-              if (client.expiration_date) {
-                const [day, month, year] = client.expiration_date.split('/');
-                const expDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-                if (expDate > baseDate) baseDate = expDate;
-              }
-
-              baseDate.setMonth(baseDate.getMonth() + monthsToAdd);
-              const newExpDate = `${String(baseDate.getDate()).padStart(2, '0')}/${String(baseDate.getMonth() + 1).padStart(2, '0')}/${baseDate.getFullYear()}`;
-
-              // Update Client expiration in Supabase
-              await supabase.from('clients').update({ expiration_date: newExpDate }).eq('username', username);
-
-              // Create Invoice Record
-              const invoiceDate = `${String(new Date().getDate()).padStart(2, '0')}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${new Date().getFullYear()}`;
-
-              if (client.user_id) {
-                await supabase.from('invoices').insert([{
-                  user_id: client.user_id,
-                  description: `Renovação de Planos - ${plan.name}`,
-                  value: Number(plan.price),
-                  date: invoiceDate,
-                  type: 'premium',
-                  sub: `Mercado Pago (Checkout Pro)`,
-                  status: 'Pago'
-                }]);
-              }
-
-              // Send Push Notification
-              const { data: subscriptions } = await supabase.from('push_subscriptions').select('subscription_json').eq('username', username);
-              if (subscriptions && subscriptions.length > 0) {
-                const payload = JSON.stringify({
-                  title: 'Pagamento Aprovado! 🎉',
-                  body: `Seu plano "${plan.name}" foi ativado/renovado. Novo vencimento: ${newExpDate}`
-                });
-                subscriptions.forEach(sub => {
-                  try {
-                    webpush.sendNotification(JSON.parse(sub.subscription_json), payload).catch(() => { });
-                  } catch (e) { }
-                });
-              }
-            }
-          }
+          await processApprovedPayment(paymentData.external_reference, 'Mercado Pago');
         }
+      }
+      res.sendStatus(200);
+    } catch (err) {
+      console.error('Mercado Pago Webhook Error:', err);
+      res.sendStatus(200); // MP recomenda sempre 200 para evitar retentativas infinitas em falhas parciais
+    }
+  });
+
+  // Webhook Stripe
+  app.post('/api/webhooks/stripe', async (req, res) => {
+    try {
+      // Nota: Para produção, deveríamos validar a assinatura com stripe.webhooks.constructEvent
+      const event = req.body;
+
+      if (event.type === 'checkout.session.completed') {
+        const session = event.data.object;
+        await processApprovedPayment(session.client_reference_id, 'Stripe');
+      }
+
+      res.json({ received: true });
+    } catch (err) {
+      console.error('Stripe Webhook Error:', err);
+      res.status(400).send(`Webhook Error`);
+    }
+  });
+
+  // Webhook Asaas
+  app.post('/api/webhooks/asaas', async (req, res) => {
+    try {
+      const { event, payment } = req.body;
+
+      // Validar token no header se configurado
+      const { data: setting } = await supabase.from('payment_settings').select('*').eq('provider', 'asaas').single();
+      const webhookSecret = setting?.webhook_secret;
+
+      if (webhookSecret && req.headers['asaas-access-token'] !== webhookSecret) {
+        return res.status(401).send('Unauthorized');
+      }
+
+      if (event === 'PAYMENT_RECEIVED' || event === 'PAYMENT_CONFIRMED') {
+        await processApprovedPayment(payment.externalReference, 'Asaas');
       }
 
       res.sendStatus(200);
     } catch (err) {
-      console.error('Webhook Error:', err);
-      res.sendStatus(500);
+      console.error('Asaas Webhook Error:', err);
+      res.sendStatus(200);
     }
   });
 

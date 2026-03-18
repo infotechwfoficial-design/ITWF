@@ -22,7 +22,12 @@ import {
   Film,
   Zap,
   ShieldCheck,
-  UserCheck
+  UserCheck,
+  CreditCard,
+  Globe,
+  Wallet,
+  CheckCircle2,
+  Lock
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Client, Notification, Plan } from '../types';
@@ -40,7 +45,7 @@ export default function Admin() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
-  const [activeTab, setActiveTab] = useState<'clients' | 'notifications' | 'requests' | 'plans'>('clients');
+  const [activeTab, setActiveTab] = useState<'clients' | 'notifications' | 'requests' | 'plans' | 'payments'>('clients');
   const [toast, setToast] = useState<ToastState | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [currentAdmin, setCurrentAdmin] = useState<{ id: string; role: string } | null>(null);
@@ -51,6 +56,10 @@ export default function Admin() {
     name: '',
     role: 'admin'
   });
+
+  // Payment Settings State
+  const [paymentSettings, setPaymentSettings] = useState<any[]>([]);
+  const [isSavingPayment, setIsSavingPayment] = useState(false);
 
   // Plan Form State
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
@@ -109,9 +118,36 @@ export default function Admin() {
       fetchPlans();
       if (currentAdmin.role === 'master') {
         fetchResellers();
+        fetchPaymentSettings();
       }
     }
   }, [currentAdmin]);
+
+  const fetchPaymentSettings = async () => {
+    const { data } = await supabase.from('payment_settings').select('*').order('provider');
+    if (data) setPaymentSettings(data);
+  };
+
+  const updatePaymentSetting = async (provider: string, updates: any) => {
+    try {
+      setIsSavingPayment(true);
+      const { error } = await supabase
+        .from('payment_settings')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString()
+        })
+        .eq('provider', provider);
+
+      if (error) throw error;
+      showToast(`${provider.toUpperCase()} atualizado com sucesso!`, 'success');
+      fetchPaymentSettings();
+    } catch (err: any) {
+      showToast('Erro ao salvar: ' + err.message, 'error');
+    } finally {
+      setIsSavingPayment(false);
+    }
+  };
 
   const fetchResellers = async () => {
     const { data } = await supabase
@@ -460,6 +496,7 @@ export default function Admin() {
     { id: 'notifications', label: 'Avisos', icon: Bell, onClick: () => setActiveTab('notifications') },
     { id: 'requests', label: 'Pedidos', icon: MessageSquare, onClick: () => setActiveTab('requests') },
     { id: 'plans', label: 'Planos', icon: DollarSign, onClick: () => setActiveTab('plans') },
+    { id: 'payments', label: 'Pagamentos', icon: CreditCard, onClick: () => setActiveTab('payments') },
     ...(currentAdmin?.role === 'master' ? [
       { id: 'resellers', label: 'Revendedores', icon: ShieldCheck, onClick: () => setActiveTab('resellers' as any) }
     ] : []),
@@ -1430,6 +1467,145 @@ export default function Admin() {
               </form>
             </motion.div>
           </div>
+        )}
+
+        {activeTab === 'payments' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-8"
+          >
+            <div className="flex flex-col gap-2">
+              <h2 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">Configurações de Pagamento</h2>
+              <p className="text-slate-500 dark:text-slate-400">Gerencie seus gateways de pagamento e chaves de API.</p>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              {['mercadopago', 'stripe', 'asaas'].map((provider) => {
+                const setting = paymentSettings.find(s => s.provider === provider) || {
+                  provider,
+                  active: false,
+                  is_sandbox: true,
+                  credentials: {},
+                  webhook_secret: ''
+                };
+
+                const providerInfo = {
+                  mercadopago: { name: 'Mercado Pago', color: 'bg-blue-500', icon: CreditCard },
+                  stripe: { name: 'Stripe', color: 'bg-purple-600', icon: Globe },
+                  asaas: { name: 'Asaas', color: 'bg-sky-500', icon: Wallet }
+                }[provider as keyof typeof providerInfo];
+
+                return (
+                  <div key={provider} className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-black/5 dark:border-white/5 rounded-[2.5rem] p-8 flex flex-col shadow-sm">
+                    <div className="flex items-center justify-between mb-8">
+                      <div className="flex items-center gap-4">
+                        <div className={`size-14 rounded-2xl ${providerInfo.color} text-white flex items-center justify-center shadow-lg shadow-${providerInfo.color.split('-')[1]}/20`}>
+                          <providerInfo.icon size={28} />
+                        </div>
+                        <div>
+                          <h4 className="text-xl font-bold">{providerInfo.name}</h4>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className={`size-2 rounded-full ${setting.active ? 'bg-emerald-500' : 'bg-slate-300'}`}></span>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+                              {setting.active ? 'Ativo' : 'Inativo'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          checked={setting.active}
+                          onChange={(e) => updatePaymentSetting(provider, { active: e.target.checked })}
+                        />
+                        <div className="w-14 h-7 bg-slate-200 dark:bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-emerald-500 shadow-inner"></div>
+                      </label>
+                    </div>
+
+                    <div className="space-y-6 flex-1">
+                      <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-black/5 dark:border-white/5">
+                        <div className="flex items-center gap-3">
+                          <ShieldCheck size={18} className="text-primary" />
+                          <span className="text-sm font-bold">Modo Sandbox (Teste)</span>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={setting.is_sandbox}
+                          onChange={(e) => updatePaymentSetting(provider, { is_sandbox: e.target.checked })}
+                          className="size-5 rounded-lg border-black/10 dark:border-white/10 text-primary focus:ring-primary"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">Chave de API / Access Token</label>
+                        <div className="relative group">
+                          <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors" size={18} />
+                          <input
+                            type="password"
+                            placeholder="Insira seu token aqui..."
+                            className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-white/5 border border-black/5 dark:border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-mono text-sm"
+                            value={setting.credentials?.token || ''}
+                            onBlur={(e) => {
+                              if (e.target.value !== (setting.credentials?.token || '')) {
+                                updatePaymentSetting(provider, {
+                                  credentials: { ...setting.credentials, token: e.target.value }
+                                });
+                              }
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {provider === 'stripe' && (
+                        <div className="space-y-2">
+                          <label className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">Public Key</label>
+                          <input
+                            type="text"
+                            placeholder="pk_test_..."
+                            className="w-full px-4 py-4 bg-slate-50 dark:bg-white/5 border border-black/5 dark:border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-mono text-sm"
+                            value={setting.credentials?.publicKey || ''}
+                            onBlur={(e) => {
+                              if (e.target.value !== (setting.credentials?.publicKey || '')) {
+                                updatePaymentSetting(provider, {
+                                  credentials: { ...setting.credentials, publicKey: e.target.value }
+                                });
+                              }
+                            }}
+                          />
+                        </div>
+                      )}
+
+                      <div className="space-y-2">
+                        <label className="text-xs font-black uppercase tracking-widest text-slate-400 ml-1">Webhook Secret / Link</label>
+                        <input
+                          type="text"
+                          placeholder="Secret de validação..."
+                          className="w-full px-4 py-4 bg-slate-50 dark:bg-white/5 border border-black/5 dark:border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-mono text-sm"
+                          value={setting.webhook_secret || ''}
+                          onBlur={(e) => {
+                            if (e.target.value !== (setting.webhook_secret || '')) {
+                              updatePaymentSetting(provider, { webhook_secret: e.target.value });
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-8 pt-6 border-t border-black/5 dark:border-white/5">
+                      <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-xl p-3 flex items-center gap-3">
+                        <CheckCircle2 className="text-emerald-500" size={16} />
+                        <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
+                          Configurações salvas automaticamente
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
         )}
     </Layout>
   );
