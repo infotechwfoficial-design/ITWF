@@ -154,11 +154,24 @@ export default function Admin() {
   };
 
   const fetchResellers = async () => {
-    const { data } = await supabase
+    const { data: adminsData } = await supabase
       .from('admins')
       .select('*')
       .order('created_at', { ascending: false });
-    if (data) setResellers(data);
+
+    if (adminsData) {
+      // Para cada revendedor, busca a quantidade de clientes vinculados
+      const resellersWithCount = await Promise.all(
+        adminsData.map(async (admin) => {
+          const { count } = await supabase
+            .from('clients')
+            .select('*', { count: 'exact', head: true })
+            .eq('admin_id', admin.user_id);
+          return { ...admin, clientCount: count || 0 };
+        })
+      );
+      setResellers(resellersWithCount);
+    }
   };
 
   const fetchPlans = async () => {
@@ -177,7 +190,11 @@ export default function Admin() {
     
     let query = supabase.from('clients').select('*');
     
-    if (currentAdmin.role !== 'master') {
+    if (currentAdmin.role === 'master') {
+      // Master vê apenas seus clientes diretos (sem vinculação com revendedores)
+      query = query.is('admin_id', null);
+    } else {
+      // Revendedores veem apenas os seus próprios clientes
       query = query.eq('admin_id', currentAdmin.id);
     }
     
@@ -197,7 +214,10 @@ export default function Admin() {
 
     let query = supabase.from('requests').select('*');
     
-    if (currentAdmin.role !== 'master') {
+    if (currentAdmin.role === 'master') {
+      // Master vê apenas pedidos de seus clientes diretos (sem admin_id)
+      query = query.is('admin_id', null);
+    } else {
       query = query.eq('admin_id', currentAdmin.id);
     }
 
@@ -1023,6 +1043,7 @@ export default function Admin() {
                   <tr className="bg-black/[0.02] dark:bg-white/5 text-slate-500 text-xs uppercase tracking-widest">
                     <th className="px-6 py-4 font-bold">Revendedor</th>
                     <th className="px-6 py-4 font-bold">E-mail</th>
+                    <th className="px-6 py-4 font-bold">Clientes</th>
                     <th className="px-6 py-4 font-bold">Tipo</th>
                     <th className="px-6 py-4 font-bold">Desde</th>
                     <th className="px-6 py-4 font-bold text-right">Ações</th>
@@ -1040,6 +1061,12 @@ export default function Admin() {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-slate-500">{reseller.email}</td>
+                      <td className="px-6 py-4">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                          <Users size={12} />
+                          {reseller.clientCount ?? 0} cliente{reseller.clientCount !== 1 ? 's' : ''}
+                        </span>
+                      </td>
                       <td className="px-6 py-4">
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${reseller.role === 'master' ? 'bg-amber-500/10 text-amber-500' : 'bg-primary/10 text-primary'}`}>
                           {reseller.role}
