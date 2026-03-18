@@ -499,13 +499,26 @@ async function startServer() {
     res.json({ success: true });
   });
 
-  // Setup automatic daily job for sending due date notifications
-  cron.schedule('0 9 * * *', async () => {
-    console.log('Running daily expiration check...');
+  // Keep-alive: pinga a si mesmo a cada 5 min para o Render não dormir
+  const RENDER_URL = process.env.RENDER_EXTERNAL_URL || 'https://itwf.onrender.com';
+  setInterval(() => {
+    fetch(`${RENDER_URL}/api/plans`).catch(() => {});
+    console.log(`[Keep-alive] Ping enviado às ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`);
+  }, 5 * 60 * 1000);
+
+  // Controle para não enviar a mesma notificação mais de 1x por dia
+  const notifiedToday = new Set<string>();
+
+  // Cron 3x ao dia: 8h, 14h, 20h (horário de Brasília = 11h, 17h, 23h UTC)
+  cron.schedule('0 11,17,23 * * *', async () => {
+    const brTime = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+    console.log(`[Cron] Verificação de vencimento iniciada às ${brTime}`);
+
     const { data: clients } = await supabase.from('clients').select('*');
     if (!clients) return;
 
     const today = new Date();
+    const todayKey = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
 
     for (const client of clients) {
       if (!client.expiration_date) continue;
@@ -517,24 +530,53 @@ async function startServer() {
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
       let message = '';
-      if (diffDays === 7) {
-        message = `Olá ${client.name}, sua assinatura vence em 7 dias (uma semana). Fique atento à renovação para não perder acesso.`;
+      let title = 'Aviso de Assinatura';
+
+      // Antes do vencimento
+      if (diffDays === 15) {
+        message = `📢 Olá ${client.name}, sua assinatura vence em 15 dias. Planeje sua renovação com antecedência!`;
+      } else if (diffDays === 7) {
+        message = `📅 Olá ${client.name}, sua assinatura vence em 7 dias (uma semana). Fique atento à renovação!`;
+      } else if (diffDays === 5) {
+        message = `⏰ ${client.name}, sua assinatura vence em 5 dias. Não deixe para última hora!`;
       } else if (diffDays === 3) {
-        message = `Atenção ${client.name}! Sua assinatura vence em 3 dias. Adote uma renovação rápida entrando em contato com a equipe.`;
+        message = `⚡ Atenção ${client.name}! Sua assinatura vence em 3 dias. Renove agora!`;
+      } else if (diffDays === 1) {
+        message = `🔔 ${client.name}, sua assinatura vence AMANHÃ! Renove hoje para não perder acesso.`;
+        title = '⚠️ Vencimento Amanhã';
       } else if (diffDays === 0) {
-        message = `⚠️ ${client.name}, sua assinatura vence HOJE! Por favor, realize a renovação imediatamente.`;
+        message = `⚠️ ${client.name}, sua assinatura vence HOJE! Renove imediatamente para não perder acesso.`;
+        title = '🚨 Vence Hoje!';
+      }
+      // Após o vencimento
+      else if (diffDays === -1) {
+        message = `❗ ${client.name}, sua assinatura venceu ontem. Renove agora para restaurar seu acesso.`;
+        title = '❌ Assinatura Vencida';
       } else if (diffDays === -2) {
-        message = `❌ ${client.name}, sua assinatura venceu há 2 dias. Seu acesso está pendente, renove para continuar.`;
+        message = `❌ ${client.name}, sua assinatura venceu há 2 dias. Seu acesso está pendente.`;
+        title = '❌ Assinatura Vencida';
+      } else if (diffDays === -3) {
+        message = `🚫 ${client.name}, sua assinatura venceu há 3 dias. Renove urgentemente!`;
+        title = '🚫 Acesso Suspenso';
       } else if (diffDays === -4) {
-        message = `⛔ ${client.name}, sua assinatura venceu há 4 dias. Seu serviço poderá ser permanentemente suspenso, não perca tempo!`;
+        message = `⛔ ${client.name}, sua assinatura venceu há 4 dias. Seu serviço poderá ser permanentemente suspenso!`;
+        title = '⛔ Suspensão Iminente';
+      } else if (diffDays === -5) {
+        message = `🔴 ${client.name}, ÚLTIMO AVISO! Sua assinatura venceu há 5 dias. O acesso será encerrado.`;
+        title = '🔴 Último Aviso!';
       }
 
       if (message) {
+        // Evitar duplicatas no mesmo dia
+        const notifKey = `${todayKey}-${client.id}-${diffDays}`;
+        if (notifiedToday.has(notifKey)) continue;
+        notifiedToday.add(notifKey);
+
         const { data: subscriptions } = await supabase.from('push_subscriptions').select('subscription_json').eq('username', client.username);
-        if (subscriptions) {
+        if (subscriptions && subscriptions.length > 0) {
           const appUrl = process.env.VITE_APP_URL || 'https://itwf.vercel.app';
           const payload = JSON.stringify({
-            title: 'Aviso de Assinatura',
+            title,
             body: message,
             icon: `${appUrl}/logo.png`,
             badge: `${appUrl}/logo.png`,
@@ -544,6 +586,7 @@ async function startServer() {
           const promises = subscriptions.map(sub => {
             const pushSubscription = JSON.parse(sub.subscription_json);
             return webpush.sendNotification(pushSubscription, payload).catch(err => {
+              console.error(`[Cron] Push falhou para ${client.username}:`, err.statusCode);
               if (err.statusCode === 404 || err.statusCode === 410) {
                 supabase.from('push_subscriptions').delete().eq('subscription_json', sub.subscription_json).then();
               }
@@ -551,9 +594,18 @@ async function startServer() {
           });
 
           await Promise.all(promises);
+          console.log(`[Cron] Notificação enviada para ${client.username} (${diffDays} dias)`);
         }
       }
     }
+
+    console.log(`[Cron] Verificação concluída. ${notifiedToday.size} notificações enviadas hoje.`);
+  });
+
+  // Limpar controle de duplicatas à meia-noite (3h UTC = 0h BR)
+  cron.schedule('0 3 * * *', () => {
+    notifiedToday.clear();
+    console.log('[Cron] Controle de duplicatas resetado (meia-noite BR).');
   });
 
   // Vite middleware for development
