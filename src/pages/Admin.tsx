@@ -196,7 +196,7 @@ export default function Admin() {
           body: JSON.stringify({
             title: 'Aviso de Vencimento',
             message,
-            email: client.email
+            username: client.username
           })
         });
         
@@ -260,7 +260,7 @@ export default function Admin() {
       body: JSON.stringify({
         title: 'Status do seu Pedido',
         message: `O status do seu pedido "${title}" mudou para: ${status}`,
-        email
+        username: targetClient?.username
       })
     });
 

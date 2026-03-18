@@ -58,7 +58,7 @@ export default function Dashboard() {
 
         if (clientData) {
           setClient(clientData);
-          subscribeUserToPush(clientData.email);
+          subscribeUserToPush(clientData.email, clientData.username);
         }
 
         // Fetch Requests
