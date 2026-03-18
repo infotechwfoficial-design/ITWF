@@ -47,13 +47,17 @@ export async function subscribeUserToPush(email: string, username?: string, admi
 
         // 4. Send to server
         const apiUrl = import.meta.env.VITE_API_URL || '';
-        await fetch(`${apiUrl}/api/subscribe`, {
-          method: 'POST',
-          body: JSON.stringify({ email, username, subscription, adminId }),
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
+        try {
+          await fetch(`${apiUrl}/api/subscribe`, {
+            method: 'POST',
+            body: JSON.stringify({ email, username, subscription, adminId }),
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+        } catch (fetchErr) {
+          console.warn('Não foi possível registrar push no servidor:', fetchErr);
+        }
 
       } catch (subErr: any) {
         console.error('Subscription error:', subErr);
