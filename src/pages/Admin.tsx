@@ -388,6 +388,26 @@ export default function Admin() {
     }
   };
 
+  const sendSportsAgenda = async () => {
+    try {
+      setSubmitting(true);
+      const apiUrl = import.meta.env.VITE_API_URL || '';
+      const res = await fetch(`${apiUrl}/api/send-sports-push`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erro ao enviar agenda');
+
+      showToast('Agenda esportiva enviada com sucesso!', 'success');
+    } catch (err: any) {
+      showToast('Erro: ' + err.message, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const openEditClient = (client: Client) => {
     setEditingClient(client);
     setClientForm({
@@ -747,13 +767,23 @@ export default function Admin() {
                 <h3 className="text-xl font-bold tracking-tight">Avisos e Informativos</h3>
                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Envie notificações push em massa.</p>
               </div>
-              <button
-                onClick={() => setIsNotifModalOpen(true)}
-                className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-5 py-2.5 rounded-2xl text-sm font-black uppercase tracking-wider shadow-lg shadow-primary/20 transition-all active:scale-95"
-              >
-                <Plus size={18} />
-                Criar
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={sendSportsAgenda}
+                  disabled={submitting}
+                  className="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white px-5 py-2.5 rounded-2xl text-sm font-black uppercase tracking-wider shadow-lg shadow-amber-500/20 transition-all active:scale-95 disabled:opacity-50"
+                  title="Enviar Agenda Esportiva"
+                >
+                  ⚽ Agenda
+                </button>
+                <button
+                  onClick={() => setIsNotifModalOpen(true)}
+                  className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-5 py-2.5 rounded-2xl text-sm font-black uppercase tracking-wider shadow-lg shadow-primary/20 transition-all active:scale-95"
+                >
+                  <Plus size={18} />
+                  Criar
+                </button>
+              </div>
             </div>
             <div className="p-6 space-y-4">
               {notifications.map((notif) => (

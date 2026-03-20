@@ -608,6 +608,112 @@ async function startServer() {
     console.log('[Cron] Controle de duplicatas resetado (meia-noite BR).');
   });
 
+  // --- NOVA FUNCIONALIDADE: AGENDA ESPORTIVA ---
+
+  async function fetchSportsAgenda(): Promise<string> {
+    try {
+      console.log('[Sports Agenda] Gerando prompt...');
+      const today = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long', day: 'numeric', month: 'long' });
+      const prompt = `System Prompt: Você é um assistente de agenda esportiva. 
+      Sua tarefa é fornecer os principais jogos de futebol e outros esportes importantes para HOJE (${today}) que serão transmitidos na TV Aberta do Brasil (Globo, SBT, Band, etc) ou canais de streaming gratuitos (CazéTV, Canal Goat, etc).
+      
+      Regras:
+      1. Liste apenas os 5 a 8 jogos mais importantes.
+      2. Use o formato: ⚽ TIME A x TIME B - Horário (Brasília) - Canal/Streaming
+      3. Seja direto, use emojis e organize por horário.
+      4. O título deve ser: ⚽ AGENDA ESPORTIVA ⚽\n🗓️ ${today.toUpperCase()}
+      
+      Retorne apenas o texto formatado para uma notificação push.`;
+
+      console.log('[Sports Agenda] Chamando Gemini...');
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: [{ role: 'user', parts: [{ text: prompt }] }]
+      });
+
+      console.log('[Sports Agenda] Resposta recebida do Gemini.');
+      return response.text.trim();
+    } catch (err) {
+      console.error('Error fetching sports agenda:', err);
+      return '';
+    }
+  }
+
+  app.post('/api/send-sports-push', async (req, res) => {
+    console.log('[API] Recebida requisição para /api/send-sports-push');
+    try {
+      console.log('[Sports Push] Iniciando envio manual...');
+      const message = await fetchSportsAgenda();
+      
+      if (!message) {
+        return res.status(500).json({ error: 'Não foi possível obter a agenda esportiva.' });
+      }
+
+      const { data: subscriptions } = await supabase.from('push_subscriptions').select('subscription_json');
+      if (!subscriptions || subscriptions.length === 0) {
+        return res.status(404).json({ error: 'Nenhum inscrito encontrado.' });
+      }
+
+      const reqHost = req.get('host') ? (req.get('host')!.includes('localhost') ? `http://${req.get('host')}` : `https://${req.get('host')}`) : '';
+      const appUrl = process.env.VITE_APP_URL || (reqHost);
+      
+      const payload = JSON.stringify({
+        title: '⚽ Agenda Esportiva do Dia',
+        body: message,
+        icon: `${appUrl}/logo.png`,
+        badge: `${appUrl}/logo.png`,
+        url: '/dashboard'
+      });
+
+      const promises = subscriptions.map(sub => {
+        const pushSubscription = JSON.parse(sub.subscription_json);
+        console.log(`[Sports Push] Enviando para: ${pushSubscription.endpoint.substring(0, 30)}...`);
+        return webpush.sendNotification(pushSubscription, payload)
+          .then(() => console.log(`[Sports Push] Sucesso no envio!`))
+          .catch((err) => {
+            console.error(`[Sports Push] Erro ao enviar para inscrição:`, err.statusCode, err.body || err.message);
+          });
+      });
+
+      await Promise.all(promises);
+      res.json({ success: true, message: 'Agenda enviada com sucesso!' });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Cron Agenda Esportiva: Diariamente às 09:00 BRT (12:00 UTC)
+  cron.schedule('0 12 * * *', async () => {
+    console.log('[Cron] Iniciando envio da Agenda Esportiva...');
+    try {
+      const message = await fetchSportsAgenda();
+      if (!message) return;
+
+      const { data: subscriptions } = await supabase.from('push_subscriptions').select('subscription_json');
+      if (!subscriptions) return;
+
+      const appUrl = process.env.VITE_APP_URL || 'https://itwf.vercel.app';
+      const payload = JSON.stringify({
+        title: '⚽ Agenda Esportiva do Dia',
+        body: message,
+        icon: `${appUrl}/logo.png`,
+        badge: `${appUrl}/logo.png`,
+        url: '/dashboard'
+      });
+
+      subscriptions.forEach(sub => {
+        try {
+          webpush.sendNotification(JSON.parse(sub.subscription_json), payload).catch(() => {});
+        } catch (e) {}
+      });
+      console.log('[Cron] Agenda Esportiva enviada.');
+    } catch (e) {
+      console.error('[Cron] Falha na Agenda Esportiva:', e);
+    }
+  });
+
+  // ---------------------------------------------
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
