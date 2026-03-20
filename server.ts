@@ -70,7 +70,7 @@ async function startServer() {
       contents.push({ role: 'user', parts: [{ text: message }] });
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-2.5-flash',
         contents: contents
       });
 
@@ -640,7 +640,7 @@ async function startServer() {
 
       console.log('[Sports Agenda] Chamando Gemini...');
       const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-2.5-flash',
         contents: [
           {
             role: 'user',
@@ -648,10 +648,7 @@ async function startServer() {
           }
         ],
         config: {
-          systemInstruction: {
-            role: 'system',
-            parts: [{ 
-              text: `Você é um assistente especializado em esportes. Sua missão é fornecer a agenda esportiva do dia de hoje (MARÇO DE 2026).
+          systemInstruction: `Você é um assistente especializado em esportes. Sua missão é fornecer a agenda esportiva do dia de hoje (MARÇO DE 2026).
               
               IMPORTANTE:
               1. Use OBRIGATORIAMENTE a ferramenta de busca (Google Search) para obter os dados em tempo real.
@@ -661,9 +658,7 @@ async function startServer() {
               
               Formato de saída:
               - Use emojis para cada esporte.
-              - Liste o jogo, horário (Brasília) e onde assistir.`
-            }]
-          },
+              - Liste o jogo, horário (Brasília) e onde assistir.`,
           tools: [
             {
               googleSearch: {}
@@ -673,9 +668,17 @@ async function startServer() {
       });
 
       console.log('[Sports Agenda] Resposta recebida do Gemini.');
+      
+      if (!response.text) {
+        console.warn('[Sports Agenda] Gemini retornou texto vazio ou indefinido.');
+        console.dir(response, { depth: null });
+      }
+
       return response.text?.trim() || '';
-    } catch (err) {
-      console.error('Error fetching sports agenda:', err);
+    } catch (err: any) {
+      console.error('[Sports Agenda] Erro detalhado:', err);
+      // Log extra para erros da API do Google
+      if (err.response) console.error('[Sports Agenda] Dados da resposta de erro:', err.response);
       return '';
     }
   }
@@ -723,9 +726,9 @@ async function startServer() {
     }
   });
 
-  // Cron Agenda Esportiva: Diariamente às 09:00 BRT (12:00 UTC)
+  // Cron Agenda Esportiva: Manhã (09:00 BRT / 12:00 UTC)
   cron.schedule('0 12 * * *', async () => {
-    console.log('[Cron] Iniciando envio da Agenda Esportiva...');
+    console.log('[Cron] Iniciando envio da Agenda Esportiva (Manhã)...');
     try {
       const message = await fetchSportsAgenda();
       if (!message) return;
@@ -747,9 +750,69 @@ async function startServer() {
           webpush.sendNotification(JSON.parse(sub.subscription_json), payload).catch(() => {});
         } catch (e) {}
       });
-      console.log('[Cron] Agenda Esportiva enviada.');
+      console.log('[Cron] Agenda Esportiva (Manhã) enviada.');
     } catch (e) {
-      console.error('[Cron] Falha na Agenda Esportiva:', e);
+      console.error('[Cron] Falha na Agenda Esportiva (Manhã):', e);
+    }
+  });
+
+  // Cron Agenda Esportiva: Tarde (15:00 BRT / 18:00 UTC)
+  cron.schedule('0 18 * * *', async () => {
+    console.log('[Cron] Iniciando envio da Agenda Esportiva (Tarde)...');
+    try {
+      const message = await fetchSportsAgenda();
+      if (!message) return;
+
+      const { data: subscriptions } = await supabase.from('push_subscriptions').select('subscription_json');
+      if (!subscriptions) return;
+
+      const appUrl = process.env.VITE_APP_URL || 'https://itwf.vercel.app';
+      const payload = JSON.stringify({
+        title: '⚽ Agenda Esportiva do Dia',
+        body: message,
+        icon: `${appUrl}/logo.png`,
+        badge: `${appUrl}/logo.png`,
+        url: '/dashboard'
+      });
+
+      subscriptions.forEach(sub => {
+        try {
+          webpush.sendNotification(JSON.parse(sub.subscription_json), payload).catch(() => {});
+        } catch (e) {}
+      });
+      console.log('[Cron] Agenda Esportiva (Tarde) enviada.');
+    } catch (e) {
+      console.error('[Cron] Falha na Agenda Esportiva (Tarde):', e);
+    }
+  });
+
+  // Cron Agenda Esportiva: Noite (21:00 BRT / 00:00 UTC)
+  cron.schedule('0 0 * * *', async () => {
+    console.log('[Cron] Iniciando envio da Agenda Esportiva (Noite)...');
+    try {
+      const message = await fetchSportsAgenda();
+      if (!message) return;
+
+      const { data: subscriptions } = await supabase.from('push_subscriptions').select('subscription_json');
+      if (!subscriptions) return;
+
+      const appUrl = process.env.VITE_APP_URL || 'https://itwf.vercel.app';
+      const payload = JSON.stringify({
+        title: '⚽ Agenda Esportiva do Dia',
+        body: message,
+        icon: `${appUrl}/logo.png`,
+        badge: `${appUrl}/logo.png`,
+        url: '/dashboard'
+      });
+
+      subscriptions.forEach(sub => {
+        try {
+          webpush.sendNotification(JSON.parse(sub.subscription_json), payload).catch(() => {});
+        } catch (e) {}
+      });
+      console.log('[Cron] Agenda Esportiva (Noite) enviada.');
+    } catch (e) {
+      console.error('[Cron] Falha na Agenda Esportiva (Noite):', e);
     }
   });
 
