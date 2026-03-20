@@ -70,7 +70,7 @@ async function startServer() {
       contents.push({ role: 'user', parts: [{ text: message }] });
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-2.0-flash',
         contents: contents
       });
 
@@ -619,6 +619,8 @@ async function startServer() {
       const prompt = `System Prompt: Você é um curador de elite de agenda esportiva. 
       Sua tarefa é fornecer os 5 jogos MAIS IMPORTANTES para HOJE (${today}) que serão transmitidos na TV Aberta do Brasil ou streaming gratuito.
       
+      IMPORTANTE: Use sua ferramenta de busca para encontrar os jogos REAIS de março de 2026. Ignore qualquer dado do seu treinamento que mencione anos anteriores a 2025 ou eventos cancelados.
+      
       HORÁRIO ATUAL: ${now} (Brasília)
       
       CRITÉRIOS DE SELEÇÃO (Prioridade):
@@ -638,12 +640,40 @@ async function startServer() {
 
       console.log('[Sports Agenda] Chamando Gemini...');
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: [{ role: 'user', parts: [{ text: prompt }] }]
+        model: 'gemini-2.0-flash',
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: prompt }]
+          }
+        ],
+        config: {
+          systemInstruction: {
+            role: 'system',
+            parts: [{ 
+              text: `Você é um assistente especializado em esportes. Sua missão é fornecer a agenda esportiva do dia de hoje (MARÇO DE 2026).
+              
+              IMPORTANTE:
+              1. Use OBRIGATORIAMENTE a ferramenta de busca (Google Search) para obter os dados em tempo real.
+              2. Ignore QUALQUER dado interno ou antigo que você tenha. Foque APENAS em resultados de busca para o ano de 2026.
+              3. Garanta que os jogos listados ainda não aconteceram hoje ou estão acontecendo agora.
+              4. Se não encontrar jogos para hoje, informe que não há eventos programados.
+              
+              Formato de saída:
+              - Use emojis para cada esporte.
+              - Liste o jogo, horário (Brasília) e onde assistir.`
+            }]
+          },
+          tools: [
+            {
+              googleSearch: {}
+            }
+          ]
+        }
       });
 
       console.log('[Sports Agenda] Resposta recebida do Gemini.');
-      return response.text.trim();
+      return response.text?.trim() || '';
     } catch (err) {
       console.error('Error fetching sports agenda:', err);
       return '';
