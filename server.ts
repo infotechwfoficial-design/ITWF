@@ -613,17 +613,21 @@ async function startServer() {
   async function fetchSportsAgenda(): Promise<string> {
     try {
       console.log('[Sports Agenda] Gerando prompt...');
+      const now = new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
       const today = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long', day: 'numeric', month: 'long' });
-      const prompt = `System Prompt: Você é um assistente de agenda esportiva. 
-      Sua tarefa é fornecer os principais jogos de futebol e outros esportes importantes para HOJE (${today}) que serão transmitidos na TV Aberta do Brasil (Globo, SBT, Band, etc) ou canais de streaming gratuitos (CazéTV, Canal Goat, etc).
       
-      Regras:
-      1. Liste apenas os 5 a 8 jogos mais importantes.
-      2. Use o formato: ⚽ TIME A x TIME B - Horário (Brasília) - Canal/Streaming
-      3. Seja direto, use emojis e organize por horário.
+      const prompt = `System Prompt: Você é um assistente de agenda esportiva. 
+      Sua tarefa é fornecer os principais jogos de futebol e outros esportes importantes para HOJE (${today}) que serão transmitidos na TV Aberta do Brasil ou canais de streaming gratuitos.
+      
+      HORÁRIO ATUAL: ${now} (Brasília)
+      
+      Regras de Negócio:
+      1. Liste apenas os 5 a 8 jogos mais importantes que AINDA NÃO TERMINARAM a partir de ${now}.
+      2. Dê prioridade total aos jogos que começam nos próximos 60-120 minutos ou que estão prestes a começar.
+      3. Use o formato: ⚽ TIME A x TIME B - Horário (Brasília) - Canal/Streaming
       4. O título deve ser: ⚽ AGENDA ESPORTIVA ⚽\n🗓️ ${today.toUpperCase()}
       
-      Retorne apenas o texto formatado para uma notificação push.`;
+      Retorne APENAS o texto formatado para push.`;
 
       console.log('[Sports Agenda] Chamando Gemini...');
       const response = await ai.models.generateContent({
