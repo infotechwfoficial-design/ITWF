@@ -616,18 +616,25 @@ async function startServer() {
       const now = new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
       const today = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long', day: 'numeric', month: 'long' });
       
-      const prompt = `System Prompt: Você é um assistente de agenda esportiva. 
-      Sua tarefa é fornecer os principais jogos de futebol e outros esportes importantes para HOJE (${today}) que serão transmitidos na TV Aberta do Brasil ou canais de streaming gratuitos.
+      const prompt = `System Prompt: Você é um curador de elite de agenda esportiva. 
+      Sua tarefa é fornecer os 5 jogos MAIS IMPORTANTES para HOJE (${today}) que serão transmitidos na TV Aberta do Brasil ou streaming gratuito.
       
       HORÁRIO ATUAL: ${now} (Brasília)
       
-      Regras de Negócio:
-      1. Liste apenas os 5 a 8 jogos mais importantes que AINDA NÃO TERMINARAM a partir de ${now}.
-      2. Dê prioridade total aos jogos que começam nos próximos 60-120 minutos ou que estão prestes a começar.
-      3. Use o formato: ⚽ TIME A x TIME B - Horário (Brasília) - Canal/Streaming
-      4. O título deve ser: ⚽ AGENDA ESPORTIVA ⚽\n🗓️ ${today.toUpperCase()}
+      CRITÉRIOS DE SELEÇÃO (Prioridade):
+      1. Brasileirão Série A/B, Copa do Brasil, Libertadores, Sul-Americana.
+      2. Champions League, Europa League, Premier League, La Liga, Bundesliga, Serie A (Itália).
+      3. Grandes Clássicos ou Finais de outros esportes.
+      4. IGNORE ligas menores ou jogos irrelevantes para o grande público.
       
-      Retorne APENAS o texto formatado para push.`;
+      REGRAS DE FORMATAÇÃO:
+      - Liste EXATAMENTE os 5 melhores jogos que AINDA NÃO TERMINARAM a partir de ${now}.
+      - Se houver jogos acontecendo agora, use o prefixo "🔥 AO VIVO:".
+      - Se forem em breve, use "🕒 EM BREVE:".
+      - Use o formato: [EMOJI] TIME A x TIME B - Horário (Brasília) - Canal/Streaming
+      - Título: ⚽ AGENDA DE ELITE ⚽\n🗓 ${today.toUpperCase()}
+      
+      Retorne APENAS o texto formatado.`;
 
       console.log('[Sports Agenda] Chamando Gemini...');
       const response = await ai.models.generateContent({
