@@ -337,7 +337,17 @@ export default function Admin() {
           await supabase.from('invoices').delete().eq('user_id', client.user_id);
         }
 
-        // 4. Delete the client itself
+        // 4. Delete the user from Supabase Auth via backend
+        if (client.user_id) {
+          const apiUrl = import.meta.env.VITE_API_URL || '';
+          try {
+            await fetch(`${apiUrl}/api/users/${client.user_id}`, { method: 'DELETE' });
+          } catch (backendErr) {
+            console.error('Erro ao deletar da tabela auth.users no backend:', backendErr);
+          }
+        }
+
+        // 5. Delete the client itself
         const { error } = await supabase.from('clients').delete().eq('id', client.id);
         
         if (error) throw error;

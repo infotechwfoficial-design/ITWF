@@ -440,6 +440,18 @@ async function startServer() {
     }
   });
 
+  app.delete('/api/users/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+      const { error } = await supabase.auth.admin.deleteUser(id);
+      if (error) throw error;
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error('Delete Auth User Error:', err);
+      res.status(400).json({ error: err.message });
+    }
+  });
+
   app.post('/api/subscribe', async (req, res) => {
     const { email, username, subscription, adminId } = req.body;
     try {
