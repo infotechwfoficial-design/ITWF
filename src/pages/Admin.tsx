@@ -191,8 +191,8 @@ export default function Admin() {
     let query = supabase.from('clients').select('*');
     
     if (currentAdmin.role === 'master') {
-      // Master vê apenas seus clientes diretos (sem vinculação com revendedores)
-      query = query.is('admin_id', null);
+      // Master vê seus clientes diretos (sem vinculação) e também os que indicou
+      query = query.or(`admin_id.is.null,admin_id.eq.${currentAdmin.id}`);
     } else {
       // Revendedores veem apenas os seus próprios clientes
       query = query.eq('admin_id', currentAdmin.id);
@@ -215,8 +215,8 @@ export default function Admin() {
     let query = supabase.from('requests').select('*');
     
     if (currentAdmin.role === 'master') {
-      // Master vê apenas pedidos de seus clientes diretos (sem admin_id)
-      query = query.is('admin_id', null);
+      // Master vê pedidos de seus clientes diretos (sem admin_id ou indicados por ele)
+      query = query.or(`admin_id.is.null,admin_id.eq.${currentAdmin.id}`);
     } else {
       query = query.eq('admin_id', currentAdmin.id);
     }
