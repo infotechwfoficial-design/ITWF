@@ -19,6 +19,13 @@ export default function Login({ onLogin }: LoginProps) {
   const [searchParams] = useSearchParams();
   const referralId = searchParams.get('ref');
 
+  // Guarda o referralId de forma segura
+  React.useEffect(() => {
+    if (referralId) {
+      localStorage.setItem('referralId', referralId);
+    }
+  }, [referralId]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -53,14 +60,24 @@ export default function Login({ onLogin }: LoginProps) {
         if (data.user) {
           // Cria registro do usuário na tabela clients para o dashboard
           const baseName = email.split('@')[0];
-          await supabase.from('clients').insert([{
+          const finalAdminId = referralId || localStorage.getItem('referralId') || null;
+
+          const { error: insertError } = await supabase.from('clients').insert([{
             user_id: data.user.id,
             username: baseName,
             name: baseName, // Default name based on email
             email: email,
             expiration_date: '',
-            admin_id: referralId || null // Vincula ao revendedor se houver indicação
+            admin_id: finalAdminId // Vincula ao revendedor se houver indicação
           }]);
+
+          if (insertError) {
+            console.error('Inserção na tabela clients falhou:', insertError);
+            throw new Error(`Erro ao finalizar seu perfil: ${insertError.message}`);
+          }
+          
+          // Limpa o referral cache
+          localStorage.removeItem('referralId');
 
           // Notificar Administrador sobre novo cadastro
           const apiUrl = import.meta.env.VITE_API_URL || '';
