@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import {
@@ -65,7 +65,10 @@ export default function Admin() {
 
   // Admin Settings State
   const [adminSupportNumber, setAdminSupportNumber] = useState('');
+  const [adminPushLogoUrl, setAdminPushLogoUrl] = useState('');
   const [savingSettings, setSavingSettings] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   // Payment Settings State
   const [paymentSettings, setPaymentSettings] = useState<any[]>([]);
@@ -120,14 +123,58 @@ export default function Admin() {
     checkUser();
   }, [navigate]);
 
-  const fetchAdminSupportNumber = async () => {
+  const fetchAdminSettings = async () => {
     if (!currentAdmin?.id) return;
     const { data } = await supabase
       .from('clients')
-      .select('support_number')
+      .select('support_number, push_logo_url')
       .eq('user_id', currentAdmin.id)
       .single();
-    if (data?.support_number) setAdminSupportNumber(data.support_number);
+    if (data) {
+      if (data.support_number) setAdminSupportNumber(data.support_number);
+      if (data.push_logo_url) setAdminPushLogoUrl(data.push_logo_url);
+    }
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !currentAdmin) return;
+
+    if (file.size > 1 * 1024 * 1024) {
+      showToast('A logo deve ter no máximo 1MB.', 'error');
+      return;
+    }
+
+    setUploadingLogo(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `push-logo-${currentAdmin.id}-${Math.random()}.${fileExt}`;
+      const filePath = `push-logos/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      const { error: updateError } = await supabase
+        .from('clients')
+        .update({ push_logo_url: publicUrl })
+        .eq('user_id', currentAdmin.id);
+
+      if (updateError) throw updateError;
+
+      setAdminPushLogoUrl(publicUrl);
+      showToast('Logo do Push atualizada!', 'success');
+    } catch (err: any) {
+      showToast('Erro no upload: ' + err.message, 'error');
+    } finally {
+      setUploadingLogo(false);
+    }
   };
 
   const saveAdminSupportNumber = async () => {
@@ -155,7 +202,7 @@ export default function Admin() {
       fetchNotifications();
       fetchRequests();
       fetchPlans();
-      fetchAdminSupportNumber();
+      fetchAdminSettings();
       if (currentAdmin.role === 'master') {
         fetchResellers();
         fetchPaymentSettings();
@@ -1759,23 +1806,54 @@ export default function Admin() {
             <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Configurações do Negócio</h3>
             <p className="text-slate-500 dark:text-slate-400 mb-6">Defina os canais de atendimento e contatos para os seus clientes.</p>
             
-            <div className="space-y-4 max-w-md">
-              <label className="text-sm font-medium text-slate-500 dark:text-slate-400">WhatsApp para Suporte (Revendedores)</label>
-              <input
-                type="tel"
-                value={adminSupportNumber}
-                onChange={e => setAdminSupportNumber(e.target.value)}
-                placeholder="Ex: 5584999999999"
-                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-black/10 dark:border-white/10 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
-              />
-              <button
-                onClick={saveAdminSupportNumber}
-                disabled={savingSettings}
-                className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3 mt-4 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2"
-              >
-                {savingSettings ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
-                {savingSettings ? 'Salvando...' : 'Salvar Configurações'}
-              </button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-4">
+                <label className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[10px]">WhatsApp para Suporte</label>
+                <input
+                  type="tel"
+                  value={adminSupportNumber}
+                  onChange={e => setAdminSupportNumber(e.target.value)}
+                  placeholder="Ex: 5584999999999"
+                  className="w-full px-4 py-4 bg-slate-50 dark:bg-slate-800/50 border border-black/10 dark:border-white/10 rounded-2xl text-slate-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                />
+                <button
+                  onClick={saveAdminSupportNumber}
+                  disabled={savingSettings}
+                  className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
+                >
+                  {savingSettings ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+                  {savingSettings ? 'Salvando...' : 'Salvar WhatsApp'}
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <label className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-[10px]">Logo das Notificações Push</label>
+                <div className="flex flex-col items-center gap-4 p-6 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-dashed border-black/10 dark:border-white/10">
+                  <div className="size-20 bg-white dark:bg-slate-800 rounded-2xl flex items-center justify-center overflow-hidden border border-black/5 shadow-sm">
+                    {adminPushLogoUrl ? (
+                      <img src={adminPushLogoUrl} alt="Push Logo" className="w-full h-full object-contain" />
+                    ) : (
+                      <Bell size={32} className="text-slate-300" />
+                    )}
+                  </div>
+                  <input
+                    type="file"
+                    ref={logoInputRef}
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                    accept="image/*"
+                  />
+                  <button
+                    onClick={() => logoInputRef.current?.click()}
+                    disabled={uploadingLogo}
+                    className="flex items-center gap-2 text-xs font-black text-primary hover:bg-primary/10 px-4 py-2 rounded-lg transition-all"
+                  >
+                    {uploadingLogo ? <Loader2 className="animate-spin" size={14} /> : <Smartphone size={14} />}
+                    {uploadingLogo ? 'Subindo...' : 'Alterar Logo do Push'}
+                  </button>
+                  <p className="text-[10px] text-slate-400 text-center">Tamanho recomendado: 192x192px (PNG/JPG). Esta logo aparecerá nos alertas enviados aos seus clientes.</p>
+                </div>
+              </div>
             </div>
           </motion.div>
         </div>
