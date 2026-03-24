@@ -53,6 +53,15 @@ export default function App() {
   };
 
   useEffect(() => {
+    // CAPTURA GLOBAL DO LINK DE INDICAÇÃO (?ref=...)
+    // Isso garante que não importa em qual aba o cliente caia primeiro (/plans, /login, /), 
+    // ele ficará eternamente vinculado ao revendedor nas memórias do dispositivo.
+    const params = new URLSearchParams(window.location.search);
+    const referralId = params.get('ref');
+    if (referralId) {
+      localStorage.setItem('referralId', referralId);
+    }
+
     console.log('App: Verificando sessão do Supabase...');
     supabase.auth.getSession().then(({ data: { session } }) => {
       console.log('App: Sessão recuperada:', !!session);
