@@ -10,7 +10,8 @@ import {
   Film,
   LogOut,
   Bell,
-  LucideIcon
+  LucideIcon,
+  ShieldCheck
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
@@ -46,6 +47,15 @@ export default function Sidebar({ items, title = "ITWF", logoUrl = "/logo.png", 
     { path: '/support', icon: Headset, label: 'Suporte Técnico', separator: true },
     { path: '/settings', icon: SettingsIcon, label: 'Configurações' },
   ];
+
+  if (localStorage.getItem('isAdminAuthenticated') === 'true') {
+    defaultItems.push({
+      path: '/admin',
+      icon: ShieldCheck,
+      label: 'Painel Admin',
+      separator: true
+    });
+  }
 
   const currentItems = items || defaultItems;
 
