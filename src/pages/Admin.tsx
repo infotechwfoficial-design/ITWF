@@ -1837,20 +1837,19 @@ export default function Admin() {
                     )}
                   </div>
                   <input
+                    id="push_logo_input"
                     type="file"
-                    ref={logoInputRef}
                     onChange={handleLogoUpload}
                     className="hidden"
                     accept="image/*"
                   />
-                  <button
-                    onClick={() => logoInputRef.current?.click()}
-                    disabled={uploadingLogo}
-                    className="flex items-center gap-2 text-xs font-black text-primary hover:bg-primary/10 px-4 py-2 rounded-lg transition-all"
+                  <label
+                    htmlFor="push_logo_input"
+                    className="flex items-center gap-2 text-xs font-black text-primary hover:bg-primary/10 px-4 py-2 rounded-lg cursor-pointer transition-all active:scale-95"
                   >
                     {uploadingLogo ? <Loader2 className="animate-spin" size={14} /> : <Smartphone size={14} />}
-                    {uploadingLogo ? 'Subindo...' : 'Alterar Logo do Push'}
-                  </button>
+                    {uploadingLogo ? 'Subindo...' : 'Escolher Logo do Push'}
+                  </label>
                   <p className="text-[10px] text-slate-400 text-center">Tamanho recomendado: 192x192px (PNG/JPG). Esta logo aparecerá nos alertas enviados aos seus clientes.</p>
                 </div>
               </div>
