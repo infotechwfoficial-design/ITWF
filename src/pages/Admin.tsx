@@ -35,7 +35,7 @@ import {
   Settings as SettingsIcon,
   Loader2
 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion } from 'motion/react';
 import { Client, Notification, Plan } from '../types';
 import { supabase } from '../utils/supabase';
 import Toast from '../components/Toast';
