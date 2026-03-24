@@ -10,7 +10,8 @@ import {
   Save,
   ChevronRight,
   Loader2,
-  LogOut
+  LogOut,
+  Phone
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
@@ -34,6 +35,7 @@ export default function Settings() {
     name: '',
     email: '',
     phone: '',
+    support_number: '',
     language: 'Português (Brasil)'
   });
 
@@ -71,6 +73,7 @@ export default function Settings() {
           name: data.name || '',
           email: data.email || '',
           phone: '',
+          support_number: data.support_number || '',
           language: 'Português (Brasil)'
         });
       }
@@ -140,7 +143,8 @@ export default function Settings() {
       const { error } = await supabase
         .from('clients')
         .update({
-          name: formData.name
+          name: formData.name,
+          support_number: formData.support_number
         })
         .eq('user_id', session.user.id);
 
@@ -300,6 +304,23 @@ export default function Settings() {
                         value={formData.email}
                         className="w-full pl-10 pr-4 py-2.5 bg-slate-100 dark:bg-slate-900/50 border border-black/5 dark:border-white/5 rounded-xl text-slate-500 dark:text-slate-400 focus:outline-none cursor-not-allowed"
                         title="Para alterar seu e-mail de acesso, entre em contato com o suporte."
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-slate-500 dark:text-slate-400">WhatsApp para Suporte (Revendedores)</label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Phone size={18} className="text-slate-500" />
+                      </div>
+                      <input
+                        type="tel"
+                        value={formData.support_number}
+                        onChange={e => setFormData({ ...formData, support_number: e.target.value })}
+                        placeholder="Ex: 5584999999999"
+                        className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-800/50 border border-black/10 dark:border-white/10 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                        title="Se você for um revendedor, seus clientes serão direcionados para este número."
                       />
                     </div>
                   </div>

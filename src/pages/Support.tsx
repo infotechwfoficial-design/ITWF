@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import {
   Search,
@@ -11,9 +12,37 @@ import {
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
+import { supabase } from '../utils/supabase';
 
 export default function Support() {
   const navigate = useNavigate();
+  const [supportNumber, setSupportNumber] = useState('5584996764125');
+
+  useEffect(() => {
+    const fetchSupportInfo = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: clientData } = await supabase
+          .from('clients')
+          .select('admin_id')
+          .eq('user_id', user.id)
+          .single();
+          
+        if (clientData?.admin_id) {
+          const { data: adminData } = await supabase
+            .from('clients')
+            .select('support_number')
+            .eq('user_id', clientData.admin_id)
+            .single();
+            
+          if (adminData?.support_number) {
+            setSupportNumber(adminData.support_number);
+          }
+        }
+      }
+    };
+    fetchSupportInfo();
+  }, []);
 
   const faqs = [
     { q: 'Como renovar minha assinatura?', a: 'Basta acessar o painel principal, clicar em "Renovar Agora" na fatura desejada e seguir as instruções de pagamento.' },
@@ -69,7 +98,7 @@ export default function Support() {
             <h3 className="text-lg font-bold text-slate-900 dark:text-white">WhatsApp</h3>
             <p className="text-slate-500 dark:text-slate-400 text-sm">Suporte rápido via mensagem. Atendimento 24/7.</p>
             <a
-              href="https://wa.me/5584996764125"
+              href={`https://wa.me/${supportNumber.replace(/\D/g, '')}`}
               target="_blank" rel="noopener noreferrer"
               className="mt-2 text-emerald-600 dark:text-emerald-500 font-bold text-sm flex items-center gap-1 hover:underline"
             >
@@ -130,7 +159,7 @@ export default function Support() {
             </div>
           </div>
           <a
-            href="https://wa.me/5584996764125?text=Preciso+de+suporte"
+            href={`https://wa.me/${supportNumber.replace(/\D/g, '')}?text=Preciso+de+suporte`}
             target="_blank" rel="noopener noreferrer"
             className="bg-primary hover:bg-primary/90 text-white px-8 py-3 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-primary/20 transition-all whitespace-nowrap"
           >

@@ -1,6 +1,8 @@
 export interface Client {
   id: string | number;
   user_id?: string;
+  admin_id?: string;
+  support_number?: string;
   username: string;
   name: string;
   email: string;

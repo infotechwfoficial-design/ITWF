@@ -37,6 +37,7 @@ export default function RequestContent() {
   const [selectedMedia, setSelectedMedia] = useState<TMDBResult | null>(null);
   const [showLiveResults, setShowLiveResults] = useState(false);
   const [liveResults, setLiveResults] = useState<TMDBResult[]>([]);
+  const [supportNumber, setSupportNumber] = useState('5584996764125');
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -48,7 +49,21 @@ export default function RequestContent() {
           .select('*')
           .eq('user_id', user.id)
           .single();
-        if (clientData) setClient(clientData);
+        if (clientData) {
+          setClient(clientData);
+          
+          if (clientData.admin_id) {
+            const { data: adminData } = await supabase
+              .from('clients')
+              .select('support_number')
+              .eq('user_id', clientData.admin_id)
+              .single();
+              
+            if (adminData?.support_number) {
+              setSupportNumber(adminData.support_number);
+            }
+          }
+        }
 
         // Fetch favorites
         const { data: favData } = await supabase
@@ -188,7 +203,7 @@ export default function RequestContent() {
       `*Solicitado por:* ${client.name} (@${username})`;
 
     const encodedMessage = encodeURIComponent(whatsappMessage);
-    window.open(`https://wa.me/5584996764125?text=${encodedMessage}`, '_blank');
+    window.open(`https://wa.me/${supportNumber.replace(/\D/g, '')}?text=${encodedMessage}`, '_blank');
   };
 
   return (

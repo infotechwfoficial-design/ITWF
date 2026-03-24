@@ -241,7 +241,7 @@ export default function Admin() {
       } else {
         const { error } = await supabase
           .from('clients')
-          .insert([{ ...clientForm, admin_id: currentAdmin?.user_id }]);
+          .insert([{ ...clientForm, admin_id: currentAdmin?.id }]);
 
         if (error) throw error;
         showToast('Cliente cadastrado com sucesso!', 'success');
