@@ -31,7 +31,8 @@ import {
   Smartphone,
   Download,
   Copy,
-  Check
+  Check,
+  Settings as SettingsIcon
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Client, Notification, Plan } from '../types';
@@ -551,6 +552,7 @@ export default function Admin() {
     { id: 'requests', label: 'Pedidos', icon: MessageSquare, onClick: () => setActiveTab('requests') },
     { id: 'plans', label: 'Planos', icon: DollarSign, onClick: () => setActiveTab('plans') },
     { id: 'payments', label: 'Pagamentos', icon: CreditCard, onClick: () => setActiveTab('payments') },
+    { id: 'settings', label: 'Configurações', icon: SettingsIcon, onClick: () => navigate('/settings') },
     ...(currentAdmin?.role === 'master' ? [
       { id: 'resellers', label: 'Revendedores', icon: ShieldCheck, onClick: () => setActiveTab('resellers' as any) }
     ] : []),
