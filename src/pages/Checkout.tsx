@@ -53,7 +53,7 @@ export default function Checkout() {
 
     try {
       setLoading(true);
-      const username = localStorage.getItem('currentUser') || '';
+      const userEmail = localStorage.getItem('currentUser') || '';
 
       const apiUrl = import.meta.env.VITE_API_URL || '';
       const response = await fetch(`${apiUrl}/api/create-preference`, {
@@ -61,7 +61,7 @@ export default function Checkout() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           plan_id: plan.id, 
-          username, 
+          email: userEmail, 
           provider: selectedProvider 
         })
       });

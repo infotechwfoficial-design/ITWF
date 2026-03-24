@@ -147,7 +147,13 @@ export default function App() {
         <Routes>
           <Route
             path="/"
-            element={<Login onLogin={() => setIsAuthenticated(true)} />}
+            element={
+              isAuthenticated ? (
+                <Navigate to={isSubdomain ? "/admin" : "/dashboard"} replace />
+              ) : (
+                <Login onLogin={() => setIsAuthenticated(true)} />
+              )
+            }
           />
           <Route path="/login" element={<Navigate to="/" replace />} />
           <Route

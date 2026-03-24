@@ -137,7 +137,7 @@ async function startServer() {
   // Create Mercado Pago Preference
   app.post('/api/create-preference', async (req, res) => {
     try {
-      const { plan_id, username, provider = 'mercadopago' } = req.body;
+      const { plan_id, email, provider = 'mercadopago' } = req.body;
 
       // 1. Buscar configurações do provedor no Banco de Dados
       const { data: setting, error: settingError } = await supabase
@@ -163,13 +163,13 @@ async function startServer() {
 
       // 3. Buscar o cliente (opcional)
       let client = null;
-      if (username) {
-        const { data: c } = await supabase.from('clients').select('*').eq('username', username).single();
+      if (email) {
+        const { data: c } = await supabase.from('clients').select('*').eq('email', email).single();
         client = c;
       }
 
       const reqHost = req.get('host') ? (req.secure || req.get('host')?.includes('localhost') ? `http://${req.get('host')}` : `https://${req.get('host')}`) : '';
-      const externalReference = username ? `${username}|${plan.id}` : `guest|${plan.id}`;
+      const externalReference = email ? `${email}|${plan.id}` : `guest|${plan.id}`;
 
       // --- LOGICA POR PROVEDOR ---
 
@@ -270,9 +270,9 @@ async function startServer() {
   async function processApprovedPayment(externalRef: string, providerName: string) {
     if (!externalRef || !externalRef.includes('|')) return;
 
-    const [username, planId] = externalRef.split('|');
+    const [userEmail, planId] = externalRef.split('|');
 
-    const { data: client } = await supabase.from('clients').select('*').eq('username', username).single();
+    const { data: client } = await supabase.from('clients').select('*').eq('email', userEmail).single();
     const { data: plan } = await supabase.from('plans').select('*').eq('id', planId).single();
 
     if (client && plan) {
@@ -293,7 +293,7 @@ async function startServer() {
       const newExpDate = `${String(baseDate.getDate()).padStart(2, '0')}/${String(baseDate.getMonth() + 1).padStart(2, '0')}/${baseDate.getFullYear()}`;
 
       // Update Client expiration in Supabase
-      await supabase.from('clients').update({ expiration_date: newExpDate }).eq('username', username);
+      await supabase.from('clients').update({ expiration_date: newExpDate }).eq('email', userEmail);
 
       // Create Invoice Record
       const invoiceDate = `${String(new Date().getDate()).padStart(2, '0')}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${new Date().getFullYear()}`;
@@ -311,7 +311,7 @@ async function startServer() {
       }
 
       // Send Push Notification
-      const { data: subscriptions } = await supabase.from('push_subscriptions').select('subscription_json').eq('username', username);
+      const { data: subscriptions } = await supabase.from('push_subscriptions').select('subscription_json').eq('email', userEmail);
       if (subscriptions && subscriptions.length > 0) {
         const appUrl = process.env.VITE_APP_URL || 'https://itwf.vercel.app';
         const payload = JSON.stringify({
