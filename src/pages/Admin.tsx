@@ -32,7 +32,8 @@ import {
   Download,
   Copy,
   Check,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  Loader2
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Client, Notification, Plan } from '../types';
@@ -50,7 +51,7 @@ export default function Admin() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
-  const [activeTab, setActiveTab] = useState<'clients' | 'notifications' | 'requests' | 'plans' | 'payments'>('clients');
+  const [activeTab, setActiveTab] = useState<'clients' | 'notifications' | 'requests' | 'plans' | 'payments' | 'resellers' | 'settings'>('clients');
   const [toast, setToast] = useState<ToastState | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [currentAdmin, setCurrentAdmin] = useState<{ id: string; role: string } | null>(null);
@@ -61,6 +62,10 @@ export default function Admin() {
     name: '',
     role: 'admin'
   });
+
+  // Admin Settings State
+  const [adminSupportNumber, setAdminSupportNumber] = useState('');
+  const [savingSettings, setSavingSettings] = useState(false);
 
   // Payment Settings State
   const [paymentSettings, setPaymentSettings] = useState<any[]>([]);
@@ -115,12 +120,42 @@ export default function Admin() {
     checkUser();
   }, [navigate]);
 
+  const fetchAdminSupportNumber = async () => {
+    if (!currentAdmin?.id) return;
+    const { data } = await supabase
+      .from('clients')
+      .select('support_number')
+      .eq('user_id', currentAdmin.id)
+      .single();
+    if (data?.support_number) setAdminSupportNumber(data.support_number);
+  };
+
+  const saveAdminSupportNumber = async () => {
+    if (!currentAdmin?.id) return;
+    setSubmitting(true);
+    setSavingSettings(true);
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .update({ support_number: adminSupportNumber })
+        .eq('user_id', currentAdmin.id);
+      if (error) throw error;
+      showToast('Configurações salvas com sucesso!', 'success');
+    } catch (e: any) {
+      showToast('Erro ao salvar: ' + e.message, 'error');
+    } finally {
+      setSubmitting(false);
+      setSavingSettings(false);
+    }
+  };
+
   useEffect(() => {
     if (currentAdmin) {
       fetchClients();
       fetchNotifications();
       fetchRequests();
       fetchPlans();
+      fetchAdminSupportNumber();
       if (currentAdmin.role === 'master') {
         fetchResellers();
         fetchPaymentSettings();
@@ -552,7 +587,7 @@ export default function Admin() {
     { id: 'requests', label: 'Pedidos', icon: MessageSquare, onClick: () => setActiveTab('requests') },
     { id: 'plans', label: 'Planos', icon: DollarSign, onClick: () => setActiveTab('plans') },
     { id: 'payments', label: 'Pagamentos', icon: CreditCard, onClick: () => setActiveTab('payments') },
-    { id: 'settings', label: 'Configurações', icon: SettingsIcon, onClick: () => navigate('/settings') },
+    { id: 'settings', label: 'Configurações', icon: SettingsIcon, onClick: () => setActiveTab('settings') },
     ...(currentAdmin?.role === 'master' ? [
       { id: 'resellers', label: 'Revendedores', icon: ShieldCheck, onClick: () => setActiveTab('resellers' as any) }
     ] : []),
@@ -1717,6 +1752,35 @@ export default function Admin() {
             </div>
           </motion.div>
         )}
+
+      {activeTab === 'settings' && (
+        <div className="space-y-6">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white dark:bg-slate-900 border border-black/5 dark:border-white/5 rounded-3xl overflow-hidden shadow-xl shadow-black/5 dark:shadow-white/5 p-8">
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Configurações do Negócio</h3>
+            <p className="text-slate-500 dark:text-slate-400 mb-6">Defina os canais de atendimento e contatos para os seus clientes.</p>
+            
+            <div className="space-y-4 max-w-md">
+              <label className="text-sm font-medium text-slate-500 dark:text-slate-400">WhatsApp para Suporte (Revendedores)</label>
+              <input
+                type="tel"
+                value={adminSupportNumber}
+                onChange={e => setAdminSupportNumber(e.target.value)}
+                placeholder="Ex: 5584999999999"
+                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-black/10 dark:border-white/10 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+              />
+              <button
+                onClick={saveAdminSupportNumber}
+                disabled={savingSettings}
+                className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3 mt-4 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2"
+              >
+                {savingSettings ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+                {savingSettings ? 'Salvando...' : 'Salvar Configurações'}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
     </Layout>
   );
 }
