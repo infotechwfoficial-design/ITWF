@@ -62,18 +62,33 @@ export default function Login({ onLogin }: LoginProps) {
           const baseName = email.split('@')[0];
           const finalAdminId = referralId || localStorage.getItem('referralId') || null;
 
-          const { error: insertError } = await supabase.from('clients').insert([{
+          let clientInsert = await supabase.from('clients').insert([{
             user_id: data.user.id,
             username: baseName,
-            name: baseName, // Default name based on email
+            name: baseName,
             email: email,
             expiration_date: '',
-            admin_id: finalAdminId // Vincula ao revendedor se houver indicação
+            admin_id: finalAdminId
           }]);
 
-          if (insertError) {
-            console.error('Inserção na tabela clients falhou:', insertError);
-            throw new Error(`Erro ao finalizar seu perfil: ${insertError.message}`);
+          // Fallback para unique_violation (mesmo baseName existente em provedores diferentes)
+          if (clientInsert.error && clientInsert.error.code === '23505') {
+            const fallbackSufix = Math.floor(Math.random() * 10000);
+            clientInsert = await supabase.from('clients').insert([{
+              user_id: data.user.id,
+              username: `${baseName}_${fallbackSufix}`,
+              name: baseName,
+              email: email,
+              expiration_date: '',
+              admin_id: finalAdminId
+            }]);
+          }
+
+          if (clientInsert.error) {
+            console.error('Inserção na tabela clients falhou:', clientInsert.error);
+            // Em vez de crashar a conta inteira, prossegue para não deixar o usuário num "limbo"
+            // O Dashboard lidará com a falta do cliente se extremamente necessário.
+            throw new Error(`Erro ao finalizar seu perfil: ${clientInsert.error.message}`);
           }
           
           // Limpa o referral cache
@@ -96,7 +111,12 @@ export default function Login({ onLogin }: LoginProps) {
         setIsLogin(true);
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Ocorreu um erro durante a autenticação.');
+      let msg = err.message || 'Ocorreu um erro durante a autenticação.';
+      if (msg.includes('Invalid login credentials')) msg = 'E-mail ou senha incorretos.';
+      if (msg.includes('already registered')) msg = 'Este e-mail já está cadastrado no sistema.';
+      if (msg.includes('Password should be at least')) msg = 'A senha deve ter no mínimo 6 caracteres.';
+      if (msg.includes('Email not confirmed')) msg = 'Por favor, confirme seu e-mail antes de entrar.';
+      setErrorMsg(msg);
     } finally {
       setLoading(false);
     }

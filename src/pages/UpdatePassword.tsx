@@ -64,7 +64,10 @@ export default function UpdatePassword() {
             }, 3000);
 
         } catch (err: any) {
-            setErrorMsg(err.message || 'Erro ao atualizar a senha.');
+            let msg = err.message || 'Erro ao atualizar a senha.';
+            if (msg.includes('should be different')) msg = 'A nova senha deve ser diferente da atual.';
+            if (msg.includes('Password should be at least')) msg = 'A senha deve ter no mínimo 6 caracteres.';
+            setErrorMsg(msg);
         } finally {
             setLoading(false);
         }

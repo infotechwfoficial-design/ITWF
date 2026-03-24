@@ -25,7 +25,10 @@ export default function ForgotPassword() {
       if (error) throw error;
       setIsSent(true);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Erro ao enviar o e-mail de recuperação.');
+      let msg = err.message || 'Erro ao enviar o e-mail de recuperação.';
+      if (msg.includes('User not found') || msg.includes('not found')) msg = 'E-mail não encontrado no sistema.';
+      if (msg.includes('rate limit')) msg = 'Muitas tentativas. Aguarde um momento e tente novamente.';
+      setErrorMsg(msg);
     } finally {
       setLoading(false);
     }

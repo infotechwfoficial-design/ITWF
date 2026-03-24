@@ -44,7 +44,9 @@ export default function AdminLogin() {
         navigate('/admin');
       }
     } catch (err: any) {
-      setError(err.message || 'Credenciais administrativas inválidas.');
+      let msg = err.message || 'Credenciais administrativas inválidas.';
+      if (msg.includes('Invalid login credentials')) msg = 'E-mail ou senha administrativos incorretos.';
+      setError(msg);
     } finally {
       setLoading(false);
     }
