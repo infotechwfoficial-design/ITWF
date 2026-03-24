@@ -36,8 +36,8 @@ export default function BottomNav({ items, activeId }: BottomNavProps) {
     const currentItems = items || defaultItems;
 
     return (
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-black/5 dark:border-white/10 px-4 pb-safe pt-2">
-            <ul className="flex justify-between items-center max-w-lg mx-auto">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-black/5 dark:border-white/10 pb-safe pt-2">
+            <ul className="flex items-center gap-6 overflow-x-auto custom-scrollbar px-6 pb-2">
                 {currentItems.map((item, idx) => {
                     const isActive = item.path ? location.pathname === item.path : activeId === item.id;
                     const Icon = item.icon;
@@ -54,7 +54,7 @@ export default function BottomNav({ items, activeId }: BottomNavProps) {
                     );
 
                     return (
-                        <li key={item.path || item.id || idx} className="flex-1">
+                        <li key={item.path || item.id || idx} className="flex-shrink-0 flex flex-col justify-center min-w-[64px]">
                             {item.path ? (
                                 <Link
                                     to={item.path}
