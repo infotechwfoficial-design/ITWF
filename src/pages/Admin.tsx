@@ -166,7 +166,7 @@ export default function Admin() {
           const { count } = await supabase
             .from('clients')
             .select('*', { count: 'exact', head: true })
-            .or(`admin_id.eq.${admin.id},admin_id.eq.${admin.user_id}`);
+            .eq('admin_id', admin.user_id);
           return { ...admin, clientCount: count || 0 };
         })
       );
@@ -192,10 +192,10 @@ export default function Admin() {
     
     if (currentAdmin.role === 'master') {
       // Master vê seus clientes diretos (sem vinculação) e também os que indicou
-      query = query.or(`admin_id.is.null,admin_id.eq.${currentAdmin.id},admin_id.eq.${currentAdmin.user_id}`);
+      query = query.or(`admin_id.is.null,admin_id.eq.${currentAdmin.user_id}`);
     } else {
       // Revendedores veem apenas os seus próprios clientes
-      query = query.or(`admin_id.eq.${currentAdmin.id},admin_id.eq.${currentAdmin.user_id}`);
+      query = query.eq('admin_id', currentAdmin.user_id);
     }
     
     const { data } = await query.order('created_at', { ascending: false });
@@ -216,9 +216,9 @@ export default function Admin() {
     
     if (currentAdmin.role === 'master') {
       // Master vê pedidos de seus clientes diretos (sem admin_id ou indicados por ele)
-      query = query.or(`admin_id.is.null,admin_id.eq.${currentAdmin.id},admin_id.eq.${currentAdmin.user_id}`);
+      query = query.or(`admin_id.is.null,admin_id.eq.${currentAdmin.user_id}`);
     } else {
-      query = query.or(`admin_id.eq.${currentAdmin.id},admin_id.eq.${currentAdmin.user_id}`);
+      query = query.eq('admin_id', currentAdmin.user_id);
     }
 
     const { data } = await query.order('created_at', { ascending: false });
