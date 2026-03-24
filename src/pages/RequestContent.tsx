@@ -38,6 +38,8 @@ export default function RequestContent() {
   const [showLiveResults, setShowLiveResults] = useState(false);
   const [liveResults, setLiveResults] = useState<TMDBResult[]>([]);
   const [supportNumber, setSupportNumber] = useState('5584996764125');
+  const [trendingMedia, setTrendingMedia] = useState<TMDBResult[]>([]);
+  const [loadingTrending, setLoadingTrending] = useState(false);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -77,6 +79,32 @@ export default function RequestContent() {
       }
     };
     fetchUserData();
+  }, []);
+
+  useEffect(() => {
+    const fetchTrending = async () => {
+      setLoadingTrending(true);
+      try {
+        const apiKey = (import.meta as any).env.VITE_TMDB_API_KEY || 'YOUR_TMDB_API_KEY';
+        // Caso possua um backend proxy (custom api url), evitamos usar chaves publicas se o apiKey nao estiver setado
+        if (!apiKey || apiKey === 'YOUR_TMDB_API_KEY') {
+          return;
+        }
+        
+        const url = `https://api.themoviedb.org/3/trending/all/day?api_key=${apiKey}&language=pt-BR`;
+        const res = await fetch(url);
+        const data = await res.json();
+        const filtered = (data.results || []).filter((m: any) => 
+          (m.media_type === 'movie' || m.media_type === 'tv') && m.poster_path
+        );
+        setTrendingMedia(filtered.slice(0, 15));
+      } catch (err) {
+        console.error('Error fetching trending media:', err);
+      } finally {
+        setLoadingTrending(false);
+      }
+    };
+    fetchTrending();
   }, []);
 
   // Debounced search for live results
@@ -206,6 +234,70 @@ export default function RequestContent() {
     window.open(`https://wa.me/${supportNumber.replace(/\D/g, '')}?text=${encodedMessage}`, '_blank');
   };
 
+  const renderMediaCard = (media: TMDBResult) => (
+    <motion.div
+      key={media.id}
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="group relative bg-white dark:bg-slate-900 rounded-2xl overflow-hidden border border-black/5 dark:border-white/10 shadow-sm hover:shadow-xl transition-all"
+    >
+      <div className="aspect-[2/3] relative overflow-hidden">
+        {media.poster_path ? (
+          <img
+            src={`https://image.tmdb.org/t/p/w500${media.poster_path}`}
+            alt={media.title || media.name}
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <div className="w-full h-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center">
+            <Film size={48} className="text-slate-400" />
+          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-4">
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleRequest(media)}
+              className="flex-1 bg-primary text-white py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1"
+            >
+              <MessageCircle size={14} />
+              Pedir
+            </button>
+            <button
+              onClick={() => toggleFavorite(media)}
+              className={`p-2 rounded-lg ${favorites.includes(media.id.toString()) ? 'bg-rose-500 text-white' : 'bg-white/20 text-white backdrop-blur-md'}`}
+            >
+              <Heart size={14} fill={favorites.includes(media.id.toString()) ? 'currentColor' : 'none'} />
+            </button>
+          </div>
+        </div>
+      </div>
+      <div className="p-3">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-1">
+            {media.media_type === 'movie' ? <Film size={10} /> : <Tv size={10} />}
+            {media.media_type === 'movie' ? 'Filme' : 'Série'}
+          </span>
+          <span className="flex items-center gap-1 text-[10px] font-bold text-amber-500">
+            <Star size={10} fill="currentColor" />
+            {media.vote_average?.toFixed(1) || '0.0'}
+          </span>
+        </div>
+        <h3 className="font-bold text-sm truncate">{media.title || media.name}</h3>
+        <p className="text-[10px] text-slate-500">
+          {(media.release_date || media.first_air_date || '').split('-')[0]}
+        </p>
+        <button
+          onClick={() => setSelectedMedia(media)}
+          className="mt-2 text-[10px] font-bold text-slate-400 hover:text-primary flex items-center gap-1"
+        >
+          <Info size={10} />
+          Ver Sinopse
+        </button>
+      </div>
+    </motion.div>
+  );
+
   return (
     <Layout>
       <div className="flex flex-col gap-8">
@@ -261,71 +353,34 @@ export default function RequestContent() {
           )}
         </form>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-          {results.map((media) => (
-            <motion.div
-              key={media.id}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="group relative bg-white dark:bg-slate-900 rounded-2xl overflow-hidden border border-black/5 dark:border-white/10 shadow-sm hover:shadow-xl transition-all"
-            >
-              <div className="aspect-[2/3] relative overflow-hidden">
-                {media.poster_path ? (
-                  <img
-                    src={`https://image.tmdb.org/t/p/w500${media.poster_path}`}
-                    alt={media.title || media.name}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center">
-                    <Film size={48} className="text-slate-400" />
-                  </div>
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-4">
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleRequest(media)}
-                      className="flex-1 bg-primary text-white py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1"
-                    >
-                      <MessageCircle size={14} />
-                      Pedir
-                    </button>
-                    <button
-                      onClick={() => toggleFavorite(media)}
-                      className={`p-2 rounded-lg ${favorites.includes(media.id.toString()) ? 'bg-rose-500 text-white' : 'bg-white/20 text-white backdrop-blur-md'}`}
-                    >
-                      <Heart size={14} fill={favorites.includes(media.id.toString()) ? 'currentColor' : 'none'} />
-                    </button>
-                  </div>
-                </div>
+        {query && results.length > 0 && (
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+            {results.map((media) => renderMediaCard(media))}
+          </div>
+        )}
+
+        {!query && (
+          <div className="space-y-6">
+            <div className="flex items-center gap-2 border-b border-black/5 dark:border-white/5 pb-4">
+              <span className="text-2xl">🔥</span>
+              <h2 className="text-xl font-black text-slate-900 dark:text-white">Em Destaque Hoje</h2>
+            </div>
+            
+            {loadingTrending ? (
+              <div className="flex items-center justify-center py-20">
+                <RefreshCw className="animate-spin text-primary" size={32} />
               </div>
-              <div className="p-3">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-primary flex items-center gap-1">
-                    {media.media_type === 'movie' ? <Film size={10} /> : <Tv size={10} />}
-                    {media.media_type === 'movie' ? 'Filme' : 'Série'}
-                  </span>
-                  <span className="flex items-center gap-1 text-[10px] font-bold text-amber-500">
-                    <Star size={10} fill="currentColor" />
-                    {media.vote_average?.toFixed(1) || '0.0'}
-                  </span>
-                </div>
-                <h3 className="font-bold text-sm truncate">{media.title || media.name}</h3>
-                <p className="text-[10px] text-slate-500">
-                  {(media.release_date || media.first_air_date || '').split('-')[0]}
-                </p>
-                <button
-                  onClick={() => setSelectedMedia(media)}
-                  className="mt-2 text-[10px] font-bold text-slate-400 hover:text-primary flex items-center gap-1"
-                >
-                  <Info size={10} />
-                  Ver Sinopse
-                </button>
+            ) : trendingMedia.length > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+                {trendingMedia.map((media) => renderMediaCard(media))}
               </div>
-            </motion.div>
-          ))}
-        </div>
+            ) : (
+              <div className="py-10 text-center text-slate-500 italic">
+                Não foi possível carregar os destaques no momento.
+              </div>
+            )}
+          </div>
+        )}
 
         {results.length === 0 && !loading && query && (
           <div className="py-20 text-center text-slate-500 italic">
