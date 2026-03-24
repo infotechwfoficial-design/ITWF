@@ -85,6 +85,12 @@ export default function Settings() {
     const file = e.target.files?.[0];
     if (!file || !profile) return;
 
+    if (file.size > 2 * 1024 * 1024) { // Limite de 2MB
+      showToast('A imagem selecionada é muito grande. O limite máximo é 2MB.', 'error');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
     try {
       setUploading(true);
       const { data: { session } } = await supabase.auth.getSession();
@@ -134,8 +140,7 @@ export default function Settings() {
       const { error } = await supabase
         .from('clients')
         .update({
-          name: formData.name,
-          email: formData.email
+          name: formData.name
         })
         .eq('user_id', session.user.id);
 
@@ -283,17 +288,18 @@ export default function Settings() {
                       />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-500 dark:text-slate-400">E-mail</label>
+                  <div className="space-y-2 opacity-60">
+                    <label className="text-sm font-medium text-slate-500 dark:text-slate-400">E-mail (Não alterável)</label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <Mail size={18} className="text-slate-500" />
                       </div>
                       <input
                         type="email"
+                        disabled
                         value={formData.email}
-                        onChange={e => setFormData({ ...formData, email: e.target.value })}
-                        className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-800/50 border border-black/10 dark:border-white/10 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                        className="w-full pl-10 pr-4 py-2.5 bg-slate-100 dark:bg-slate-900/50 border border-black/5 dark:border-white/5 rounded-xl text-slate-500 dark:text-slate-400 focus:outline-none cursor-not-allowed"
+                        title="Para alterar seu e-mail de acesso, entre em contato com o suporte."
                       />
                     </div>
                   </div>
