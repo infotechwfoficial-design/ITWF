@@ -125,21 +125,27 @@ export default function Admin() {
   }, [navigate]);
 
   const fetchAdminSettings = async () => {
-    if (!currentAdmin?.id) return;
-    const { data } = await supabase
-      .from('clients')
-      .select('support_number, push_logo_url')
-      .eq('user_id', currentAdmin.id)
-      .single();
-    if (data) {
-      if (data.support_number) setAdminSupportNumber(data.support_number);
-      if (data.push_logo_url) {
-        setAdminPushLogoUrl(data.push_logo_url);
-        // Se não for um link do Supabase Storage, assume que é link externo e preenche o input
-        if (!data.push_logo_url.includes('supabase.co/storage')) {
-          setAdminPushLogoLink(data.push_logo_url);
+    try {
+      if (!currentAdmin?.id) return;
+      const { data, error } = await supabase
+        .from('clients')
+        .select('support_number, push_logo_url')
+        .eq('user_id', currentAdmin.id)
+        .maybeSingle();
+      
+      if (error) throw error;
+      
+      if (data) {
+        if (data.support_number) setAdminSupportNumber(data.support_number);
+        if (data.push_logo_url) {
+          setAdminPushLogoUrl(data.push_logo_url);
+          if (!data.push_logo_url.includes('supabase.co/storage')) {
+            setAdminPushLogoLink(data.push_logo_url);
+          }
         }
       }
+    } catch (err: any) {
+      console.error('Erro ao buscar configurações:', err);
     }
   };
 
@@ -173,7 +179,7 @@ export default function Admin() {
     setUploadingLogo(true);
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `push-logo-${currentAdmin.id}-${Math.random()}.${fileExt}`;
+      const fileName = `push-logo-${currentAdmin.id}-${Date.now()}.${fileExt}`;
       const filePath = `push-logos/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
@@ -182,23 +188,27 @@ export default function Admin() {
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
+      const { data: publicData } = supabase.storage
         .from('avatars')
         .getPublicUrl(filePath);
 
+      if (!publicData?.publicUrl) throw new Error('Falha ao gerar URL pública da logo');
+
       const { error: updateError } = await supabase
         .from('clients')
-        .update({ push_logo_url: publicUrl })
+        .update({ push_logo_url: publicData.publicUrl })
         .eq('user_id', currentAdmin.id);
 
       if (updateError) throw updateError;
 
-      setAdminPushLogoUrl(publicUrl);
+      setAdminPushLogoUrl(publicData.publicUrl);
       showToast('Logo do Push atualizada!', 'success');
     } catch (err: any) {
-      showToast('Erro no upload: ' + err.message, 'error');
+      console.error('Erro no upload da logo:', err);
+      showToast('Erro no upload: ' + (err.message || 'Erro desconhecido'), 'error');
     } finally {
       setUploadingLogo(false);
+      if (logoInputRef.current) logoInputRef.current.value = '';
     }
   };
 
@@ -1825,7 +1835,7 @@ export default function Admin() {
           </motion.div>
         )}
 
-      {activeTab === 'settings' && (
+      {activeTab === 'settings' && currentAdmin && (
         <div className="space-y-6">
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white dark:bg-slate-900 border border-black/5 dark:border-white/5 rounded-3xl overflow-hidden shadow-xl shadow-black/5 dark:shadow-white/5 p-8">
             <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Configurações do Negócio</h3>
