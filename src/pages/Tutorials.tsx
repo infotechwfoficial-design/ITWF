@@ -5,11 +5,11 @@ import {
   Search, 
   ChevronRight, 
   BookOpen,
-  Star
+  Star,
+  User as UserIcon
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
-
 export default function Tutorials() {
   const navigate = useNavigate();
 
@@ -22,13 +22,81 @@ export default function Tutorials() {
     { id: 6, title: 'Entendendo seu Histórico de Faturas', duration: '4:15', thumb: 'https://images.unsplash.com/photo-1454165833767-027ff33027ef?auto=format&fit=crop&q=80', category: 'Financeiro' },
   ];
 
+  const featuredCanva = (
+    <div className="md:col-span-4 mb-4">
+      <div className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-black/5 dark:border-white/5 rounded-[2.5rem] p-6 md:p-10 shadow-sm overflow-hidden">
+        <div className="flex flex-col lg:flex-row gap-10 items-center">
+          <div className="flex-1 space-y-4">
+            <span className="px-3 py-1 bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest rounded-full">Destaque</span>
+            <h2 className="text-3xl font-black text-slate-900 dark:text-white leading-tight">Aprenda a Maximizar sua Experiência ITWF</h2>
+            <p className="text-slate-500 dark:text-slate-400">Assista ao nosso tutorial interativo e domine todas as funcionalidades do seu painel em poucos minutos.</p>
+            <div className="pt-4 flex items-center gap-4">
+               <div className="flex -space-x-2">
+                 {[1,2,3].map(i => (
+                   <div key={i} className="size-8 rounded-full border-2 border-white dark:border-slate-800 bg-slate-200 dark:bg-white/10 flex items-center justify-center text-[10px] font-bold">
+                     <UserIcon size={12} />
+                   </div>
+                 ))}
+               </div>
+               <span className="text-xs text-slate-400 font-medium">+500 clientes já assistiram</span>
+            </div>
+          </div>
+          
+          <div className="w-full lg:w-[400px]">
+            <div 
+              style={{
+                position: 'relative',
+                width: '100%',
+                height: 0,
+                paddingTop: '177.7778%',
+                paddingBottom: 0,
+                boxShadow: '0 2px 20px 0 rgba(0,0,0,0.2)',
+                overflow: 'hidden',
+                borderRadius: '24px',
+                willChange: 'transform'
+              }}
+              className="group hover:scale-[1.02] transition-transform duration-500"
+            >
+              <iframe 
+                loading="lazy" 
+                style={{
+                  position: 'absolute',
+                  width: '100%',
+                  height: '100%',
+                  top: 0,
+                  left: 0,
+                  border: 'none',
+                  padding: 0,
+                  margin: 0
+                }}
+                src="https://www.canva.com/design/DAHD4du1Sc4/bX4V-gbFTm887xQ65zOIWA/watch?embed" 
+                allowFullScreen={true}
+                allow="fullscreen"
+              />
+            </div>
+            <div className="mt-4 text-center">
+              <a 
+                href="https://www.canva.com/design/DAHD4du1Sc4/bX4V-gbFTm887xQ65zOIWA/watch?utm_content=DAHD4du1Sc4&utm_campaign=designshare&utm_medium=embeds&utm_source=link" 
+                target="_blank" 
+                rel="noopener"
+                className="text-[10px] font-bold text-slate-400 hover:text-primary transition-colors uppercase tracking-widest"
+              >
+                Ver no Canva ↗
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <Layout>
       <div className="max-w-6xl mx-auto flex flex-col gap-10">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-1">
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Tutoriais em Vídeo</h1>
-            <p className="text-slate-500 dark:text-slate-400">Aprenda a dominar todas as ferramentas do sistema ITWF.</p>
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Centro de Aprendizado</h1>
+            <p className="text-slate-500 dark:text-slate-400">Tudo o que você precisa para dominar o ITWF em um só lugar.</p>
           </div>
           <div className="w-full md:w-80 relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -43,6 +111,8 @@ export default function Tutorials() {
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {featuredCanva}
+
           <div className="md:col-span-1 space-y-6">
             <div className="bg-slate-50 dark:bg-slate-900/40 border border-black/5 dark:border-white/10 rounded-2xl p-6 space-y-4 shadow-sm">
               <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest">Categorias</h3>
