@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Bell,
   Timer,
@@ -23,6 +23,7 @@ import { Client } from '../types';
 import { subscribeUserToPush } from '../utils/push';
 import { supabase } from '../utils/supabase';
 import Toast from '../components/Toast';
+import WelcomeModal from '../components/WelcomeModal';
 
 // Calcula dias restantes a partir de uma data no formato DD/MM/AAAA
 function getDaysRemaining(expirationDate: string): number {
@@ -55,6 +56,8 @@ export default function Dashboard() {
   const [newName, setNewName] = useState('');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [toastConfig, setToastConfig] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [showPushBanner, setShowPushBanner] = useState(false);
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
@@ -75,7 +78,18 @@ export default function Dashboard() {
 
         if (clientData) {
           setClient(clientData);
-          subscribeUserToPush(clientData.email, clientData.username, clientData.admin_id);
+          
+          // Verifica se precisa mostrar o banner de notificações
+          if ('Notification' in window && Notification.permission === 'default') {
+            setShowPushBanner(true);
+          } else if ('Notification' in window && Notification.permission === 'granted') {
+            subscribeUserToPush(clientData.email, clientData.username, clientData.admin_id);
+          }
+
+          // Verifica Onboarding
+          if (!clientData.onboarding_completed) {
+            setShowWelcomeModal(true);
+          }
         }
 
         // Fetch Requests
@@ -145,6 +159,32 @@ export default function Dashboard() {
     }
   };
 
+  const handleEnablePush = async () => {
+    if (!client) return;
+    try {
+      await subscribeUserToPush(client.email, client.username, client.admin_id);
+      setShowPushBanner(false);
+      showToast('Notificações ativadas!', 'success');
+    } catch (err) {
+      showToast('Erro ao ativar notificações', 'error');
+    }
+  };
+
+  const handleCloseWelcome = async () => {
+    setShowWelcomeModal(false);
+    if (!client) return;
+    try {
+      await supabase
+        .from('clients')
+        .update({ onboarding_completed: true })
+        .eq('user_id', client.user_id);
+      
+      setClient({ ...client, onboarding_completed: true });
+    } catch (err) {
+      console.warn('Erro ao salvar status de onboarding:', err);
+    }
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -168,7 +208,49 @@ export default function Dashboard() {
 
   return (
     <Layout>
+      <WelcomeModal
+        isOpen={showWelcomeModal}
+        onClose={handleCloseWelcome}
+        clientName={client?.name || ''}
+      />
       <div className="flex flex-col gap-8">
+        <AnimatePresence>
+          {showPushBanner && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="bg-gradient-to-r from-primary to-indigo-600 p-6 rounded-[2rem] text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl shadow-primary/20">
+                <div className="flex items-center gap-4">
+                  <div className="size-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shrink-0">
+                    <Bell className="animate-bounce" size={28} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold tracking-tight">Ative as Notificações! 🔔</h3>
+                    <p className="text-white/80 text-sm">Receba avisos de vencimento e novidades direto no seu celular.</p>
+                  </div>
+                </div>
+                <div className="flex gap-2 w-full md:w-auto">
+                  <button
+                    onClick={handleEnablePush}
+                    className="flex-1 md:flex-none bg-white text-primary px-8 py-3 rounded-xl font-black uppercase tracking-wider text-xs shadow-lg transition-transform active:scale-95"
+                  >
+                    Ativar Agora
+                  </button>
+                  <button
+                    onClick={() => setShowPushBanner(false)}
+                    className="p-3 bg-white/10 hover:bg-white/20 rounded-xl transition-colors"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <header className="flex items-center justify-between pb-6 border-b border-black/5 dark:border-white/5">
           <div>
             <h2 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
@@ -345,7 +427,7 @@ export default function Dashboard() {
             >
               <div>
                 <p className="text-sm text-slate-500 dark:text-slate-400 mb-1 font-medium">Valor do Plano</p>
-                <p className="text-2xl font-black text-slate-900 dark:text-white">R$ {client?.balance?.toFixed(2) || '0,00'}</p>
+                <p className="text-2xl font-black text-slate-900 dark:text-white">R$ {client?.balance?.toFixed(2).replace('.', ',') || '0,00'}</p>
               </div>
               <div className="size-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
                 <Wallet size={28} />

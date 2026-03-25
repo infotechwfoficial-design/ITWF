@@ -9,6 +9,8 @@ export interface Client {
   expiration_date: string;
   balance: number;
   renewal_link: string;
+  avatar_url?: string;
+  onboarding_completed?: boolean;
 }
 
 export interface Notification {
