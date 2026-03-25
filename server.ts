@@ -268,7 +268,7 @@ async function startServer() {
 
   // Helper para processar pagamentos de qualquer gateway
   // Cache de logos de administradores para evitar múltiplas consultas ao DB
-  const adminLogoCache = new Map<string, string>();
+  const adminLogoCache = new Map<string | null, string>();
 
   async function getAdminLogo(adminId: string | null): Promise<string> {
     const appUrl = process.env.VITE_APP_URL || 'https://itwf.vercel.app';
@@ -279,7 +279,7 @@ async function startServer() {
 
     try {
       const { data: admin } = await supabase.from('clients').select('push_logo_url').eq('user_id', adminId).maybeSingle();
-      const logo = admin?.push_logo_url || defaultLogo;
+      const logo = (admin as any)?.push_logo_url || defaultLogo;
       adminLogoCache.set(adminId, logo);
       return logo;
     } catch (e) {
