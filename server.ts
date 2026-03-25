@@ -504,9 +504,23 @@ async function startServer() {
         admin_id: adminId,
         subscription_json: JSON.stringify(subscription)
       }], { onConflict: 'subscription_json' });
-      res.status(201).json({});
+      res.status(201).json({ success: true });
     } catch (err: any) {
       res.status(400).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/push-stats', async (req, res) => {
+    const { adminId } = req.query;
+    try {
+      let query = supabase.from('push_subscriptions').select('*', { count: 'exact', head: true });
+      if (adminId) {
+        query = query.eq('admin_id', adminId);
+      }
+      const { count, error } = await query;
+      res.json({ count: count || 0 });
+    } catch (err) {
+      res.json({ count: 0 });
     }
   });
 
@@ -627,32 +641,14 @@ async function startServer() {
 
         const { data: subscriptions } = await supabase.from('push_subscriptions').select('subscription_json, admin_id').eq('username', client.username);
         if (subscriptions && subscriptions.length > 0) {
-          const appUrl = process.env.VITE_APP_URL || 'https://itwf.vercel.app';
-          
           for (const sub of subscriptions) {
-            let pushLogo = `${appUrl}/logo.png`;
-            if (sub.admin_id) {
-              const { data: admin } = await supabase.from('clients').select('push_logo_url').eq('user_id', sub.admin_id).single();
-              if (admin?.push_logo_url) pushLogo = admin.push_logo_url;
-            }
-
-            const payload = JSON.stringify({
+            const payload = {
               title,
               body: message,
-              icon: pushLogo,
-              badge: pushLogo,
               url: '/dashboard'
-            });
-
-            const pushSubscription = JSON.parse(sub.subscription_json);
-            try {
-              await webpush.sendNotification(pushSubscription, payload).catch(err => {
-                console.error(`[Cron] Push falhou para ${client.username}:`, err.statusCode);
-                if (err.statusCode === 404 || err.statusCode === 410) {
-                  supabase.from('push_subscriptions').delete().eq('subscription_json', sub.subscription_json).then();
-                }
-              });
-            } catch (e) {}
+            };
+            // Usar o helper centralizado: resolve IDs, usa cache e limpa tokens inválidos
+            await sendPushNotification(sub.subscription_json, payload, sub.admin_id);
           }
           console.log(`[Cron] Notificação enviada para ${client.username} (${diffDays} dias)`);
         }

@@ -57,6 +57,7 @@ export default function Admin() {
   const [currentAdmin, setCurrentAdmin] = useState<{ id: string; role: string } | null>(null);
   const [resellers, setResellers] = useState<any[]>([]);
   const [isResellerModalOpen, setIsResellerModalOpen] = useState(false);
+  const [pushSubscribersCount, setPushSubscribersCount] = useState<number | null>(null);
   const [resellerForm, setResellerForm] = useState({
     email: '',
     name: '',
@@ -242,6 +243,7 @@ export default function Admin() {
         fetchResellers();
         fetchPaymentSettings();
       }
+      fetchPushStats();
     }
   }, [currentAdmin]);
 
@@ -300,6 +302,18 @@ export default function Admin() {
       setPlans(data);
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const fetchPushStats = async () => {
+    if (!currentAdmin) return;
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || '';
+      const res = await fetch(`${apiUrl}/api/push-stats?adminId=${currentAdmin.id}`);
+      const data = await res.json();
+      setPushSubscribersCount(data.count || 0);
+    } catch (err) {
+      console.error('Error fetching push stats', err);
     }
   };
 
@@ -389,7 +403,7 @@ export default function Admin() {
 
       if (!res.ok) throw new Error('Falha ao salvar notificação');
 
-      await fetch(`${apiUrl}/api/send-push`, {
+      const resPush = await fetch(`${apiUrl}/api/send-push`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -399,10 +413,17 @@ export default function Admin() {
         })
       });
 
+      const pushData = await resPush.json();
+      
       setIsNotifModalOpen(false);
       setNotifForm({ title: '', message: '', type: 'info' });
       fetchNotifications();
-      showToast('Notificação enviada com sucesso!', 'success');
+      
+      if (pushData.count === 0) {
+        showToast('Notificação salva, mas nenhum inscrito para receber o Push agora.', 'warning');
+      } else {
+        showToast(`Notificação enviada com sucesso!`, 'success');
+      }
     } catch (err: any) {
       showToast('Erro: ' + err.message, 'error');
     } finally {
@@ -1481,6 +1502,16 @@ export default function Admin() {
                 </button>
               </div>
               <form onSubmit={handleNotifSubmit} className="p-6 space-y-6">
+                <div className="bg-primary/5 border border-primary/10 rounded-2xl p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Smartphone size={20} className="text-primary" />
+                    <span className="text-sm font-bold text-slate-700 dark:text-slate-300">Inscritos para Push</span>
+                  </div>
+                  <span className="px-3 py-1 bg-primary text-white text-xs font-black rounded-full">
+                    {pushSubscribersCount === null ? '...' : pushSubscribersCount}
+                  </span>
+                </div>
+
                 <div className="space-y-2">
                   <label className="text-sm font-bold text-slate-500">Título</label>
                   <input
