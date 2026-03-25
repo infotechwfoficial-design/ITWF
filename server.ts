@@ -70,7 +70,7 @@ async function startServer() {
       contents.push({ role: 'user', parts: [{ text: message }] });
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-1.5-flash',
         contents: contents
       });
 
@@ -267,6 +267,49 @@ async function startServer() {
   });
 
   // Helper para processar pagamentos de qualquer gateway
+  // Cache de logos de administradores para evitar múltiplas consultas ao DB
+  const adminLogoCache = new Map<string, string>();
+
+  async function getAdminLogo(adminId: string | null): Promise<string> {
+    const appUrl = process.env.VITE_APP_URL || 'https://itwf.vercel.app';
+    const defaultLogo = `${appUrl}/logo.png`;
+
+    if (!adminId) return defaultLogo;
+    if (adminLogoCache.has(adminId)) return adminLogoCache.get(adminId)!;
+
+    try {
+      const { data: admin } = await supabase.from('clients').select('push_logo_url').eq('user_id', adminId).maybeSingle();
+      const logo = admin?.push_logo_url || defaultLogo;
+      adminLogoCache.set(adminId, logo);
+      return logo;
+    } catch (e) {
+      return defaultLogo;
+    }
+  }
+
+  async function sendPushNotification(subscriptionJson: string, payload: any, adminId?: string | null) {
+    try {
+      const pushSubscription = JSON.parse(subscriptionJson);
+      const logo = await getAdminLogo(adminId || null);
+
+      const finalPayload = JSON.stringify({
+        ...payload,
+        icon: payload.icon || logo,
+        badge: payload.badge || logo
+      });
+
+      return webpush.sendNotification(pushSubscription, finalPayload)
+        .catch(async (err) => {
+          if (err.statusCode === 404 || err.statusCode === 410) {
+            console.log(`[Push] Removendo inscrição inválida (${err.statusCode})`);
+            await supabase.from('push_subscriptions').delete().eq('subscription_json', subscriptionJson);
+          }
+        });
+    } catch (e) {
+      console.error('[Push Error] Falha ao enviar notificação:', e);
+    }
+  }
+
   async function processApprovedPayment(externalRef: string, providerName: string) {
     if (!externalRef || !externalRef.includes('|')) return;
 
@@ -313,26 +356,13 @@ async function startServer() {
       // Send Push Notification
       const { data: subscriptions } = await supabase.from('push_subscriptions').select('subscription_json, admin_id').eq('email', userEmail);
       if (subscriptions && subscriptions.length > 0) {
-        const appUrl = process.env.VITE_APP_URL || 'https://itwf.vercel.app';
-        
         for (const sub of subscriptions) {
-          let pushLogo = `${appUrl}/logo.png`;
-          if (sub.admin_id) {
-            const { data: admin } = await supabase.from('clients').select('push_logo_url').eq('user_id', sub.admin_id).single();
-            if (admin?.push_logo_url) pushLogo = admin.push_logo_url;
-          }
-
-          const payload = JSON.stringify({
+          const payload = {
             title: 'Pagamento Aprovado! 🎉',
             body: `Seu plano "${plan.name}" foi ativado/renovado. Novo vencimento: ${newExpDate}`,
-            icon: pushLogo,
-            badge: pushLogo,
             url: '/invoices'
-          });
-
-          try {
-            webpush.sendNotification(JSON.parse(sub.subscription_json), payload).catch(() => { });
-          } catch (e) { }
+          };
+          await sendPushNotification(sub.subscription_json, payload, sub.admin_id);
         }
       }
     }
@@ -493,29 +523,13 @@ async function startServer() {
 
     const appUrl = process.env.VITE_APP_URL || 'https://itwf.vercel.app';
 
-    const promises = subscriptions.map(async (sub) => {
-      let pushLogo = `${appUrl}/logo.png`;
-      if (sub.admin_id) {
-        const { data: admin } = await supabase.from('clients').select('push_logo_url').eq('user_id', sub.admin_id).single();
-        if (admin?.push_logo_url) pushLogo = admin.push_logo_url;
-      }
-
-      const payload = JSON.stringify({
+    const promises = subscriptions.map((sub) => {
+      const payload = {
         title,
         body: message,
-        icon: pushLogo,
-        badge: pushLogo,
         url: '/dashboard'
-      });
-
-      const pushSubscription = JSON.parse(sub.subscription_json);
-      return webpush.sendNotification(pushSubscription, payload)
-        .catch(err => {
-          console.error(`Push error for user ${email || 'all'}:`, err.statusCode, err.body || err.message);
-          if (err.statusCode === 404 || err.statusCode === 410) {
-            supabase.from('push_subscriptions').delete().eq('subscription_json', sub.subscription_json).then();
-          }
-        });
+      };
+      return sendPushNotification(sub.subscription_json, payload, sub.admin_id);
     });
 
     await Promise.all(promises);
@@ -670,7 +684,7 @@ async function startServer() {
 
       console.log('[Sports Agenda] Chamando Gemini...');
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-1.5-flash',
         contents: [
           {
             role: 'user',
@@ -730,28 +744,13 @@ async function startServer() {
 
       const appUrl = process.env.VITE_APP_URL || 'https://itwf.vercel.app';
       
-      const promises = subscriptions.map(async (sub) => {
-        let pushLogo = `${appUrl}/logo.png`;
-        if (sub.admin_id) {
-          const { data: admin } = await supabase.from('clients').select('push_logo_url').eq('user_id', sub.admin_id).single();
-          if (admin?.push_logo_url) pushLogo = admin.push_logo_url;
-        }
-
-        const payload = JSON.stringify({
+      const promises = subscriptions.map((sub) => {
+        const payload = {
           title: '⚽ Agenda Esportiva do Dia',
           body: message,
-          icon: pushLogo,
-          badge: pushLogo,
           url: '/dashboard'
-        });
-
-        const pushSubscription = JSON.parse(sub.subscription_json);
-        console.log(`[Sports Push] Enviando para: ${pushSubscription.endpoint.substring(0, 30)}...`);
-        return webpush.sendNotification(pushSubscription, payload)
-          .then(() => console.log(`[Sports Push] Sucesso no envio!`))
-          .catch((err) => {
-            console.error(`[Sports Push] Erro ao enviar para inscrição:`, err.statusCode, err.body || err.message);
-          });
+        };
+        return sendPushNotification(sub.subscription_json, payload, sub.admin_id);
       });
 
       await Promise.all(promises);
@@ -774,23 +773,12 @@ async function startServer() {
       const appUrl = process.env.VITE_APP_URL || 'https://itwf.vercel.app';
       
       for (const sub of subscriptions) {
-        let pushLogo = `${appUrl}/logo.png`;
-        if (sub.admin_id) {
-          const { data: admin } = await supabase.from('clients').select('push_logo_url').eq('user_id', sub.admin_id).single();
-          if (admin?.push_logo_url) pushLogo = admin.push_logo_url;
-        }
-
-        const payload = JSON.stringify({
+        const payload = {
           title: '⚽ Agenda Esportiva do Dia',
           body: message,
-          icon: pushLogo,
-          badge: pushLogo,
           url: '/dashboard'
-        });
-
-        try {
-          webpush.sendNotification(JSON.parse(sub.subscription_json), payload).catch(() => {});
-        } catch (e) {}
+        };
+        await sendPushNotification(sub.subscription_json, payload, sub.admin_id);
       }
       console.log('[Cron] Agenda Esportiva (Manhã) enviada.');
     } catch (e) {
@@ -811,23 +799,12 @@ async function startServer() {
       const appUrl = process.env.VITE_APP_URL || 'https://itwf.vercel.app';
       
       for (const sub of subscriptions) {
-        let pushLogo = `${appUrl}/logo.png`;
-        if (sub.admin_id) {
-          const { data: admin } = await supabase.from('clients').select('push_logo_url').eq('user_id', sub.admin_id).single();
-          if (admin?.push_logo_url) pushLogo = admin.push_logo_url;
-        }
-
-        const payload = JSON.stringify({
+        const payload = {
           title: '⚽ Agenda Esportiva do Dia',
           body: message,
-          icon: pushLogo,
-          badge: pushLogo,
           url: '/dashboard'
-        });
-
-        try {
-          webpush.sendNotification(JSON.parse(sub.subscription_json), payload).catch(() => {});
-        } catch (e) {}
+        };
+        await sendPushNotification(sub.subscription_json, payload, sub.admin_id);
       }
       console.log('[Cron] Agenda Esportiva (Tarde) enviada.');
     } catch (e) {
@@ -842,23 +819,17 @@ async function startServer() {
       const message = await fetchSportsAgenda();
       if (!message) return;
 
-      const { data: subscriptions } = await supabase.from('push_subscriptions').select('subscription_json');
+      const { data: subscriptions } = await supabase.from('push_subscriptions').select('subscription_json, admin_id');
       if (!subscriptions) return;
 
-      const appUrl = process.env.VITE_APP_URL || 'https://itwf.vercel.app';
-      const payload = JSON.stringify({
-        title: '⚽ Agenda Esportiva do Dia',
-        body: message,
-        icon: `${appUrl}/logo.png`,
-        badge: `${appUrl}/logo.png`,
-        url: '/dashboard'
-      });
-
-      subscriptions.forEach(sub => {
-        try {
-          webpush.sendNotification(JSON.parse(sub.subscription_json), payload).catch(() => {});
-        } catch (e) {}
-      });
+      for (const sub of subscriptions) {
+        const payload = {
+          title: '⚽ Agenda Esportiva do Dia',
+          body: message,
+          url: '/dashboard'
+        };
+        await sendPushNotification(sub.subscription_json, payload, sub.admin_id);
+      }
       console.log('[Cron] Agenda Esportiva (Noite) enviada.');
     } catch (e) {
       console.error('[Cron] Falha na Agenda Esportiva (Noite):', e);

@@ -12,7 +12,7 @@ self.addEventListener('push', function (event) {
 
   const baseUrl = self.registration.scope.replace(/\/$/, '');
   const iconUrl = data.icon || `${baseUrl}/logo.png`;
-  const badgeUrl = `${baseUrl}/logo.png`;
+  const badgeUrl = data.badge || `${baseUrl}/logo.png`;
 
   const options = {
     body: data.body || 'Você tem uma nova atualização no seu painel.',
