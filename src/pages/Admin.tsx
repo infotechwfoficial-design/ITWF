@@ -66,6 +66,7 @@ export default function Admin() {
   // Admin Settings State
   const [adminSupportNumber, setAdminSupportNumber] = useState('');
   const [adminPushLogoUrl, setAdminPushLogoUrl] = useState('');
+  const [adminPushLogoLink, setAdminPushLogoLink] = useState('');
   const [savingSettings, setSavingSettings] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -132,7 +133,31 @@ export default function Admin() {
       .single();
     if (data) {
       if (data.support_number) setAdminSupportNumber(data.support_number);
-      if (data.push_logo_url) setAdminPushLogoUrl(data.push_logo_url);
+      if (data.push_logo_url) {
+        setAdminPushLogoUrl(data.push_logo_url);
+        // Se não for um link do Supabase Storage, assume que é link externo e preenche o input
+        if (!data.push_logo_url.includes('supabase.co/storage')) {
+          setAdminPushLogoLink(data.push_logo_url);
+        }
+      }
+    }
+  };
+
+  const savePushLogoLink = async () => {
+    if (!currentAdmin?.id || !adminPushLogoLink) return;
+    setSavingSettings(true);
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .update({ push_logo_url: adminPushLogoLink })
+        .eq('user_id', currentAdmin.id);
+      if (error) throw error;
+      setAdminPushLogoUrl(adminPushLogoLink);
+      showToast('Link da logo salvo!', 'success');
+    } catch (err: any) {
+      showToast('Erro ao salvar link: ' + err.message, 'error');
+    } finally {
+      setSavingSettings(false);
     }
   };
 
@@ -1851,6 +1876,26 @@ export default function Admin() {
                     {uploadingLogo ? 'Subindo...' : 'Escolher Logo do Push'}
                   </label>
                   <p className="text-[10px] text-slate-400 text-center">Tamanho recomendado: 192x192px (PNG/JPG). Esta logo aparecerá nos alertas enviados aos seus clientes.</p>
+                </div>
+
+                <div className="pt-4 border-t border-black/5 dark:border-white/5 space-y-3">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Ou cole o link direto da imagem</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="url"
+                      value={adminPushLogoLink}
+                      onChange={e => setAdminPushLogoLink(e.target.value)}
+                      placeholder="https://exemplo.com/sua-logo.png"
+                      className="flex-1 px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border border-black/10 dark:border-white/10 rounded-xl text-xs outline-none focus:ring-1 focus:ring-primary"
+                    />
+                    <button
+                      onClick={savePushLogoLink}
+                      disabled={savingSettings || !adminPushLogoLink}
+                      className="px-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-xl text-xs font-bold hover:opacity-90 disabled:opacity-50 transition-all"
+                    >
+                      Salvar Link
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
