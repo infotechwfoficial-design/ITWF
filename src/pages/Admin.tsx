@@ -106,6 +106,9 @@ export default function Admin() {
 
   // Notification Form State
   const [isNotifModalOpen, setIsNotifModalOpen] = useState(false);
+  const [isDirectPushModalOpen, setIsDirectPushModalOpen] = useState(false);
+  const [directPushClient, setDirectPushClient] = useState<Client | null>(null);
+  const [directPushMessage, setDirectPushMessage] = useState('');
   const [notifForm, setNotifForm] = useState({
     title: '',
     message: '',
@@ -431,30 +434,41 @@ export default function Admin() {
     }
   };
 
-  const sendDirectPush = async (client: Client) => {
-    const message = window.prompt(`Enviar notificação direta para ${client.name}:`, `Olá ${client.name}, sua assinatura vence em ${client.expiration_date}.`);
-    if (message) {
-      try {
-        const apiUrl = import.meta.env.VITE_API_URL || '';
-        const res = await fetch(`${apiUrl}/api/send-push`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title: 'Aviso de Vencimento',
-            message,
-            username: client.username,
-            adminId: currentAdmin?.id
-          })
-        });
-        
-        const data = await res.json();
-        
-        if (!res.ok) throw new Error(data.error || 'Falha ao enviar push');
-        
-        showToast('Notificação enviada!', 'success');
-      } catch (err: any) {
-        showToast(`Erro ao enviar notificação: ${err.message}`, 'error');
-      }
+  const openDirectPushModal = (client: Client) => {
+    setDirectPushClient(client);
+    setDirectPushMessage(`Olá ${client.name}, sua assinatura vence em ${client.expiration_date}.`);
+    setIsDirectPushModalOpen(true);
+  };
+
+  const handleDirectPushSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!directPushClient || !directPushMessage || submitting) return;
+    
+    try {
+      setSubmitting(true);
+      const apiUrl = import.meta.env.VITE_API_URL || '';
+      const res = await fetch(`${apiUrl}/api/send-push`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: 'Aviso de Vencimento',
+          message: directPushMessage,
+          username: directPushClient.username,
+          adminId: currentAdmin?.id
+        })
+      });
+      
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Falha ao enviar push');
+      
+      showToast('Notificação enviada!', 'success');
+      setIsDirectPushModalOpen(false);
+      setDirectPushClient(null);
+      setDirectPushMessage('');
+    } catch (err: any) {
+      showToast(`Erro ao enviar notificação: ${err.message}`, 'error');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -793,7 +807,7 @@ export default function Admin() {
                       <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-end gap-2">
                           <button
-                            onClick={() => sendDirectPush(client)}
+                            onClick={() => openDirectPushModal(client)}
                             className="p-2 text-slate-400 hover:text-amber-500 transition-colors"
                             title="Enviar Notificação Push"
                           >
@@ -859,7 +873,7 @@ export default function Admin() {
                     </div>
                     <div className="flex gap-2">
                       <button
-                        onClick={(e) => { e.stopPropagation(); sendDirectPush(client); }}
+                        onClick={(e) => { e.stopPropagation(); openDirectPushModal(client); }}
                         className="p-2 bg-amber-500/10 rounded-xl text-amber-500"
                         title="Enviar Notificação Push"
                       >
@@ -1561,6 +1575,60 @@ export default function Admin() {
                   >
                     <Bell size={20} />
                     Enviar Notificação
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Direct Push Modal */}
+        {isDirectPushModalOpen && directPushClient && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-sm shadow-2xl border border-black/5 dark:border-white/10"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h3 className="text-xl font-bold">Enviar Aviso</h3>
+                  <p className="text-xs text-slate-500 font-mono">@{directPushClient.username}</p>
+                </div>
+                <button
+                  onClick={() => setIsDirectPushModalOpen(false)}
+                  className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <form onSubmit={handleDirectPushSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Mensagem para {directPushClient.name}</label>
+                  <textarea
+                    required
+                    rows={3}
+                    value={directPushMessage}
+                    onChange={e => setDirectPushMessage(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-50 dark:bg-white/5 border border-black/5 dark:border-white/10 rounded-2xl outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm resize-none"
+                    placeholder="Sua mensagem aqui..."
+                  />
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsDirectPushModalOpen(false)}
+                    className="flex-1 px-6 py-3 rounded-2xl font-bold text-slate-500 hover:bg-black/5 dark:hover:bg-white/5 transition-all text-sm"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="flex-1 flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-2xl font-black text-sm shadow-lg shadow-amber-500/20 transition-all active:scale-95 disabled:opacity-50"
+                  >
+                    {submitting ? <Loader2 className="animate-spin" size={18} /> : <Bell size={18} />}
+                    {submitting ? 'Enviando...' : 'Enviar Push'}
                   </button>
                 </div>
               </form>
