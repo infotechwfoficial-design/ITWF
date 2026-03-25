@@ -478,41 +478,49 @@ export default function Admin() {
     showToast('Link de acesso copiado!', 'success');
   };
 
+  const performClientCleanup = async (client: Client) => {
+    // 1. Delete push subscriptions
+    await supabase.from('push_subscriptions').delete().eq('email', client.email);
+    
+    // 2. Delete requests
+    await supabase.from('requests').delete().eq('username', client.username);
+    
+    // 3. Delete invoices
+    if (client.user_id) {
+      await supabase.from('invoices').delete().eq('user_id', client.user_id);
+    }
+
+    // 4. Delete the user from Supabase Auth via backend
+    if (client.user_id) {
+      const apiUrl = import.meta.env.VITE_API_URL || '';
+      try {
+        const res = await fetch(`${apiUrl}/api/users/${client.user_id}`, { method: 'DELETE' });
+        if (!res.ok) {
+          const errorData = await res.json();
+          console.error(`Falha ao deletar Auth do usuário ${client.email}:`, errorData.error);
+        }
+      } catch (backendErr) {
+        console.error('Erro ao deletar da tabela auth.users no backend:', backendErr);
+      }
+    }
+
+    // 5. Delete the client record
+    const { error } = await supabase.from('clients').delete().eq('id', client.id);
+    if (error) throw error;
+  };
+
   const deleteClient = async (client: Client) => {
     if (window.confirm(`Tem certeza que deseja excluir o cliente ${client.name}? Esta ação apagará permanentemente todos os pedidos, faturas e registros de notificação vinculados.`)) {
       try {
-        // 1. Delete push subscriptions
-        await supabase.from('push_subscriptions').delete().eq('email', client.email);
-        
-        // 2. Delete requests
-        await supabase.from('requests').delete().eq('username', client.username);
-        
-        // 3. Delete invoices
-        if (client.user_id) {
-          await supabase.from('invoices').delete().eq('user_id', client.user_id);
-        }
-
-        // 4. Delete the user from Supabase Auth via backend
-        if (client.user_id) {
-          const apiUrl = import.meta.env.VITE_API_URL || '';
-          try {
-            await fetch(`${apiUrl}/api/users/${client.user_id}`, { method: 'DELETE' });
-          } catch (backendErr) {
-            console.error('Erro ao deletar da tabela auth.users no backend:', backendErr);
-          }
-        }
-
-        // 5. Delete the client itself
-        const { error } = await supabase.from('clients').delete().eq('id', client.id);
-        
-        if (error) throw error;
-
+        setSubmitting(true);
+        await performClientCleanup(client);
         showToast('Cliente e acesso ao App completamente excluídos!', 'success');
         fetchClients();
       } catch (err: any) {
         showToast('Erro crítico ao excluir conta do cliente: ' + err.message, 'error');
+      } finally {
+        setSubmitting(false);
       }
-
     }
   };
 
@@ -683,14 +691,55 @@ export default function Admin() {
     }
   };
 
-  const deleteReseller = async (id: string) => {
-    if (window.confirm('Remover acesso de revendedor desta conta?')) {
-      const { error } = await supabase.from('admins').delete().eq('id', id);
-      if (error) {
-        showToast('Erro ao remover: ' + error.message, 'error');
-      } else {
-        showToast('Revendedor removido.', 'success');
+  const deleteReseller = async (reseller: any) => {
+    const warning = reseller.clientCount > 0 
+      ? `ATENÇÃO: Este revendedor possui ${reseller.clientCount} clientes vinculados. Ao excluir o revendedor, TODOS os seus clientes, pedidos e faturas também serão excluídos permanentemente. Deseja continuar?`
+      : `Tem certeza que deseja remover o acesso de revendedor de ${reseller.name || reseller.email}?`;
+
+    if (window.confirm(warning)) {
+      try {
+        setSubmitting(true);
+        
+        // 1. Limpeza em Cascata: Deletar todos os clientes vinculados
+        if (reseller.user_id) {
+          const { data: linkedClients, error: fetchErr } = await supabase
+            .from('clients')
+            .select('*')
+            .eq('admin_id', reseller.user_id);
+          
+          if (fetchErr) throw fetchErr;
+          
+          if (linkedClients && linkedClients.length > 0) {
+            for (const client of linkedClients) {
+              await performClientCleanup(client);
+            }
+          }
+
+          // 2. Limpar pedidos que possam estar vinculados diretamente ao admin_id
+          await supabase.from('requests').delete().eq('admin_id', reseller.user_id);
+        }
+
+        // 3. Deletar o registro de administrador
+        const { error: adminErr } = await supabase.from('admins').delete().eq('id', reseller.id);
+        if (adminErr) throw adminErr;
+
+        // 3. Deletar a conta no Supabase Auth
+        if (reseller.user_id) {
+          const apiUrl = import.meta.env.VITE_API_URL || '';
+          try {
+            await fetch(`${apiUrl}/api/users/${reseller.user_id}`, { method: 'DELETE' });
+          } catch (err) {
+            console.error('Erro ao remover Auth do revendedor:', err);
+          }
+        }
+
+        showToast('Revendedor e todos os seus vínculos foram excluídos!', 'success');
         fetchResellers();
+        fetchClients(); // Atualizar lista de clientes também pois foram apagados em cascata
+      } catch (err: any) {
+        showToast('Erro na exclusão em cascata: ' + err.message, 'error');
+      } finally {
+        setSubmitting(false);
       }
     }
   };
@@ -1274,8 +1323,9 @@ export default function Admin() {
                       <td className="px-6 py-4 text-right">
                         {reseller.role !== 'master' && (
                           <button
-                            onClick={() => deleteReseller(reseller.id)}
-                            className="p-2 text-slate-400 hover:text-rose-500 transition-colors"
+                            onClick={() => deleteReseller(reseller)}
+                            disabled={submitting}
+                            className="p-2 text-slate-400 hover:text-rose-500 transition-colors disabled:opacity-50"
                           >
                             <Trash2 size={18} />
                           </button>
