@@ -5,6 +5,8 @@
 
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { RefreshCw } from 'lucide-react';
 import { supabase } from './utils/supabase';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -224,34 +226,47 @@ export default function App() {
       </Router>
 
       {/* PWA Toast Notification */}
-      {(offlineReady || needRefresh) && (
-        <div className="fixed bottom-4 right-4 z-[9999] bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-2xl border border-black/5 dark:border-white/10 flex flex-col gap-3 min-w-[300px] animate-in slide-in-from-bottom-5">
-          <div className="flex flex-col gap-1">
-            <h4 className="font-bold text-slate-900 dark:text-white">
-              {offlineReady ? 'App pronto para uso offline!' : 'Nova atualização disponível!'}
-            </h4>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              {offlineReady ? 'Você pode usar o app sem internet.' : 'Clique em atualizar para ver as novidades.'}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            {needRefresh && (
+      <AnimatePresence>
+        {(offlineReady || needRefresh) && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            className="fixed bottom-6 right-6 z-[9999] bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl p-5 rounded-3xl shadow-2xl border border-black/5 dark:border-white/10 flex flex-col gap-4 min-w-[320px] max-w-[400px]"
+          >
+            <div className="flex items-center gap-4">
+              <div className="size-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center animate-pulse">
+                <RefreshCw size={24} />
+              </div>
+              <div className="flex flex-col">
+                <h4 className="font-bold text-slate-900 dark:text-white text-lg tracking-tight leading-tight">
+                  {offlineReady ? 'App Offline Pronto!' : 'Nova Versão! 🚀'}
+                </h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                  {offlineReady ? 'O sistema está pronto para uso sem internet.' : 'Acabamos de lançar melhorias incríveis.'}
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex gap-2">
+              {needRefresh && (
+                <button
+                  onClick={() => updateServiceWorker(true)}
+                  className="flex-1 bg-primary hover:bg-primary/90 text-white py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-primary/20 transition-all active:scale-95"
+                >
+                  Atualizar Agora
+                </button>
+              )}
               <button
-                onClick={() => updateServiceWorker(true)}
-                className="flex-1 bg-primary text-white py-2 rounded-xl text-sm font-bold shadow-lg shadow-primary/20"
+                onClick={close}
+                className="flex-1 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-900 dark:text-white py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest transition-all"
               >
-                Atualizar Agora
+                Ignorar
               </button>
-            )}
-            <button
-              onClick={close}
-              className="flex-1 bg-slate-100 dark:bg-white/10 text-slate-900 dark:text-white py-2 rounded-xl text-sm font-bold"
-            >
-              Fechar
-            </button>
-          </div>
-        </div>
-      )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {showInstallModal && (
         <PWAInstallModal
           deferredPrompt={deferredPrompt}
