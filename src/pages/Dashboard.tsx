@@ -10,13 +10,19 @@ import {
   Clock,
   MessageSquare,
   ExternalLink,
-  AlertTriangle
+  AlertTriangle,
+  Camera,
+  Edit3,
+  Check,
+  X,
+  User
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { Client } from '../types';
 import { subscribeUserToPush } from '../utils/push';
 import { supabase } from '../utils/supabase';
+import Toast from '../components/Toast';
 
 // Calcula dias restantes a partir de uma data no formato DD/MM/AAAA
 function getDaysRemaining(expirationDate: string): number {
@@ -43,6 +49,17 @@ export default function Dashboard() {
   const [client, setClient] = useState<Client | null>(null);
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Quick Edit States
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [toastConfig, setToastConfig] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToastConfig({ message, type });
+  };
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -74,6 +91,59 @@ export default function Dashboard() {
 
     fetchUserData();
   }, []);
+
+  const handleUpdateName = async () => {
+    if (!client || !newName.trim()) return;
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .update({ name: newName.trim() })
+        .eq('user_id', client.user_id);
+
+      if (error) throw error;
+      setClient({ ...client, name: newName.trim() });
+      setIsEditingName(false);
+      showToast('Nome atualizado com sucesso!', 'success');
+    } catch (err: any) {
+      showToast('Erro ao atualizar nome: ' + err.message, 'error');
+    }
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !client) return;
+
+    setUploadingAvatar(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${client.user_id}-${Math.random()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      const { error: updateError } = await supabase
+        .from('clients')
+        .update({ avatar_url: publicUrl })
+        .eq('user_id', client.user_id);
+
+      if (updateError) throw updateError;
+
+      setClient({ ...client, avatar_url: publicUrl });
+      showToast('Foto de perfil atualizada!', 'success');
+    } catch (err: any) {
+      showToast('Erro ao subir foto: ' + err.message, 'error');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -113,14 +183,59 @@ export default function Dashboard() {
             </Link>
             <div className="flex items-center gap-3">
               <div className="text-right hidden md:block">
-                <p className="text-sm font-bold text-slate-900 dark:text-white">{client?.name || 'Visitante'}</p>
+                {isEditingName ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      autoFocus
+                      type="text"
+                      className="text-sm font-bold bg-white dark:bg-slate-800 border border-primary/30 rounded px-2 py-1 outline-none text-slate-900 dark:text-white"
+                      value={newName}
+                      onChange={e => setNewName(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleUpdateName()}
+                    />
+                    <button onClick={handleUpdateName} className="text-green-500 hover:scale-110 transition-transform"><Check size={16} /></button>
+                    <button onClick={() => setIsEditingName(false)} className="text-rose-500 hover:scale-110 transition-transform"><X size={16} /></button>
+                  </div>
+                ) : (
+                  <div 
+                    className="group cursor-pointer flex items-center gap-2 justify-end"
+                    onClick={() => {
+                      setNewName(client?.name || '');
+                      setIsEditingName(true);
+                    }}
+                  >
+                    <p className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">{client?.name || 'Visitante'}</p>
+                    <Edit3 size={12} className="text-slate-400 group-hover:text-primary opacity-0 group-hover:opacity-100 transition-all" />
+                  </div>
+                )}
                 <p className="text-xs text-slate-500">{client?.email || 'sem-email@empresa.com'}</p>
               </div>
-              <div className="size-10 rounded-full bg-slate-200 dark:bg-slate-800 border-2 border-primary/50 overflow-hidden">
-                <img
-                  src={client?.avatar_url || `https://ui-avatars.com/api/?name=${client?.name || 'V'}&background=random`}
-                  alt="Avatar"
-                  className="w-full h-full object-cover"
+              
+              <div 
+                className="relative group cursor-pointer"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <div className="size-10 md:size-12 rounded-full bg-slate-200 dark:bg-slate-800 border-2 border-primary/50 overflow-hidden relative shadow-lg shadow-primary/10">
+                  {uploadingAvatar && (
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
+                      <RefreshCw className="animate-spin text-white" size={16} />
+                    </div>
+                  )}
+                  <img
+                    src={client?.avatar_url || `https://ui-avatars.com/api/?name=${client?.name || 'V'}&background=random`}
+                    alt="Avatar"
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  />
+                  <div className="absolute inset-0 bg-primary/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Camera size={18} className="text-white" />
+                  </div>
+                </div>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleAvatarUpload}
+                  className="hidden"
+                  accept="image/*"
                 />
               </div>
             </div>
@@ -316,6 +431,14 @@ export default function Dashboard() {
           </div>
         </section>
       </div>
+
+      {toastConfig && (
+        <Toast
+          message={toastConfig.message}
+          type={toastConfig.type}
+          onClose={() => setToastConfig(null)}
+        />
+      )}
     </Layout>
   );
 }
