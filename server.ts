@@ -278,11 +278,16 @@ async function startServer() {
     if (adminLogoCache.has(adminId)) return adminLogoCache.get(adminId)!;
 
     try {
-      const { data: admin } = await supabase.from('clients').select('push_logo_url').eq('user_id', adminId).maybeSingle();
-      const logo = (admin as any)?.push_logo_url || defaultLogo;
+      const { data: adminAuth } = await supabase.from('admins').select('user_id').eq('id', adminId).maybeSingle();
+      const userId = adminAuth?.user_id || adminId;
+
+      const { data: adminProfile } = await supabase.from('clients').select('push_logo_url').eq('user_id', userId).maybeSingle();
+      const logo = adminProfile?.push_logo_url || defaultLogo;
+
       adminLogoCache.set(adminId, logo);
       return logo;
     } catch (e) {
+      console.error(`[AdminLogo Error] Falha ao buscar logo para ${adminId}:`, e);
       return defaultLogo;
     }
   }
@@ -506,19 +511,30 @@ async function startServer() {
   });
 
   app.post('/api/send-push', async (req, res) => {
-    const { title, message, email, username } = req.body;
-    console.log(`Sending push for: ${username || email || 'all'}`);
+    const { title, message, email, username, adminId } = req.body;
+    console.log(`Sending push for: ${username || email || 'all'} (Admin: ${adminId || 'global'})`);
 
     let query = supabase.from('push_subscriptions').select('subscription_json, admin_id');
+    
+    // Se for enviado por um revendedor (adminId presente), filtramos apenas os clientes dele
+    if (adminId) {
+      query = query.eq('admin_id', adminId);
+    }
+
     if (username) {
       query = query.eq('username', username);
     } else if (email) {
       query = query.eq('email', email);
     }
+
     const { data: subscriptions, error } = await query;
     if (error || !subscriptions) {
       console.error('Push fetch error:', error);
       return res.status(400).json({ error: 'Failed to fetch subscriptions' });
+    }
+
+    if (subscriptions.length === 0) {
+      return res.json({ success: true, count: 0, message: 'Nenhum inscrito funcional encontrado para este filtro.' });
     }
 
     const appUrl = process.env.VITE_APP_URL || 'https://itwf.vercel.app';

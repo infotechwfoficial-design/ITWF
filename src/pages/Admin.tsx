@@ -394,7 +394,8 @@ export default function Admin() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: notifForm.title,
-          message: notifForm.message
+          message: notifForm.message,
+          adminId: currentAdmin?.id
         })
       });
 
@@ -420,7 +421,8 @@ export default function Admin() {
           body: JSON.stringify({
             title: 'Aviso de Vencimento',
             message,
-            username: client.username
+            username: client.username,
+            adminId: currentAdmin?.id
           })
         });
         
