@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { CheckCircle2, X, Sparkles } from 'lucide-react';
+import { CheckCircle2, X, Sparkles, PlayCircle, Circle } from 'lucide-react';
 
 interface WelcomeModalProps {
   isOpen: boolean;
@@ -27,10 +27,10 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose, clientName
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.9, y: 100 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="relative w-[95%] max-w-5xl h-auto max-h-[90vh] bg-white dark:bg-[#0B1120] rounded-[2.5rem] md:rounded-[3rem] shadow-[0_0_100px_rgba(0,0,0,0.8)] border border-white/10 overflow-hidden flex flex-row custom-scrollbar"
+            className="relative w-[95%] max-w-6xl h-auto max-h-[90vh] bg-white dark:bg-[#0B1120] rounded-[2.5rem] md:rounded-[3rem] shadow-[0_0_100px_rgba(0,0,0,0.8)] border border-white/10 overflow-hidden flex flex-col md:flex-row custom-scrollbar"
           >
             {/* Left Side: Content area */}
-            <div className="flex-1 relative flex flex-col overflow-y-auto custom-scrollbar border-r border-white/5">
+            <div className="md:flex-[0.8] relative flex flex-col overflow-y-auto custom-scrollbar border-b md:border-b-0 md:border-r border-white/5">
               {/* Decorative Gradient Blob */}
               <div className="absolute -top-12 -left-12 size-48 bg-primary/20 rounded-full blur-[80px] pointer-events-none"></div>
               
@@ -67,8 +67,8 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose, clientName
                       transition={{ delay: 0.4 + (i * 0.1) }}
                       className="flex gap-3 md:gap-5 p-3 md:p-5 rounded-2xl md:rounded-3xl bg-slate-50 dark:bg-white/[0.03] border border-black/[0.04] dark:border-white/[0.06] hover:scale-[1.02] transition-all cursor-default group"
                     >
-                      <div className="size-6 md:size-8 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0 mt-0.5 ring-4 md:ring-8 ring-emerald-500/5">
-                        <CheckCircle2 size={12} className="md:size-5" />
+                      <div className="size-6 md:size-8 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0 mt-0.5 ring-4 md:ring-8 ring-primary/5">
+                        <PlayCircle size={12} className="md:size-5" />
                       </div>
                       <p className="text-slate-900 dark:text-white font-bold text-xs sm:text-sm md:text-lg leading-tight uppercase tracking-tight">{item.title}</p>
                     </motion.div>
@@ -78,7 +78,7 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose, clientName
                 <div className="flex flex-col gap-3 mt-4">
                   <button
                     onClick={onClose}
-                    className="w-full bg-primary hover:bg-primary/90 text-white px-4 md:px-8 py-4 md:py-6 rounded-xl md:rounded-[1.5rem] font-black uppercase tracking-[0.1em] md:tracking-[0.2em] text-[10px] md:text-sm shadow-[0_15px_40px_-10px_rgba(var(--primary-rgb),0.5)] transition-all active:scale-[0.97] flex items-center justify-center gap-2 md:gap-3 relative overflow-hidden group"
+                    className="w-full bg-primary hover:bg-primary/90 text-white px-4 md:px-8 py-4 md:py-6 rounded-xl md:rounded-[1.5rem] font-black uppercase tracking-[0.1em] md:tracking-[0.2em] text-[10px] md:text-sm shadow-[0_15px_40px_-10px_rgba(var(--primary-rgb),0.5)] transition-all active:scale-[0.97] flex items-center justify-center gap-2 md:gap-3 relative overflow-hidden group animate-pulse-subtle"
                   >
                     <span className="relative z-10 flex items-center gap-2">
                       COMEÇAR AGORA <span className="text-xs">▶</span>
@@ -93,11 +93,11 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose, clientName
             </div>
 
             {/* Right Side: High-Impact Video Area */}
-            <div className="flex-1 bg-slate-100 dark:bg-[#070B14] p-4 sm:p-6 md:p-12 flex items-center justify-center relative min-h-0">
+            <div className="md:flex-[1.2] bg-slate-100 dark:bg-[#070B14] p-4 sm:p-6 md:p-12 flex items-center justify-center relative min-h-[400px] md:min-h-0">
               {/* Massive Glow behind video */}
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 size-32 md:size-64 bg-primary/20 rounded-full blur-[60px] md:blur-[100px]"></div>
               
-              <div className="w-full aspect-[9/16] max-h-[80%] rounded-2xl md:rounded-[3rem] overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.5)] relative border-4 md:border-[8px] border-slate-900 dark:border-slate-800 z-10 transition-transform hover:scale-[1.01] duration-500">
+              <div className="w-full aspect-[9/16] max-h-[90%] rounded-2xl md:rounded-[2.5rem] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.6)] relative border-2 md:border-4 border-slate-900 dark:border-slate-800 z-10 transition-transform hover:scale-[1.02] duration-500">
                 <iframe 
                   loading="lazy" 
                   className="absolute inset-0 w-full h-full border-none"
