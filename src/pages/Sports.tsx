@@ -16,7 +16,7 @@ const Sports = () => {
               <Trophy className="text-primary" size={32} />
               Arena Esportiva
             </h2>
-            <p className="text-slate-500 dark:text-slate-400 mt-1">Acompanhe rodadas, classificação e resultados ao vivo.</p>
+            <p className="text-slate-500 dark:text-slate-400 mt-1">Acompanhe rodadas, tabela e resultados ao vivo.</p>
           </div>
           
           <div className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-2xl border border-amber-500/20 text-xs font-bold">
@@ -54,7 +54,7 @@ const Sports = () => {
                 }`}
               >
                 <Table size={18} />
-                Classificação
+                TABELA
               </button>
             </div>
 
@@ -80,7 +80,7 @@ const Sports = () => {
                   width="100%" 
                   height="100%" 
                   frameBorder="0"
-                  title="API Futebol - Classificação"
+                  title="API Futebol - TABELA"
                   className="w-full h-full"
                   loading="lazy"
                   referrerPolicy="unsafe-url"
@@ -117,7 +117,7 @@ const Sports = () => {
                 <Table size={24} />
               </div>
               <div>
-                <h4 className="font-bold text-lg text-slate-900 dark:text-white">Classificação</h4>
+                <h4 className="font-bold text-lg text-slate-900 dark:text-white">TABELA</h4>
                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Acompanhe a subida do seu time na tabela em tempo real.</p>
               </div>
             </motion.div>
