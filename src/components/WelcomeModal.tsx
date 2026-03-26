@@ -9,6 +9,26 @@ interface WelcomeModalProps {
 }
 
 const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose, clientName }) => {
+  const [currentStep, setCurrentStep] = React.useState(0);
+  const steps = [
+    { title: 'Veja como renovar sua assinatura em segundos' },
+    { title: 'Aprenda a fazer pedidos de novos conteúdos' },
+    { title: 'Saiba como entrar em contato com o suporte' }
+  ];
+
+  React.useEffect(() => {
+    if (!isOpen) {
+      setCurrentStep(0);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setCurrentStep(prev => (prev < steps.length - 1 ? prev + 1 : prev));
+    }, 6000); // 6 segundos por parte
+
+    return () => clearInterval(interval);
+  }, [isOpen, steps.length]);
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -54,26 +74,46 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose, clientName
                   </p>
                 </div>
 
-                <div className="grid gap-3 md:gap-6 py-2">
-                  {[
-                    { title: 'Veja como renovar sua assinatura em segundos' },
-                    { title: 'Aprenda a fazer pedidos de novos conteúdos' },
-                    { title: 'Saiba como entrar em contato com o suporte' }
-                  ].map((item, i) => (
-                    <motion.div 
-                      key={i} 
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.4 + (i * 0.1) }}
-                      className="flex gap-3 md:gap-5 p-3 md:p-5 rounded-2xl md:rounded-3xl bg-slate-50 dark:bg-white/[0.03] border border-black/[0.04] dark:border-white/[0.06] hover:scale-[1.02] transition-all cursor-default group"
-                    >
-                      <div className="size-6 md:size-8 rounded-full bg-primary/10 text-primary flex items-center justify-center shrink-0 mt-0.5 ring-4 md:ring-8 ring-primary/5">
-                        <PlayCircle size={12} className="md:size-5" />
-                      </div>
-                      <p className="text-slate-900 dark:text-white font-bold text-xs sm:text-sm md:text-lg leading-tight uppercase tracking-tight">{item.title}</p>
-                    </motion.div>
-                  ))}
-                </div>
+                  <div className="grid gap-3 md:gap-6 py-2">
+                    {steps.map((item, i) => {
+                      const isActive = i === currentStep;
+                      const isCompleted = i < currentStep;
+                      
+                      return (
+                        <motion.div 
+                          key={i} 
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ 
+                            opacity: 1, 
+                            x: 0,
+                            scale: isActive ? 1.05 : 1,
+                            backgroundColor: isActive ? 'rgba(var(--primary-rgb), 0.05)' : 'transparent'
+                          }}
+                          transition={{ delay: isActive ? 0 : 0.4 + (i * 0.1) }}
+                          className={`flex gap-3 md:gap-5 p-3 md:p-5 rounded-2xl md:rounded-3xl border transition-all cursor-default group ${
+                            isActive 
+                              ? 'border-primary/30 shadow-lg shadow-primary/5 bg-primary/5' 
+                              : 'bg-slate-50 dark:bg-white/[0.03] border-black/[0.04] dark:border-white/[0.06]'
+                          }`}
+                        >
+                          <div className={`size-6 md:size-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ring-4 md:ring-8 transition-colors ${
+                            isCompleted 
+                              ? 'bg-emerald-500/10 text-emerald-500 ring-emerald-500/5' 
+                              : isActive 
+                                ? 'bg-primary text-white ring-primary/20 animate-pulse' 
+                                : 'bg-slate-200 dark:bg-white/10 text-slate-400 dark:text-white/20 ring-transparent'
+                          }`}>
+                            {isCompleted ? <CheckCircle2 size={12} className="md:size-5" /> : <PlayCircle size={12} className="md:size-5" />}
+                          </div>
+                          <p className={`font-bold text-xs sm:text-sm md:text-lg leading-tight uppercase tracking-tight transition-colors ${
+                            isActive ? 'text-primary' : isCompleted ? 'text-emerald-500/80' : 'text-slate-900 dark:text-white'
+                          }`}>
+                            {item.title}
+                          </p>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
 
                 <div className="flex flex-col gap-3 mt-4">
                   <button
