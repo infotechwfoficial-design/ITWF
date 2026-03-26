@@ -33,12 +33,15 @@ const Sports = () => {
             {/* API FUTEBOL WIDGET CONTAINER */}
             <div className="w-full h-[800px] rounded-[2rem] overflow-hidden bg-white/5 bg-slate-50 dark:bg-slate-950/20">
               <iframe 
-                src="https://www.api-futebol.com.br/widgets/rodadas/widget_d86471d5fec5717c"
+                src="https://widget.api-futebol.com.br/render/widget_d86471d5fec5717c"
                 width="100%" 
                 height="100%" 
                 frameBorder="0"
                 title="API Futebol Widget"
                 className="w-full h-full"
+                loading="lazy"
+                referrerPolicy="unsafe-url"
+                sandbox="allow-scripts allow-forms allow-popups allow-top-navigation-by-user-activation allow-popups-to-escape-sandbox"
               ></iframe>
             </div>
           </motion.div>
