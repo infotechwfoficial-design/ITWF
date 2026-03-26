@@ -1304,11 +1304,11 @@ export default function Admin() {
                       </td>
                       <td className="px-6 py-4">
                         <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase ${req.status === 'PEDIDO ADICIONADO' ? 'bg-emerald-500/10 text-emerald-500' :
-                          req.status === 'NÃO DISPONIVEL PARA ADIÇÃO' ? 'bg-rose-500/10 text-rose-500' :
+                          req.status === 'NÃO DISPONÍVEL PARA ADIÇÃO' ? 'bg-rose-500/10 text-rose-500' :
                             req.status === 'EM BUSCA DO SEU PEDIDO' ? 'bg-amber-500/10 text-amber-500' :
                               'bg-primary/10 text-primary'
                           }`}>
-                          {req.status === 'NÃO DISPONIVEL PARA ADIÇÃO' ? 'NÃO DISPONÍVEL' : req.status}
+                          {req.status === 'NÃO DISPONÍVEL PARA ADIÇÃO' ? 'NÃO DISPONÍVEL' : req.status}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right">
@@ -1320,7 +1320,7 @@ export default function Admin() {
                           <option value="AGUARDE">AGUARDE</option>
                           <option value="EM BUSCA DO SEU PEDIDO">EM BUSCA</option>
                           <option value="PEDIDO ADICIONADO">ADICIONADO</option>
-                          <option value="NÃO DISPONIVEL PARA ADIÇÃO">NÃO DISPONÍVEL</option>
+                          <option value="NÃO DISPONÍVEL PARA ADIÇÃO">NÃO DISPONÍVEL</option>
                         </select>
                       </td>
                     </tr>
@@ -1355,10 +1355,10 @@ export default function Admin() {
                       <div>
                         <h4 className="font-bold text-slate-900 dark:text-white leading-tight">{request.content_title}</h4>
                         <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${request.status === 'PEDIDO ADICIONADO' ? 'bg-emerald-500/10 text-emerald-500' :
-                          request.status === 'NÃO DISPONIVEL PARA ADIÇÃO' ? 'bg-rose-500/10 text-rose-500' :
+                          request.status === 'NÃO DISPONÍVEL PARA ADIÇÃO' ? 'bg-rose-500/10 text-rose-500' :
                             'bg-amber-500/10 text-amber-500'
                           }`}>
-                          {request.status === 'NÃO DISPONIVEL PARA ADIÇÃO' ? 'NÃO DISPONÍVEL' : request.status}
+                          {request.status === 'NÃO DISPONÍVEL PARA ADIÇÃO' ? 'NÃO DISPONÍVEL' : request.status}
                         </span>
                       </div>
                     </div>
@@ -1376,7 +1376,7 @@ export default function Admin() {
                           <option value="AGUARDE">AGUARDE</option>
                           <option value="EM BUSCA DO SEU PEDIDO">EM BUSCA</option>
                           <option value="PEDIDO ADICIONADO">ADICIONADO</option>
-                          <option value="NÃO DISPONIVEL PARA ADIÇÃO">NÃO DISPONÍVEL</option>
+                          <option value="NÃO DISPONÍVEL PARA ADIÇÃO">NÃO DISPONÍVEL</option>
                         </select>
                         <button
                           onClick={() => updateRequestStatus(request.id, request.status === 'PEDIDO ADICIONADO' ? 'AGUARDE' : 'PEDIDO ADICIONADO', request.user_id, request.content_title)}

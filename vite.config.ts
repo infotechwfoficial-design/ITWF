@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => {
         includeAssets: ['logo.png'],
         manifest: {
           name: "ITWF Sistema de Renovação",
-          short_name: "ITWF Panel",
+          short_name: 'Painel ITWF',
           description: "Painel de controle de clientes e renovações ITWF",
           theme_color: "#0ea5e9",
           background_color: "#ffffff",

@@ -57,11 +57,11 @@ const RequestCard = React.memo(({ req }: { req: any }) => (
         <p className="text-xs text-slate-500">{req.content_type} • {req.content_year}</p>
       </div>
       <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${req.status === 'PEDIDO ADICIONADO' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
-        req.status === 'NÃO DISPONIVEL PARA ADIÇÃO' ? 'bg-rose-500/10 text-rose-500' :
+        req.status === 'NÃO DISPONÍVEL PARA ADIÇÃO' ? 'bg-rose-500/10 text-rose-500' :
           req.status === 'EM BUSCA DO SEU PEDIDO' ? 'bg-amber-500/10 text-amber-500' :
             'bg-primary/10 text-primary'
         }`}>
-        {req.status === 'NÃO DISPONIVEL PARA ADIÇÃO' ? 'NÃO DISPONÍVEL' : req.status}
+        {req.status === 'NÃO DISPONÍVEL PARA ADIÇÃO' ? 'NÃO DISPONÍVEL' : req.status}
       </span>
     </div>
     <div className="flex items-center justify-between pt-4 border-t border-black/5 dark:border-white/5">
