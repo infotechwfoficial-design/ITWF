@@ -843,17 +843,32 @@ async function startServer() {
     }
   }
 
+  // Cache simples para a agenda do dia
+  let cachedAgenda: { message: string, date: string } | null = null;
+
   app.post('/api/send-sports-push', async (req, res) => {
     console.log('[API] Recebida requisição para /api/send-sports-push');
     try {
-      console.log('[Sports Push] Iniciando envio manual...');
-      const message = await fetchSportsAgenda();
+      const today = new Date().toLocaleDateString('pt-BR');
+      let message = '';
+
+      // Verifica cache para não chamar Gemini repetidamente se já gerou hoje
+      if (cachedAgenda && cachedAgenda.date === today) {
+        console.log('[Sports Push] Usando agenda do cache.');
+        message = cachedAgenda.message;
+      } else {
+        console.log('[Sports Push] Gerando nova agenda via IA...');
+        message = await fetchSportsAgenda();
+        if (message) {
+          cachedAgenda = { message, date: today };
+        }
+      }
       
       if (!message) {
         return res.status(500).json({ error: 'Não foi possível obter a agenda esportiva.' });
       }
 
-      // NOVO: Salvar a agenda na tabela de notificações para visualização no app
+      // Salvar a agenda na tabela de notificações para visualização no app
       await supabase.from('notifications').insert([{
         title: '⚽ Agenda Esportiva',
         message: message,
@@ -861,23 +876,31 @@ async function startServer() {
       }]);
 
       const { data: subscriptions } = await supabase.from('push_subscriptions').select('subscription_json, admin_id');
-      if (!subscriptions || subscriptions.length === 0) {
-        return res.status(404).json({ error: 'Nenhum inscrito encontrado.' });
+      
+      // Responde ao cliente IMEDIATAMENTE após gerar/salvar
+      res.json({ success: true, message: 'Agenda gerada e sendo enviada para todos os inscritos!' });
+
+      // Envio dos Pushes em SEGUNDO PLANO (sem await no res.json)
+      if (subscriptions && subscriptions.length > 0) {
+        (async () => {
+          console.log(`[Sports Push] Enviando para ${subscriptions.length} inscritos em segundo plano...`);
+          const promises = subscriptions.map((sub) => {
+            const payload = {
+              title: '⚽ Agenda Esportiva do Dia',
+              body: message,
+              url: '/notifications'
+            };
+            return sendPushNotification(sub.subscription_json, payload, sub.admin_id);
+          });
+          await Promise.allSettled(promises);
+          console.log('[Sports Push] Processo de fundo concluído.');
+        })().catch(err => console.error('[Sports Push Background Error]', err));
       }
-
-      const promises = subscriptions.map((sub) => {
-        const payload = {
-          title: '⚽ Agenda Esportiva do Dia',
-          body: message,
-          url: '/notifications'
-        };
-        return sendPushNotification(sub.subscription_json, payload, sub.admin_id);
-      });
-
-      await Promise.all(promises);
-      res.json({ success: true, message: 'Agenda enviada e salva no sistema!' });
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      console.error('[Sports Push Error]', err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: err.message });
+      }
     }
   });
 
