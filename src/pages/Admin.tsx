@@ -1084,9 +1084,9 @@ export default function Admin() {
                 </thead>
                 <tbody className="divide-y divide-black/5 dark:divide-white/5">
                   {clients.filter(c => 
-                    c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                    c.username.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                    c.email.toLowerCase().includes(searchTerm.toLowerCase())
+                    (c.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
+                    (c.username?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
+                    (c.email?.toLowerCase() || '').includes(searchTerm.toLowerCase())
                   ).map((client) => (
                     <ClientRow
                       key={client.id}
@@ -1105,9 +1105,9 @@ export default function Admin() {
             {/* Mobile Cards */}
             <div className="md:hidden divide-y divide-black/5 dark:divide-white/5">
               {clients.filter(c => 
-                c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                c.username.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                c.email.toLowerCase().includes(searchTerm.toLowerCase())
+                (c.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
+                (c.username?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
+                (c.email?.toLowerCase() || '').includes(searchTerm.toLowerCase())
               ).map((client, idx) => (
                 <ClientCard
                   key={client.id}
@@ -1174,8 +1174,8 @@ export default function Admin() {
                     <div>
                       <h4 className="font-bold">{notif.title}</h4>
                       <p className="text-sm text-slate-500 dark:text-slate-400">{notif.message}</p>
-                      <span className="text-[10px] text-slate-400 uppercase tracking-widest mt-2 block">
-                        {new Date(notif.created_at).toLocaleString()}
+                      <span className="text-[10px] text-slate-400 uppercase tracking-widest mt-1 block">
+                        Enviado em: {new Date(notif.created_at).toLocaleString()}
                       </span>
                     </div>
                   </div>
@@ -1232,8 +1232,8 @@ export default function Admin() {
                 <tbody className="divide-y divide-black/5 dark:divide-white/5">
                   {requests.filter(req => {
                     const reqClient = clients.find(c => c.user_id === req.user_id);
-                    const matchTitle = req.content_title.toLowerCase().includes(searchTerm.toLowerCase());
-                    const matchUser = reqClient?.name.toLowerCase().includes(searchTerm.toLowerCase()) || reqClient?.username.toLowerCase().includes(searchTerm.toLowerCase());
+                    const matchTitle = (req.content_title?.toLowerCase() || '').includes(searchTerm.toLowerCase());
+                    const matchUser = (reqClient?.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || (reqClient?.username?.toLowerCase() || '').includes(searchTerm.toLowerCase());
                     return matchTitle || matchUser;
                   }).map((req) => {
                     const reqClient = clients.find(c => c.user_id === req.user_id);
@@ -1258,7 +1258,7 @@ export default function Admin() {
                             req.status === 'EM BUSCA DO SEU PEDIDO' ? 'bg-amber-500/10 text-amber-500' :
                               'bg-primary/10 text-primary'
                           }`}>
-                          {req.status}
+                          {req.status === 'NÃO DISPONIVEL PARA ADIÇÃO' ? 'NÃO DISPONÍVEL' : req.status}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right">
@@ -1284,8 +1284,8 @@ export default function Admin() {
             <div className="md:hidden divide-y divide-black/5 dark:divide-white/5">
               {requests.filter(req => {
                 const reqClient = clients.find(c => c.user_id === req.user_id);
-                const matchTitle = req.content_title.toLowerCase().includes(searchTerm.toLowerCase());
-                const matchUser = reqClient?.name.toLowerCase().includes(searchTerm.toLowerCase()) || reqClient?.username.toLowerCase().includes(searchTerm.toLowerCase());
+                const matchTitle = (req.content_title?.toLowerCase() || '').includes(searchTerm.toLowerCase());
+                const matchUser = (reqClient?.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || (reqClient?.username?.toLowerCase() || '').includes(searchTerm.toLowerCase());
                 return matchTitle || matchUser;
               }).map((request, idx) => {
                 const reqClient = clients.find(c => c.user_id === request.user_id);
@@ -1304,8 +1304,11 @@ export default function Admin() {
                       </div>
                       <div>
                         <h4 className="font-bold text-slate-900 dark:text-white leading-tight">{request.content_title}</h4>
-                        <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${request.status === 'PEDIDO ADICIONADO' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>
-                          {request.status}
+                        <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${request.status === 'PEDIDO ADICIONADO' ? 'bg-emerald-500/10 text-emerald-500' :
+                          request.status === 'NÃO DISPONIVEL PARA ADIÇÃO' ? 'bg-rose-500/10 text-rose-500' :
+                            'bg-amber-500/10 text-amber-500'
+                          }`}>
+                          {request.status === 'NÃO DISPONIVEL PARA ADIÇÃO' ? 'NÃO DISPONÍVEL' : request.status}
                         </span>
                       </div>
                     </div>
@@ -1449,7 +1452,8 @@ export default function Admin() {
                 </thead>
                 <tbody className="divide-y divide-black/5 dark:divide-white/5">
                   {resellers.filter(r => 
-                    r.email.toLowerCase().includes(searchTerm.toLowerCase())
+                    (r.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                    (r.name?.toLowerCase() || '').includes(searchTerm.toLowerCase())
                   ).map((reseller) => (
                     <ResellerRow
                       key={reseller.id}
@@ -1782,7 +1786,7 @@ export default function Admin() {
             >
               <div className="flex justify-between items-center mb-6">
                 <div>
-                  <h3 className="text-xl font-bold">Enviar Aviso</h3>
+                  <h3 className="text-xl font-bold">Aviso Direto</h3>
                   <p className="text-xs text-slate-500 font-mono">@{directPushClient?.username}</p>
                 </div>
                 <button
@@ -1818,7 +1822,7 @@ export default function Admin() {
                     className="flex-1 flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-2xl font-black text-sm shadow-lg shadow-amber-500/20 transition-all active:scale-95 disabled:opacity-50"
                   >
                     {submitting ? <Loader2 className="animate-spin" size={18} /> : <Bell size={18} />}
-                    {submitting ? 'Enviando...' : 'Enviar Push'}
+                    {submitting ? 'Enviando...' : 'Enviar Agora'}
                   </button>
                 </div>
               </form>

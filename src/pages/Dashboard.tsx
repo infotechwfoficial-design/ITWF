@@ -61,7 +61,7 @@ const RequestCard = React.memo(({ req }: { req: any }) => (
           req.status === 'EM BUSCA DO SEU PEDIDO' ? 'bg-amber-500/10 text-amber-500' :
             'bg-primary/10 text-primary'
         }`}>
-        {req.status}
+        {req.status === 'NÃO DISPONIVEL PARA ADIÇÃO' ? 'NÃO DISPONÍVEL' : req.status}
       </span>
     </div>
     <div className="flex items-center justify-between pt-4 border-t border-black/5 dark:border-white/5">
