@@ -489,6 +489,24 @@ async function startServer() {
     }
   });
 
+  app.post('/api/create-user', async (req, res) => {
+    const { email, password, username, is_admin = false } = req.body;
+    try {
+      const { data, error: authError } = await supabase.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { username, is_admin }
+      });
+
+      if (authError) throw authError;
+      res.status(201).json({ user_id: data.user.id });
+    } catch (err: any) {
+      console.error('[CreateUser Error]', err);
+      res.status(400).json({ error: err.message });
+    }
+  });
+
   app.delete('/api/users/:id', async (req, res) => {
     const { id } = req.params;
     try {

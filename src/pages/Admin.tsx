@@ -268,8 +268,11 @@ export default function Admin() {
     email: '',
     expiration_date: '',
     balance: 0,
-    renewal_link: ''
+    renewal_link: '',
+    password: ''
   });
+
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Notification Form State (Restaurados)
   const [isNotifModalOpen, setIsNotifModalOpen] = useState(false);
@@ -593,25 +596,58 @@ export default function Admin() {
     if (submitting) return;
     try {
       setSubmitting(true);
+      const apiUrl = import.meta.env.VITE_API_URL || '';
+
       if (editingClient) {
         const { error } = await supabase
           .from('clients')
-          .update(clientForm)
+          .update({
+            username: clientForm.username,
+            name: clientForm.name,
+            email: clientForm.email,
+            expiration_date: clientForm.expiration_date,
+            balance: clientForm.balance,
+            renewal_link: clientForm.renewal_link
+          })
           .eq('id', editingClient.id);
 
         if (error) throw error;
         showToast('Cliente atualizado com sucesso!', 'success');
       } else {
+        // 1. Criar usuário no Supabase Auth via Backend
+        const authRes = await fetch(`${apiUrl}/api/create-user`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: clientForm.email,
+            password: clientForm.password || '123456', // Senha padrão se não informada
+            username: clientForm.username
+          })
+        });
+
+        const authData = await authRes.json();
+        if (!authRes.ok) throw new Error(authData.error || 'Erro ao criar conta de acesso');
+
+        // 2. Inserir na tabela clients com o user_id retornado
         const { error } = await supabase
           .from('clients')
-          .insert([{ ...clientForm, admin_id: currentAdmin?.id }]);
+          .insert([{
+            user_id: authData.user_id,
+            username: clientForm.username,
+            name: clientForm.name,
+            email: clientForm.email,
+            expiration_date: clientForm.expiration_date,
+            balance: clientForm.balance,
+            renewal_link: clientForm.renewal_link,
+            admin_id: currentAdmin?.id
+          }]);
 
         if (error) throw error;
-        showToast('Cliente cadastrado com sucesso!', 'success');
+        showToast('Cliente cadastrado com sucesso! Senha: ' + (clientForm.password || '123456'), 'success');
       }
       setIsClientModalOpen(false);
       setEditingClient(null);
-      setClientForm({ username: '', name: '', email: '', expiration_date: '', balance: 0, renewal_link: '' });
+      setClientForm({ username: '', name: '', email: '', expiration_date: '', balance: 0, renewal_link: '', password: '' });
       fetchClients();
     } catch (err: any) {
       showToast('Erro ao salvar: ' + err.message, 'error');
@@ -730,31 +766,42 @@ export default function Admin() {
 
 
   const updateRequestStatus = async (id: number | string, status: string, reqUserId: string, title: string) => {
-    await supabase.from('requests').update({ status }).eq('id', id);
+    try {
+      const { error: updateError } = await supabase.from('requests').update({ status }).eq('id', id);
+      if (updateError) throw updateError;
 
-    // Find the correct client's email based on user_id
-    const targetClient = clients.find(c => c.user_id === reqUserId);
-    const email = targetClient?.email;
+      // Busca dados do cliente para o push (garante que temos os dados mais recentes)
+      const { data: clientData } = await supabase
+        .from('clients')
+        .select('name, username, email')
+        .eq('user_id', reqUserId)
+        .single();
 
-    if (!email) {
-      console.warn('Não foi possível enviar push: Cliente sem email ou não encontrado.');
+      if (clientData) {
+        const apiUrl = import.meta.env.VITE_API_URL || '';
+        // Dispara o push sem travar se não houver e-mail
+        fetch(`${apiUrl}/api/send-push`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: 'Status do seu Pedido',
+            message: `O status do seu pedido "${title}" mudou para: ${status}`,
+            email: clientData.email,
+            username: clientData.username,
+            adminId: currentAdmin?.id
+          })
+        }).catch(err => console.error('Erro ao disparar push API:', err));
+
+        showToast(`Status de "${title}" atualizado para: ${status}`, 'success');
+      } else {
+        showToast(`Status atualizado, mas cliente não encontrado para notificação.`, 'success');
+      }
+      
       fetchRequests();
-      return;
+    } catch (err: any) {
+      console.error('Erro ao atualizar status:', err);
+      showToast('Erro ao atualizar status: ' + err.message, 'error');
     }
-
-    // Send push notification to client
-    const apiUrl = import.meta.env.VITE_API_URL || '';
-    await fetch(`${apiUrl}/api/send-push`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: 'Status do seu Pedido',
-        message: `O status do seu pedido "${title}" mudou para: ${status}`,
-        username: targetClient?.username
-      })
-    });
-
-    fetchRequests();
   };
 
   const deleteNotif = async (id: number) => {
@@ -992,23 +1039,37 @@ export default function Admin() {
             animate={{ opacity: 1, y: 0 }}
             className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-black/5 dark:border-white/5 rounded-[2rem] overflow-hidden shadow-sm dark:shadow-xl"
           >
-          <div className="p-6 md:p-8 border-b border-black/5 dark:border-white/5 flex justify-between items-center bg-white/20 dark:bg-white/5">
-            <div>
-              <h3 className="text-xl font-bold tracking-tight font-display">Lista de Clientes</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Gerencie seus usuários ativos.</p>
+            <div className="p-6 md:p-8 border-b border-black/5 dark:border-white/5 flex flex-col md:flex-row gap-4 justify-between items-center bg-white/20 dark:bg-white/5">
+              <div className="w-full md:w-auto">
+                <h3 className="text-xl font-bold tracking-tight font-display">Lista de Clientes</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Gerencie seus usuários ativos.</p>
+              </div>
+              
+              <div className="flex w-full md:w-auto gap-3">
+                <div className="relative flex-1 md:w-64">
+                  <input
+                    type="text"
+                    placeholder="Buscar cliente..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2.5 bg-white/50 dark:bg-slate-800/50 border border-black/5 dark:border-white/10 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                  <Users className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                </div>
+                
+                <button
+                  onClick={() => {
+                    setEditingClient(null);
+                    setClientForm({ username: '', name: '', email: '', expiration_date: '', balance: 0, renewal_link: '', password: '' });
+                    setIsClientModalOpen(true);
+                  }}
+                  className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-5 py-2.5 rounded-2xl text-sm font-black uppercase tracking-wider shadow-lg shadow-primary/20 transition-all active:scale-95 shrink-0"
+                >
+                  <Plus size={18} />
+                  Novo
+                </button>
+              </div>
             </div>
-            <button
-              onClick={() => {
-                setEditingClient(null);
-                setClientForm({ username: '', name: '', email: '', expiration_date: '', balance: 0, renewal_link: '' });
-                setIsClientModalOpen(true);
-              }}
-              className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-5 py-2.5 rounded-2xl text-sm font-black uppercase tracking-wider shadow-lg shadow-primary/20 transition-all active:scale-95"
-            >
-              <Plus size={18} />
-              Novo
-            </button>
-          </div>
             {/* Desktop Table */}
             <div className="hidden md:block overflow-x-auto custom-scrollbar">
               <table className="w-full text-left">
@@ -1022,7 +1083,11 @@ export default function Admin() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-black/5 dark:divide-white/5">
-                  {clients.map((client) => (
+                  {clients.filter(c => 
+                    c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                    c.username.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                    c.email.toLowerCase().includes(searchTerm.toLowerCase())
+                  ).map((client) => (
                     <ClientRow
                       key={client.id}
                       client={client}
@@ -1039,7 +1104,11 @@ export default function Admin() {
 
             {/* Mobile Cards */}
             <div className="md:hidden divide-y divide-black/5 dark:divide-white/5">
-              {clients.map((client, idx) => (
+              {clients.filter(c => 
+                c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                c.username.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                c.email.toLowerCase().includes(searchTerm.toLowerCase())
+              ).map((client, idx) => (
                 <ClientCard
                   key={client.id}
                   idx={idx}
@@ -1133,9 +1202,21 @@ export default function Admin() {
             animate={{ opacity: 1, y: 0 }}
             className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-black/5 dark:border-white/5 rounded-[2rem] overflow-hidden shadow-sm dark:shadow-xl"
           >
-            <div className="p-6 md:p-8 border-b border-black/5 dark:border-white/5 bg-white/20 dark:bg-white/5">
-              <h3 className="text-xl font-bold tracking-tight font-display">Pedidos Pendentes</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Filmes e séries solicitados pelos usuários.</p>
+            <div className="p-6 md:p-8 border-b border-black/5 dark:border-white/5 bg-white/20 dark:bg-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
+              <div className="w-full md:w-auto">
+                <h3 className="text-xl font-bold tracking-tight font-display">Pedidos Pendentes</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Filmes e séries solicitados pelos usuários.</p>
+              </div>
+              <div className="relative w-full md:w-64">
+                <input
+                  type="text"
+                  placeholder="Buscar no pedido..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 bg-white/50 dark:bg-slate-800/50 border border-black/5 dark:border-white/10 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                />
+                <Film className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              </div>
             </div>
             {/* Desktop Table */}
             <div className="hidden md:block overflow-x-auto custom-scrollbar">
@@ -1149,7 +1230,12 @@ export default function Admin() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-black/5 dark:divide-white/5">
-                  {requests.map((req) => {
+                  {requests.filter(req => {
+                    const reqClient = clients.find(c => c.user_id === req.user_id);
+                    const matchTitle = req.content_title.toLowerCase().includes(searchTerm.toLowerCase());
+                    const matchUser = reqClient?.name.toLowerCase().includes(searchTerm.toLowerCase()) || reqClient?.username.toLowerCase().includes(searchTerm.toLowerCase());
+                    return matchTitle || matchUser;
+                  }).map((req) => {
                     const reqClient = clients.find(c => c.user_id === req.user_id);
                     return (
                     <tr key={req.id} className="hover:bg-black/[0.01] dark:hover:bg-white/[0.01] transition-colors">
@@ -1196,7 +1282,12 @@ export default function Admin() {
 
             {/* Mobile Cards */}
             <div className="md:hidden divide-y divide-black/5 dark:divide-white/5">
-              {requests.map((request, idx) => {
+              {requests.filter(req => {
+                const reqClient = clients.find(c => c.user_id === req.user_id);
+                const matchTitle = req.content_title.toLowerCase().includes(searchTerm.toLowerCase());
+                const matchUser = reqClient?.name.toLowerCase().includes(searchTerm.toLowerCase()) || reqClient?.username.toLowerCase().includes(searchTerm.toLowerCase());
+                return matchTitle || matchUser;
+              }).map((request, idx) => {
                 const reqClient = clients.find(c => c.user_id === request.user_id);
                 return (
                 <motion.div
@@ -1357,7 +1448,9 @@ export default function Admin() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-black/5 dark:divide-white/5">
-                  {resellers.map((reseller) => (
+                  {resellers.filter(r => 
+                    r.email.toLowerCase().includes(searchTerm.toLowerCase())
+                  ).map((reseller) => (
                     <ResellerRow
                       key={reseller.id}
                       reseller={reseller}
@@ -1439,10 +1532,25 @@ export default function Admin() {
                         value={clientForm.expiration_date}
                         onChange={e => setClientForm({ ...clientForm, expiration_date: e.target.value })}
                         className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-black/5 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-primary"
-                        placeholder="15/10/2025"
+                        placeholder="DD/MM/AAAA"
                       />
                     </div>
                   </div>
+                  {!editingClient && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-slate-500">Definir Senha</label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                        <input
+                          type="text"
+                          value={clientForm.password}
+                          onChange={e => setClientForm({ ...clientForm, password: e.target.value })}
+                          className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-black/5 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-primary"
+                          placeholder="Senha ou deixe em branco para 123456"
+                        />
+                      </div>
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-slate-500">Valor do Plano (R$)</label>
                     <div className="relative">
@@ -1453,7 +1561,7 @@ export default function Admin() {
                         step="0.01"
                         value={clientForm.balance}
                         onChange={e => setClientForm({ ...clientForm, balance: parseFloat(e.target.value) })}
-                        className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-black/5 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-primary"
+                        className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-black/5 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-primary font-bold"
                         placeholder="0.00"
                       />
                     </div>

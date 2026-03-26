@@ -104,10 +104,35 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
+    let channel: any;
+
     const fetchUserData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
 
       if (user) {
+        // Inscrição Realtime para Pedidos
+        channel = supabase
+          .channel(`user_requests_${user.id}`)
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'requests',
+              filter: `user_id=eq.${user.id}`
+            },
+            (payload) => {
+              if (payload.eventType === 'INSERT') {
+                setRequests(prev => [payload.new, ...prev]);
+              } else if (payload.eventType === 'UPDATE') {
+                setRequests(prev => prev.map(req => req.id === payload.new.id ? payload.new : req));
+              } else if (payload.eventType === 'DELETE') {
+                setRequests(prev => prev.filter(req => req.id !== payload.old.id));
+              }
+            }
+          )
+          .subscribe();
+
         // Fetch Client Data
         const { data: clientData } = await supabase
           .from('clients')
@@ -162,6 +187,10 @@ export default function Dashboard() {
     };
 
     fetchUserData();
+
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
   }, []);
 
   const handleUpdateName = async () => {
