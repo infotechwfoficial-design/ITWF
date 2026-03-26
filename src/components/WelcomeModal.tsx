@@ -137,15 +137,30 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose, clientName
               {/* Massive Glow behind video */}
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 size-32 md:size-64 bg-primary/20 rounded-full blur-[60px] md:blur-[100px]"></div>
               
-              <div className="w-full aspect-[9/16] max-h-[90%] rounded-2xl md:rounded-[2.5rem] overflow-hidden shadow-[0_30px_60px_rgba(0,0,0,0.6)] relative border-2 md:border-4 border-slate-900 dark:border-slate-800 z-10 transition-transform hover:scale-[1.02] duration-500">
-                <iframe 
-                  loading="lazy" 
-                  className="absolute inset-0 w-full h-full border-none"
-                  src="https://www.canva.com/design/DAHD4du1Sc4/bX4V-gbFTm887xQ65zOIWA/watch?embed" 
-                  allowFullScreen 
-                  allow="fullscreen"
-                  title="Tutorial ITWF"
-                />
+              <div className="w-full max-w-[400px] mx-auto z-10 transition-transform hover:scale-[1.02] duration-500">
+                <div 
+                  className="relative w-full h-0 shadow-[0_30px_60px_rgba(0,0,0,0.6)] overflow-hidden rounded-[2rem] border-2 md:border-4 border-slate-900 dark:border-slate-800"
+                  style={{ paddingTop: '177.7778%', willChange: 'transform' }}
+                >
+                  <iframe 
+                    loading="lazy" 
+                    className="absolute inset-0 w-full h-full border-none p-0 m-0"
+                    src="https://www.canva.com/design/DAHD4du1Sc4/bX4V-gbFTm887xQ65zOIWA/watch?embed" 
+                    allowFullScreen 
+                    allow="fullscreen"
+                    title="Tutorial ITWF"
+                  />
+                </div>
+                <div className="mt-4 text-center">
+                  <a 
+                    href="https://www.canva.com/design/DAHD4du1Sc4/bX4V-gbFTm887xQ65zOIWA/watch?utm_content=DAHD4du1Sc4&utm_campaign=designshare&utm_medium=embeds&utm_source=link" 
+                    target="_blank" 
+                    rel="noopener"
+                    className="text-[10px] text-slate-400 hover:text-primary transition-colors font-bold uppercase tracking-widest"
+                  >
+                    TUTORIAL ITWF RENOVAÇÕES
+                  </a>
+                </div>
               </div>
             </div>
               
