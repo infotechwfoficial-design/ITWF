@@ -10,6 +10,7 @@ import { GoogleGenerativeAI as GoogleGenAI } from '@google/generative-ai';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
+import admin from 'firebase-admin';
 
 dotenv.config();
 
@@ -38,6 +39,21 @@ webpush.setVapidDetails(
   publicVapidKey,
   privateVapidKey
 );
+
+// --- FIREBASE ADMIN SDK (Para Flutter/Mobile) ---
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  try {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
+    console.log('[Firebase] Admin SDK inicializado com sucesso.');
+  } catch (e) {
+    console.error('[Firebase] Erro ao inicializar Admin SDK. Verifique a variável FIREBASE_SERVICE_ACCOUNT.', e);
+  }
+} else {
+  console.log('[Firebase] Aviso: FIREBASE_SERVICE_ACCOUNT não definida. Notificações Mobile estarão desativadas.');
+}
 
 async function startServer() {
   const app = express();
@@ -77,7 +93,7 @@ async function startServer() {
 
       contents.push({ role: 'user', parts: [{ text: message }] });
 
-      const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = ai.getGenerativeModel({ model: 'gemini-flash-latest' });
       const result = await model.generateContent({ contents });
       const response = await result.response;
       res.json({ reply: response.text() });
@@ -300,24 +316,83 @@ async function startServer() {
 
   async function sendPushNotification(subscriptionJson: string, payload: any, adminId?: string | null) {
     try {
-      const pushSubscription = JSON.parse(subscriptionJson);
       const logo = await getAdminLogo(adminId || null);
-
-      const finalPayload = JSON.stringify({
+      const finalPayload = {
         ...payload,
         icon: payload.icon || logo,
         badge: payload.badge || logo
-      });
+      };
 
-      return webpush.sendNotification(pushSubscription, finalPayload)
-        .catch(async (err) => {
-          if (err.statusCode === 404 || err.statusCode === 410) {
-            console.log(`[Push] Removendo inscrição inválida (${err.statusCode})`);
-            await supabase.from('push_subscriptions').delete().eq('subscription_json', subscriptionJson);
-          }
-        });
+      // 1. Tentar enviar via Web Push (Se for JSON válido de VAPID)
+      if (subscriptionJson && subscriptionJson.startsWith('{')) {
+        const pushSubscription = JSON.parse(subscriptionJson);
+        await webpush.sendNotification(pushSubscription, JSON.stringify(finalPayload))
+          .catch(async (err) => {
+            if (err.statusCode === 404 || err.statusCode === 410) {
+              console.log(`[Push Web] Removendo inscrição inválida (${err.statusCode})`);
+              await supabase.from('push_subscriptions').delete().eq('subscription_json', subscriptionJson);
+            }
+          });
+      }
     } catch (e) {
-      console.error('[Erro Push] Falha ao enviar notificação:', e);
+      console.error('[Erro Push Web] Falha ao enviar:', e);
+    }
+  }
+
+  // Helper unificado para enviar para um usuário específico (Web + Mobile)
+  async function notifyUser(userId: string | null, email: string | null, username: string | null, payload: any, adminId: string | null) {
+    // A. Buscar e enviar para Web Push
+    let webQuery = supabase.from('push_subscriptions').select('subscription_json, admin_id');
+    if (username) webQuery = webQuery.eq('username', username);
+    else if (email) webQuery = webQuery.eq('email', email);
+    
+    const { data: webSubs } = await webQuery;
+    if (webSubs) {
+      for (const sub of webSubs) {
+        await sendPushNotification(sub.subscription_json, payload, sub.admin_id || adminId);
+      }
+    }
+
+    // B. Buscar e enviar para FCM (Mobile)
+    let fcmQuery = supabase.from('fcm_tokens').select('token');
+    if (userId) fcmQuery = fcmQuery.eq('user_id', userId);
+    else if (email) fcmQuery = fcmQuery.eq('email', email);
+
+    const { data: fcmTokens } = await fcmQuery;
+    if (fcmTokens) {
+      for (const fcm of fcmTokens) {
+        await sendFcmNotification(fcm.token, payload);
+      }
+    }
+  }
+
+  // Novo Helper para enviar FCM
+  async function sendFcmNotification(token: string, payload: any) {
+    if (!admin.apps.length) return;
+    try {
+      await admin.messaging().send({
+        token: token,
+        notification: {
+          title: payload.title,
+          body: payload.body
+        },
+        data: {
+          url: payload.url || '/dashboard'
+        },
+        android: {
+          priority: 'high',
+          notification: {
+            channelId: 'default',
+            clickAction: 'FLUTTER_NOTIFICATION_CLICK'
+          }
+        }
+      });
+      console.log(`[FCM] Notificação enviada para token: ${token.substring(0, 10)}...`);
+    } catch (e: any) {
+      console.error('[FCM Error]', e.message);
+      if (e.code === 'messaging/registration-token-not-registered') {
+        await supabase.from('fcm_tokens').delete().eq('token', token);
+      }
     }
   }
 
@@ -534,6 +609,25 @@ async function startServer() {
     }
   });
 
+  app.post('/api/register-fcm', async (req, res) => {
+    const { email, token, device_type } = req.body;
+    try {
+      // Tenta buscar o user_id baseado no email para vincular corretamente
+      const { data: clientData } = await supabase.from('clients').select('user_id').eq('email', email).maybeSingle();
+      
+      await supabase.from('fcm_tokens').upsert([{
+        user_id: clientData?.user_id,
+        email,
+        token,
+        device_type
+      }], { onConflict: 'token' });
+      
+      res.status(201).json({ success: true });
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
   app.get('/api/push-stats', async (req, res) => {
     const { adminId } = req.query;
     try {
@@ -694,23 +788,26 @@ async function startServer() {
         if (notifiedToday.has(notifKey)) continue;
         notifiedToday.add(notifKey);
 
-        const { data: subscriptions } = await supabase.from('push_subscriptions').select('subscription_json, admin_id').eq('username', client.username);
-        if (subscriptions && subscriptions.length > 0) {
-          for (const sub of subscriptions) {
-            const payload = {
-              title,
-              body: message,
-              url: '/dashboard'
-            };
-            // Usar o helper centralizado: resolve IDs, usa cache e limpa tokens inválidos
-            await sendPushNotification(sub.subscription_json, payload, sub.admin_id);
-          }
-          console.log(`[Cron] Notificação enviada para ${client.username} (${diffDays} dias)`);
-        }
+        const payload = {
+          title,
+          body: message,
+          url: '/dashboard'
+        };
+        
+        await notifyUser(client.user_id, client.email, client.username, payload, client.admin_id);
+        console.log(`[Cron] Notificação enviada para ${client.username} (${diffDays} dias)`);
       }
     }
 
-    console.log('[Cron] Verificação concluída. ' + notifiedToday.size + ' notificações enviadas hoje.');
+    const summary = `Verificação de vencimento concluída. ${notifiedToday.size} notificações enviadas hoje em ${brTime}.`;
+    console.log('[Cron] ' + summary);
+    
+    // Log do sistema para monitoramento no Dashboard
+    await supabase.from('notifications').insert([{
+      title: '⚙️ Sistema: Verificação de Vencimento',
+      message: summary,
+      type: 'system'
+    }]);
   });
 
   // Limpar controle de duplicatas à meia-noite (3h UTC = 0h BR)
@@ -734,14 +831,14 @@ async function startServer() {
       
       Retorne APENAS o texto diretamente.`;
 
-      console.log('[Agenda Esportiva] Chamando Gemini 1.5-Flash...');
-      const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      console.log('[Agenda Esportiva] Chamando Gemini Flash...');
+      const model = ai.getGenerativeModel({ model: 'gemini-flash-latest' });
       
       const result = await model.generateContent(prompt + " (Use seus dados internos ou busca se necessário)");
       const response = await result.response;
       return response.text()?.trim() || '';
     } catch (err: any) {
-      console.error('[Erro na Agenda Esportiva]', err);
+      console.error(`[Erro na Agenda Esportiva] Status: ${err.status || 'N/A'}. Detalhes:`, err.message || err);
       return '';
     }
   }
@@ -865,19 +962,36 @@ Placar Atual: ${homeScore} - ${awayScore}`;
       const message = await fetchSportsAgenda();
       if (!message) return;
 
-      const { data: subscriptions } = await supabase.from('push_subscriptions').select('subscription_json, admin_id');
-      if (!subscriptions) return;
+      // Salvar na tabela para visualização no app
+      await supabase.from('notifications').insert([{
+        title: '⚽ Agenda Esportiva',
+        message: message,
+        type: 'info'
+      }]);
 
-      const appUrl = process.env.VITE_APP_URL || 'https://itwf.vercel.app';
-      
-      for (const sub of subscriptions) {
-        const payload = {
-          title: '⚽ Agenda Esportiva do Dia',
-          body: message,
-          url: '/dashboard'
-        };
-        await sendPushNotification(sub.subscription_json, payload, sub.admin_id);
+      // Enviar para TODOS (Broadcast)
+      const payload = {
+        title: '⚽ Agenda Esportiva do Dia',
+        body: message,
+        url: '/dashboard'
+      };
+
+      // A. Web Push All
+      const { data: webSubs } = await supabase.from('push_subscriptions').select('subscription_json, admin_id');
+      if (webSubs) {
+        for (const sub of webSubs) {
+          await sendPushNotification(sub.subscription_json, payload, sub.admin_id);
+        }
       }
+
+      // B. FCM All
+      const { data: fcmTokens } = await supabase.from('fcm_tokens').select('token');
+      if (fcmTokens) {
+        for (const fcm of fcmTokens) {
+          await sendFcmNotification(fcm.token, payload);
+        }
+      }
+
       console.log('[Cron] Agenda Esportiva (Manhã) enviada.');
     } catch (e) {
       console.error('[Cron] Falha na Agenda Esportiva (Manhã):', e);
@@ -891,19 +1005,36 @@ Placar Atual: ${homeScore} - ${awayScore}`;
       const message = await fetchSportsAgenda();
       if (!message) return;
 
-      const { data: subscriptions } = await supabase.from('push_subscriptions').select('subscription_json, admin_id');
-      if (!subscriptions) return;
+      // Salvar na tabela
+      await supabase.from('notifications').insert([{
+        title: '⚽ Agenda Esportiva',
+        message: message,
+        type: 'info'
+      }]);
 
-      const appUrl = process.env.VITE_APP_URL || 'https://itwf.vercel.app';
-      
-      for (const sub of subscriptions) {
-        const payload = {
-          title: '⚽ Agenda Esportiva do Dia',
-          body: message,
-          url: '/dashboard'
-        };
-        await sendPushNotification(sub.subscription_json, payload, sub.admin_id);
+      // Enviar para TODOS (Broadcast)
+      const payload = {
+        title: '⚽ Agenda Esportiva do Dia',
+        body: message,
+        url: '/dashboard'
+      };
+
+      // A. Web Push All
+      const { data: webSubs } = await supabase.from('push_subscriptions').select('subscription_json, admin_id');
+      if (webSubs) {
+        for (const sub of webSubs) {
+          await sendPushNotification(sub.subscription_json, payload, sub.admin_id);
+        }
       }
+
+      // B. FCM All
+      const { data: fcmTokens } = await supabase.from('fcm_tokens').select('token');
+      if (fcmTokens) {
+        for (const fcm of fcmTokens) {
+          await sendFcmNotification(fcm.token, payload);
+        }
+      }
+
       console.log('[Cron] Agenda Esportiva (Tarde) enviada.');
     } catch (e) {
       console.error('[Cron] Falha na Agenda Esportiva (Tarde):', e);
@@ -917,17 +1048,36 @@ Placar Atual: ${homeScore} - ${awayScore}`;
       const message = await fetchSportsAgenda();
       if (!message) return;
 
-      const { data: subscriptions } = await supabase.from('push_subscriptions').select('subscription_json, admin_id');
-      if (!subscriptions) return;
+      // Salvar na tabela
+      await supabase.from('notifications').insert([{
+        title: '⚽ Agenda Esportiva',
+        message: message,
+        type: 'info'
+      }]);
 
-      for (const sub of subscriptions) {
-        const payload = {
-          title: '⚽ Agenda Esportiva do Dia',
-          body: message,
-          url: '/dashboard'
-        };
-        await sendPushNotification(sub.subscription_json, payload, sub.admin_id);
+      // Enviar para TODOS (Broadcast)
+      const payload = {
+        title: '⚽ Agenda Esportiva do Dia',
+        body: message,
+        url: '/dashboard'
+      };
+
+      // A. Web Push All
+      const { data: webSubs } = await supabase.from('push_subscriptions').select('subscription_json, admin_id');
+      if (webSubs) {
+        for (const sub of webSubs) {
+          await sendPushNotification(sub.subscription_json, payload, sub.admin_id);
+        }
       }
+
+      // B. FCM All
+      const { data: fcmTokens } = await supabase.from('fcm_tokens').select('token');
+      if (fcmTokens) {
+        for (const fcm of fcmTokens) {
+          await sendFcmNotification(fcm.token, payload);
+        }
+      }
+
       console.log('[Cron] Agenda Esportiva (Noite) enviada.');
     } catch (e) {
       console.error('[Cron] Falha na Agenda Esportiva (Noite):', e);
