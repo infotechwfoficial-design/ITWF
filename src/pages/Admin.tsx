@@ -686,8 +686,9 @@ export default function Admin() {
       
       showToast('Notificação enviada!', 'success');
       setIsDirectPushModalOpen(false);
-      setDirectPushClient(null);
       setDirectPushMessage('');
+      // Mantém o client por um breve momento para evitar crash durante a transição
+      setTimeout(() => setDirectPushClient(null), 100);
     } catch (err: any) {
       showToast(`Erro ao enviar notificação: ${err.message}`, 'error');
     } finally {
@@ -1674,7 +1675,7 @@ export default function Admin() {
               <div className="flex justify-between items-center mb-6">
                 <div>
                   <h3 className="text-xl font-bold">Enviar Aviso</h3>
-                  <p className="text-xs text-slate-500 font-mono">@{directPushClient.username}</p>
+                  <p className="text-xs text-slate-500 font-mono">@{directPushClient?.username}</p>
                 </div>
                 <button
                   onClick={() => setIsDirectPushModalOpen(false)}
@@ -1685,7 +1686,7 @@ export default function Admin() {
               </div>
               <form onSubmit={handleDirectPushSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Mensagem para {directPushClient.name}</label>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">Mensagem para {directPushClient?.name}</label>
                   <textarea
                     required
                     rows={3}

@@ -128,6 +128,14 @@ export default function Dashboard() {
           // Verifica Onboarding
           if (!clientData.onboarding_completed) {
             setShowWelcomeModal(true);
+          } else {
+            // Se já fez onboarding, verifica se está no PWA e ainda não viu o tutorial do PWA
+            const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
+            const pwaTutorialSeen = localStorage.getItem('pwa_tutorial_seen') === 'true';
+            
+            if (isStandalone && !pwaTutorialSeen) {
+              setShowWelcomeModal(true);
+            }
           }
         }
 
@@ -222,6 +230,13 @@ export default function Dashboard() {
 
   const handleCloseWelcome = async () => {
     setShowWelcomeModal(false);
+    
+    // Marca como visto no PWA se estiver em modo standalone
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
+    if (isStandalone) {
+      localStorage.setItem('pwa_tutorial_seen', 'true');
+    }
+
     if (!client) return;
     try {
       await supabase

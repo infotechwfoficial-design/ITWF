@@ -164,10 +164,16 @@ export default function PWAInstallModal({ deferredPrompt, onClose }: PWAInstallM
                                 <div className="size-20 bg-emerald-500/20 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
                                 </div>
-                                <h2 className="text-2xl font-black text-emerald-600 dark:text-emerald-500 uppercase tracking-tighter">Tudo pronto!</h2>
+                                <h2 className="text-2xl font-black text-emerald-600 dark:text-emerald-500 uppercase tracking-tighter">Instalação Concluída!</h2>
                                 <p className="text-slate-500 dark:text-slate-400 font-medium">
-                                    Você agora terá uma experiência completa. Aproveite!
+                                    Para uma experiência de tela cheia, feche esta aba e abra o ícone <strong>ITWF</strong> que apareceu na sua tela inicial.
                                 </p>
+                                <button
+                                    onClick={onClose}
+                                    className="w-full bg-emerald-500 text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-emerald-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all mt-4"
+                                >
+                                    ENTENDI, VOU ABRIR O APP
+                                </button>
                             </motion.div>
                         )}
                     </div>
