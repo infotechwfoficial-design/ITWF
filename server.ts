@@ -82,7 +82,7 @@ async function startServer() {
       const response = await result.response;
       res.json({ reply: response.text() });
   } catch (err: any) {
-    console.error('Gemini error:', err);
+    console.error('Erro no Gemini:', err);
     res.status(500).json({ error: 'Erro ao processar mensagem com Inteligência Artificial' });
   }
 });
@@ -267,7 +267,7 @@ async function startServer() {
 
       res.status(400).json({ error: 'Provedor não suportado para criação de preferência' });
     } catch (err: any) {
-      console.error('Error creating payment session:', err);
+      console.error('Erro ao criar sessão de pagamento:', err);
       res.status(500).json({ error: err.message || 'Erro ao criar sessão de pagamento' });
     }
   });
@@ -317,7 +317,7 @@ async function startServer() {
           }
         });
     } catch (e) {
-      console.error('[Push Error] Falha ao enviar notificação:', e);
+      console.error('[Erro Push] Falha ao enviar notificação:', e);
     }
   }
 
@@ -407,7 +407,7 @@ async function startServer() {
       }
       res.sendStatus(200);
     } catch (err) {
-      console.error('Mercado Pago Webhook Error:', err);
+      console.error('Erro no Webhook do Mercado Pago:', err);
       res.sendStatus(200); // MP recomenda sempre 200 para evitar retentativas infinitas em falhas parciais
     }
   });
@@ -425,8 +425,8 @@ async function startServer() {
 
       res.json({ received: true });
     } catch (err) {
-      console.error('Stripe Webhook Error:', err);
-      res.status(400).send(`Webhook Error`);
+      console.error('Erro no Webhook do Stripe:', err);
+      res.status(400).send(`Erro no Webhook`);
     }
   });
 
@@ -449,7 +449,7 @@ async function startServer() {
 
       res.sendStatus(200);
     } catch (err) {
-      console.error('Asaas Webhook Error:', err);
+      console.error('Erro no Webhook do Asaas:', err);
       res.sendStatus(200);
     }
   });
@@ -458,7 +458,7 @@ async function startServer() {
     try {
       const { data, error } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
       if (error) {
-        console.error('Get Notifications Error', error);
+        console.error('Erro ao buscar notificações', error);
         return res.json([]);
       }
       res.json(data);
@@ -496,7 +496,7 @@ async function startServer() {
       if (error) throw error;
       res.json({ success: true });
     } catch (err: any) {
-      console.error('Delete Auth User Error:', err);
+      console.error('Erro ao deletar usuário Auth:', err);
       res.status(400).json({ error: err.message });
     }
   });
@@ -526,6 +526,7 @@ async function startServer() {
       const { count, error } = await query;
       res.json({ count: count || 0 });
     } catch (err) {
+      console.error('Erro ao buscar estatísticas de push', err);
       res.json({ count: 0 });
     }
   });
@@ -691,7 +692,7 @@ async function startServer() {
       }
     }
 
-    console.log(`[Cron] Verificação concluída. ${notifiedToday.size} notificações enviadas hoje.`);
+    console.log('[Cron] Verificação concluída. ' + notifiedToday.size + ' notificações enviadas hoje.');
   });
 
   // Limpar controle de duplicatas à meia-noite (3h UTC = 0h BR)
@@ -704,7 +705,7 @@ async function startServer() {
 
   async function fetchSportsAgenda(): Promise<string> {
     try {
-      console.log('[Sports Agenda] Gerando prompt...');
+      console.log('[Agenda Esportiva] Gerando prompt...');
       const today = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long', day: 'numeric', month: 'long' });
       
       const prompt = `Liste os 5 jogos de futebol MAIS IMPORTANTES para HOJE (${today}).
@@ -715,14 +716,14 @@ async function startServer() {
       
       Retorne APENAS o texto diretamente.`;
 
-      console.log('[Sports Agenda] Chamando Gemini 1.5-Flash...');
+      console.log('[Agenda Esportiva] Chamando Gemini 1.5-Flash...');
       const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
       
       const result = await model.generateContent(prompt + " (Use seus dados internos ou busca se necessário)");
       const response = await result.response;
       return response.text()?.trim() || '';
     } catch (err: any) {
-      console.error('[Sports Agenda Error]', err);
+      console.error('[Erro na Agenda Esportiva]', err);
       return '';
     }
   }

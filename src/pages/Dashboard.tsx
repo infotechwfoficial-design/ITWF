@@ -374,7 +374,7 @@ export default function Dashboard() {
           </div>
         </header>
 
-        {/* Status Card and Services List */}
+        {/* Card de Status e Lista de Serviços */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
           <motion.div
@@ -547,7 +547,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Meus Pedidos Section */}
+        {/* Seção Meus Pedidos */}
         <section className="mt-4">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-xl font-bold flex items-center gap-2">

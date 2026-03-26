@@ -1265,7 +1265,7 @@ export default function Admin() {
           >
             <div className="p-6 md:p-8 border-b border-black/5 dark:border-white/5 flex justify-between items-center bg-white/20 dark:bg-white/5">
               <div>
-                <h3 className="text-xl font-bold tracking-tight font-display">Envio de Notificação</h3>
+                <h3 className="text-xl font-bold tracking-tight font-display">Planos de Assinatura</h3>
                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Configure as ofertas do seu sistema.</p>
               </div>
               <button

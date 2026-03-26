@@ -55,13 +55,13 @@ export default function Notifications() {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: i * 0.1 }}
-              className={`relative bg - slate - 50 dark: bg - slate - 900 / 40 border border - black / 5 dark: border - white / 5 rounded - 2xl p - 6 flex items - start gap - 6 group hover: bg - slate - 100 dark: hover: bg - white / 5 transition - all shadow - sm`}
+              className={`relative bg-slate-50 dark:bg-slate-900/40 border border-black/5 dark:border-white/5 rounded-2xl p-6 flex items-start gap-6 group hover:bg-slate-100 dark:hover:bg-white/5 transition-all shadow-sm`}
             >
-              <div className={`size - 12 rounded - xl flex items - center justify - center shrink - 0 ${notif.type === 'warning' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-500' :
+              <div className={`size-12 rounded-xl flex items-center justify-center shrink-0 ${notif.type === 'warning' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-500' :
                 notif.type === 'success' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-500' :
                   notif.type === 'info' ? 'bg-primary/10 text-primary' :
                     'bg-rose-500/10 text-rose-600 dark:text-rose-500'
-                } `}>
+                }`}>
                 {notif.type === 'warning' ? <AlertCircle size={24} /> :
                   notif.type === 'success' ? <CheckCircle2 size={24} /> :
                     notif.type === 'info' ? <Info size={24} /> :
