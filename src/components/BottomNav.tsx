@@ -6,7 +6,8 @@ import {
     CreditCard,
     Settings as SettingsIcon,
     LifeBuoy,
-    LucideIcon
+    LucideIcon,
+    Trophy
 } from 'lucide-react';
 
 interface BottomNavItem {
@@ -27,6 +28,7 @@ export default function BottomNav({ items, activeId }: BottomNavProps) {
 
     const defaultItems: BottomNavItem[] = [
         { path: '/dashboard', icon: LayoutDashboard, label: 'Painel' },
+        { path: '/sports', icon: Trophy, label: 'Arena' },
         { path: '/request-content', icon: Film, label: 'Pedir' },
         { path: '/plans', icon: CreditCard, label: 'Planos' },
         { path: '/support', icon: LifeBuoy, label: 'Suporte' },

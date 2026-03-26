@@ -11,7 +11,8 @@ import {
   LogOut,
   Bell,
   LucideIcon,
-  ShieldCheck
+  ShieldCheck,
+  Trophy
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
@@ -41,6 +42,7 @@ export default function Sidebar({ items, title = "ITWF", logoUrl = "/logo.png", 
 
   const defaultItems: NavItem[] = [
     { path: '/dashboard', icon: LayoutDashboard, label: 'Painel Geral' },
+    { path: '/sports', icon: Trophy, label: 'Arena Esportiva' },
     { path: '/request-content', icon: Film, label: 'Pedir Conteúdo' },
     { path: '/plans', icon: CreditCard, label: 'Assinaturas' },
     { path: '/invoices', icon: ReceiptText, label: 'Faturas' },

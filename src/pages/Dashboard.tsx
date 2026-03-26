@@ -45,6 +45,44 @@ function getSubscriptionStatus(daysRemaining: number) {
   return { label: 'Ativa', color: 'text-green-500', dot: 'bg-green-500', shadow: 'shadow-[0_0_10px_rgba(34,197,94,0.6)]' };
 }
 
+const RequestCard = React.memo(({ req }: { req: any }) => (
+  <motion.div
+    initial={{ opacity: 0, scale: 0.95 }}
+    animate={{ opacity: 1, scale: 1 }}
+    className="bg-white dark:bg-slate-900/40 border border-black/5 dark:border-white/10 p-5 rounded-3xl shadow-sm"
+  >
+    <div className="flex justify-between items-start mb-4">
+      <div>
+        <h4 className="font-bold text-lg truncate max-w-[180px]">{req.content_title}</h4>
+        <p className="text-xs text-slate-500">{req.content_type} • {req.content_year}</p>
+      </div>
+      <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${req.status === 'PEDIDO ADICIONADO' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+        req.status === 'NÃO DISPONIVEL PARA ADIÇÃO' ? 'bg-rose-500/10 text-rose-500' :
+          req.status === 'EM BUSCA DO SEU PEDIDO' ? 'bg-amber-500/10 text-amber-500' :
+            'bg-primary/10 text-primary'
+        }`}>
+        {req.status}
+      </span>
+    </div>
+    <div className="flex items-center justify-between pt-4 border-t border-black/5 dark:border-white/5">
+      <div className="flex items-center gap-2 text-slate-400">
+        <Clock size={14} />
+        <span className="text-[10px] font-medium">
+          {new Date(req.created_at).toLocaleDateString()}
+        </span>
+      </div>
+      <a
+        href={req.tmdb_link}
+        target="_blank"
+        rel="noreferrer"
+        className="text-[10px] font-bold text-primary flex items-center gap-1 hover:underline"
+      >
+        Ver no TMDB <ExternalLink size={10} />
+      </a>
+    </div>
+  </motion.div>
+));
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [client, setClient] = useState<Client | null>(null);
@@ -465,42 +503,7 @@ export default function Dashboard() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {requests.map((req) => (
-              <motion.div
-                key={req.id}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="bg-white dark:bg-slate-900/40 border border-black/5 dark:border-white/10 p-5 rounded-3xl shadow-sm"
-              >
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h4 className="font-bold text-lg truncate max-w-[180px]">{req.content_title}</h4>
-                    <p className="text-xs text-slate-500">{req.content_type} • {req.content_year}</p>
-                  </div>
-                  <span className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase ${req.status === 'PEDIDO ADICIONADO' ? 'bg-emerald-500/10 text-emerald-500' :
-                    req.status === 'NÃO DISPONIVEL PARA ADIÇÃO' ? 'bg-rose-500/10 text-rose-500' :
-                      req.status === 'EM BUSCA DO SEU PEDIDO' ? 'bg-amber-500/10 text-amber-500' :
-                        'bg-primary/10 text-primary'
-                    }`}>
-                    {req.status}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between pt-4 border-t border-black/5 dark:border-white/5">
-                  <div className="flex items-center gap-2 text-slate-400">
-                    <Clock size={14} />
-                    <span className="text-[10px] font-medium">
-                      {new Date(req.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <a
-                    href={req.tmdb_link}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[10px] font-bold text-primary flex items-center gap-1 hover:underline"
-                  >
-                    Ver no TMDB <ExternalLink size={10} />
-                  </a>
-                </div>
-              </motion.div>
+              <RequestCard key={req.id} req={req} />
             ))}
             {requests.length === 0 && (
               <div className="col-span-full py-10 bg-slate-50 dark:bg-white/5 rounded-3xl border border-dashed border-black/10 dark:border-white/10 text-center">

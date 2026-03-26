@@ -42,8 +42,179 @@ import Toast from '../components/Toast';
 
 interface ToastState {
   message: string;
-  type: 'success' | 'error';
+  type: 'success' | 'error' | 'warning';
 }
+
+// --- Componentes Memoizados para Performance ---
+
+const ClientRow = React.memo(({ client, onView, onDirectPush, onEdit, onCopy, onDelete }: {
+  client: Client;
+  onView: (c: Client) => void;
+  onDirectPush: (c: Client) => void;
+  onEdit: (c: Client) => void;
+  onCopy: (c: Client) => void;
+  onDelete: (c: Client) => void;
+}) => (
+  <tr
+    className="hover:bg-black/[0.01] dark:hover:bg-white/[0.01] transition-colors cursor-pointer group"
+    onClick={() => onView(client)}
+  >
+    <td className="px-6 py-4 font-mono text-sm text-primary">{client.username}</td>
+    <td className="px-6 py-4 font-bold">{client.name}</td>
+    <td className="px-6 py-4 text-slate-500">{client.expiration_date}</td>
+    <td className="px-6 py-4 font-black">R$ {Number(client.balance || 0).toFixed(2)}</td>
+    <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+      <div className="flex justify-end gap-2">
+        <button onClick={() => onDirectPush(client)} className="p-2 text-slate-400 hover:text-amber-500 transition-colors" title="Enviar Notificação Push">
+          <Bell size={18} />
+        </button>
+        <button onClick={() => onEdit(client)} className="p-2 text-slate-400 hover:text-primary transition-colors">
+          <Edit2 size={18} />
+        </button>
+        <button onClick={() => onCopy(client)} className="p-2 text-slate-400 hover:text-emerald-500 transition-colors" title="Copiar Link de Acesso">
+          <LinkIcon size={18} />
+        </button>
+        <button onClick={() => onDelete(client)} className="p-2 text-slate-400 hover:text-rose-500 transition-colors">
+          <Trash2 size={18} />
+        </button>
+      </div>
+    </td>
+  </tr>
+));
+
+const ClientCard = React.memo(({ client, idx, onView, onDirectPush, onEdit, onCopy, onDelete }: {
+  client: Client;
+  idx: number;
+  onView: (c: Client) => void;
+  onDirectPush: (c: Client) => void;
+  onEdit: (c: Client) => void;
+  onCopy: (c: Client) => void;
+  onDelete: (c: Client) => void;
+}) => (
+  <motion.div
+    initial={{ opacity: 0, x: -20 }}
+    animate={{ opacity: 1, x: 0 }}
+    transition={{ delay: idx * 0.05 }}
+    className="p-5 active:bg-black/5 dark:active:bg-white/5 transition-colors cursor-pointer relative overflow-hidden"
+    onClick={() => onView(client)}
+  >
+    <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center gap-3">
+        <div className="size-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-black text-lg">
+          {client.name?.charAt(0) || client.username?.charAt(0) || 'C'}
+        </div>
+        <div>
+          <h4 className="font-bold text-slate-900 dark:text-white leading-tight">{client.name}</h4>
+          <p className="text-xs font-mono text-primary/70">{client.username}</p>
+        </div>
+      </div>
+      <div className="text-right">
+        <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Vence em</p>
+        <p className="text-sm font-black text-slate-900 dark:text-white">{client.expiration_date}</p>
+      </div>
+    </div>
+    <div className="flex items-center justify-between mt-4">
+      <div className="flex items-center gap-2">
+         <span className="text-xs font-bold text-slate-400">Saldo:</span>
+         <span className="text-sm font-black text-slate-900 dark:text-white">R$ {Number(client.balance || 0).toFixed(2)}</span>
+      </div>
+      <div className="flex gap-2">
+        <button onClick={(e) => { e.stopPropagation(); onDirectPush(client); }} className="p-2 bg-amber-500/10 rounded-xl text-amber-500"><Bell size={16} /></button>
+        <button onClick={(e) => { e.stopPropagation(); window.open(client.renewal_link, '_blank'); }} className="p-2 bg-primary/10 rounded-xl text-primary"><LinkIcon size={16} /></button>
+        <button onClick={(e) => { e.stopPropagation(); onEdit(client); }} className="p-2 bg-slate-100 dark:bg-white/10 rounded-xl text-slate-600 dark:text-slate-400"><Edit size={16} /></button>
+        <button onClick={(e) => { e.stopPropagation(); onCopy(client); }} className="p-2 bg-emerald-500/10 rounded-xl text-emerald-500"><Copy size={16} /></button>
+        <button onClick={(e) => { e.stopPropagation(); onDelete(client); }} className="p-2 bg-rose-500/10 rounded-xl text-rose-500"><Trash2 size={16} /></button>
+      </div>
+    </div>
+  </motion.div>
+));
+
+const ResellerRow = React.memo(({ reseller, onDelete, submitting }: {
+  reseller: any;
+  onDelete: (r: any) => void;
+  submitting: boolean;
+}) => (
+  <tr className="hover:bg-black/[0.01] dark:hover:bg-white/[0.01] transition-colors">
+    <td className="px-6 py-4">
+      <div className="flex items-center gap-3">
+        <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold">
+          {reseller.name?.charAt(0) || 'R'}
+        </div>
+        <span className="font-bold">{reseller.name || 'Sem Nome'}</span>
+      </div>
+    </td>
+    <td className="px-6 py-4 text-slate-500">{reseller.email}</td>
+    <td className="px-6 py-4">
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+        <Users size={12} />
+        {reseller.clientCount ?? 0} cliente{reseller.clientCount !== 1 ? 's' : ''}
+      </span>
+    </td>
+    <td className="px-6 py-4">
+      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${reseller.role === 'master' ? 'bg-amber-500/10 text-amber-500' : 'bg-primary/10 text-primary'}`}>
+        {reseller.role}
+      </span>
+    </td>
+    <td className="px-6 py-4 text-xs text-slate-400">
+      {new Date(reseller.created_at).toLocaleDateString()}
+    </td>
+    <td className="px-6 py-4 text-right">
+      {reseller.role !== 'master' && (
+        <button
+          onClick={() => onDelete(reseller)}
+          disabled={submitting}
+          className="p-2 text-slate-400 hover:text-rose-500 transition-colors disabled:opacity-50"
+        >
+          <Trash2 size={18} />
+        </button>
+      )}
+    </td>
+  </tr>
+));
+
+const PlanRow = React.memo(({ plan, onEdit, onDelete }: {
+  plan: Plan;
+  onEdit: (p: Plan) => void;
+  onDelete: (id: number) => void;
+}) => (
+  <tr className="hover:bg-black/[0.01] dark:hover:bg-white/[0.01] transition-colors">
+    <td className="px-6 py-4 font-bold">{plan.name}</td>
+    <td className="px-6 py-4 font-black text-primary">R$ {Number(plan.price || 0).toFixed(2)}</td>
+    <td className="px-6 py-4 text-slate-500">{plan.duration}</td>
+    <td className="px-6 py-4 text-right">
+      <div className="flex justify-end gap-2">
+        <button onClick={() => onEdit(plan)} className="p-2 text-slate-400 hover:text-primary transition-colors">
+          <Edit2 size={18} />
+        </button>
+        <button onClick={() => onDelete(plan.id)} className="p-2 text-slate-400 hover:text-rose-500 transition-colors">
+          <Trash2 size={18} />
+        </button>
+      </div>
+    </td>
+  </tr>
+));
+
+const PlanCard = React.memo(({ plan, onEdit, onDelete }: {
+  plan: Plan;
+  onEdit: (p: Plan) => void;
+  onDelete: (id: number) => void;
+}) => (
+  <div className="p-4 flex items-center justify-between">
+    <div>
+      <h4 className="font-bold text-base">{plan.name}</h4>
+      <p className="text-sm font-black text-primary">R$ {Number(plan.price || 0).toFixed(2)} <span className="text-[10px] text-slate-400 font-normal">/ {plan.duration}</span></p>
+    </div>
+    <div className="flex gap-2">
+      <button onClick={() => onEdit(plan)} className="p-2 bg-primary/10 text-primary rounded-lg">
+        <Edit2 size={16} />
+      </button>
+      <button onClick={() => onDelete(plan.id)} className="p-2 bg-rose-500/10 text-rose-500 rounded-lg">
+        <Trash2 size={16} />
+      </button>
+    </div>
+  </div>
+));
+
 
 export default function Admin() {
   const navigate = useNavigate();
@@ -86,11 +257,7 @@ export default function Admin() {
     features: ''
   });
 
-  const showToast = useCallback((message: string, type: 'success' | 'error') => {
-    setToast({ message, type });
-  }, []);
-
-  // Client Form State
+  // Client Form State (Restaurados)
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -104,7 +271,7 @@ export default function Admin() {
     renewal_link: ''
   });
 
-  // Notification Form State
+  // Notification Form State (Restaurados)
   const [isNotifModalOpen, setIsNotifModalOpen] = useState(false);
   const [isDirectPushModalOpen, setIsDirectPushModalOpen] = useState(false);
   const [directPushClient, setDirectPushClient] = useState<Client | null>(null);
@@ -115,7 +282,19 @@ export default function Admin() {
     type: 'info' as Notification['type']
   });
 
+  const openEditPlan = useCallback((plan: Plan) => {
+    setEditingPlan(plan);
+    setPlanForm({
+      name: plan.name,
+      price: plan.price,
+      duration: plan.duration,
+      features: JSON.parse(plan.features || '[]').join(', ')
+    });
+    setIsPlanModalOpen(true);
+  }, []);
+
   useEffect(() => {
+
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
@@ -127,6 +306,55 @@ export default function Admin() {
     };
     checkUser();
   }, [navigate]);
+
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'warning') => {
+    setToast({ message, type });
+  }, []);
+
+  const openViewClient = useCallback((client: Client) => {
+    setViewingClient(client);
+    setIsViewModalOpen(true);
+  }, []);
+
+  const openEditClient = useCallback((client: Client) => {
+    setEditingClient(client);
+    setClientForm({
+      username: client.username,
+      name: client.name,
+      email: client.email,
+      expiration_date: client.expiration_date,
+      balance: client.balance,
+      renewal_link: client.renewal_link
+    });
+    setIsClientModalOpen(true);
+  }, []);
+
+  const openDirectPushModal = useCallback((client: Client) => {
+    setDirectPushClient(client);
+    setDirectPushMessage(`Olá ${client.name}, sua assinatura vence em ${client.expiration_date}.`);
+    setIsDirectPushModalOpen(true);
+  }, []);
+
+  const copyAccessLink = useCallback((client: Client) => {
+    const loginUrl = `${window.location.origin}/login?email=${encodeURIComponent(client.email)}`;
+    navigator.clipboard.writeText(loginUrl);
+    showToast('Link de acesso copiado!', 'success');
+  }, [showToast]);
+
+  const deleteClient = async (client: Client) => {
+    if (window.confirm(`Tem certeza que deseja excluir o cliente ${client.name}? Esta ação apagará permanentemente todos os pedidos, faturas e registros de notificação vinculados.`)) {
+      try {
+        setSubmitting(true);
+        await performClientCleanup(client);
+        showToast('Cliente e acesso ao App completamente excluídos!', 'success');
+        fetchClients();
+      } catch (err: any) {
+        showToast('Erro crítico ao excluir conta do cliente: ' + err.message, 'error');
+      } finally {
+        setSubmitting(false);
+      }
+    }
+  };
 
   const fetchAdminSettings = async () => {
     try {
@@ -434,11 +662,6 @@ export default function Admin() {
     }
   };
 
-  const openDirectPushModal = (client: Client) => {
-    setDirectPushClient(client);
-    setDirectPushMessage(`Olá ${client.name}, sua assinatura vence em ${client.expiration_date}.`);
-    setIsDirectPushModalOpen(true);
-  };
 
   const handleDirectPushSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -472,11 +695,6 @@ export default function Admin() {
     }
   };
 
-  const copyAccessLink = (client: Client) => {
-    const loginUrl = `${window.location.origin}/login?email=${encodeURIComponent(client.email)}`;
-    navigator.clipboard.writeText(loginUrl);
-    showToast('Link de acesso copiado!', 'success');
-  };
 
   const performClientCleanup = async (client: Client) => {
     // 1. Delete push subscriptions
@@ -509,20 +727,6 @@ export default function Admin() {
     if (error) throw error;
   };
 
-  const deleteClient = async (client: Client) => {
-    if (window.confirm(`Tem certeza que deseja excluir o cliente ${client.name}? Esta ação apagará permanentemente todos os pedidos, faturas e registros de notificação vinculados.`)) {
-      try {
-        setSubmitting(true);
-        await performClientCleanup(client);
-        showToast('Cliente e acesso ao App completamente excluídos!', 'success');
-        fetchClients();
-      } catch (err: any) {
-        showToast('Erro crítico ao excluir conta do cliente: ' + err.message, 'error');
-      } finally {
-        setSubmitting(false);
-      }
-    }
-  };
 
   const updateRequestStatus = async (id: number | string, status: string, reqUserId: string, title: string) => {
     await supabase.from('requests').update({ status }).eq('id', id);
@@ -581,18 +785,6 @@ export default function Admin() {
     }
   };
 
-  const openEditClient = (client: Client) => {
-    setEditingClient(client);
-    setClientForm({
-      username: client.username,
-      name: client.name,
-      email: client.email,
-      expiration_date: client.expiration_date,
-      balance: client.balance,
-      renewal_link: client.renewal_link
-    });
-    setIsClientModalOpen(true);
-  };
 
   const handlePlanSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -636,21 +828,7 @@ export default function Admin() {
     }
   };
 
-  const openEditPlan = (plan: Plan) => {
-    setEditingPlan(plan);
-    setPlanForm({
-      name: plan.name,
-      price: plan.price,
-      duration: plan.duration,
-      features: JSON.parse(plan.features || '[]').join(', ')
-    });
-    setIsPlanModalOpen(true);
-  };
 
-  const openViewClient = (client: Client) => {
-    setViewingClient(client);
-    setIsViewModalOpen(true);
-  };
 
   const handleResellerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -844,46 +1022,15 @@ export default function Admin() {
                 </thead>
                 <tbody className="divide-y divide-black/5 dark:divide-white/5">
                   {clients.map((client) => (
-                    <tr
+                    <ClientRow
                       key={client.id}
-                      className="hover:bg-black/[0.01] dark:hover:bg-white/[0.01] transition-colors cursor-pointer group"
-                      onClick={() => openViewClient(client)}
-                    >
-                      <td className="px-6 py-4 font-mono text-sm text-primary">{client.username}</td>
-                      <td className="px-6 py-4 font-bold">{client.name}</td>
-                      <td className="px-6 py-4 text-slate-500">{client.expiration_date}</td>
-                      <td className="px-6 py-4 font-black">R$ {Number(client.balance || 0).toFixed(2)}</td>
-                      <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex justify-end gap-2">
-                          <button
-                            onClick={() => openDirectPushModal(client)}
-                            className="p-2 text-slate-400 hover:text-amber-500 transition-colors"
-                            title="Enviar Notificação Push"
-                          >
-                            <Bell size={18} />
-                          </button>
-                          <button
-                            onClick={() => openEditClient(client)}
-                            className="p-2 text-slate-400 hover:text-primary transition-colors"
-                          >
-                            <Edit2 size={18} />
-                          </button>
-                          <button
-                            onClick={() => copyAccessLink(client)}
-                            className="p-2 text-slate-400 hover:text-emerald-500 transition-colors"
-                            title="Copiar Link de Acesso"
-                          >
-                            <LinkIcon size={18} />
-                          </button>
-                          <button
-                            onClick={() => deleteClient(client)}
-                            className="p-2 text-slate-400 hover:text-rose-500 transition-colors"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                      client={client}
+                      onView={openViewClient}
+                      onDirectPush={openDirectPushModal}
+                      onEdit={openEditClient}
+                      onCopy={copyAccessLink}
+                      onDelete={deleteClient}
+                    />
                   ))}
                 </tbody>
               </table>
@@ -892,73 +1039,16 @@ export default function Admin() {
             {/* Mobile Cards */}
             <div className="md:hidden divide-y divide-black/5 dark:divide-white/5">
               {clients.map((client, idx) => (
-                <motion.div
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: idx * 0.05 }}
+                <ClientCard
                   key={client.id}
-                  className="p-5 active:bg-black/5 dark:active:bg-white/5 transition-colors cursor-pointer relative overflow-hidden"
-                  onClick={() => openViewClient(client)}
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="size-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-black text-lg">
-                        {client.name?.charAt(0) || client.username?.charAt(0) || 'C'}
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-slate-900 dark:text-white leading-tight">{client.name}</h4>
-                        <p className="text-xs font-mono text-primary/70">{client.username}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Vence em</p>
-                      <p className="text-sm font-black text-slate-900 dark:text-white">{client.expiration_date}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between mt-4">
-                    <div className="flex items-center gap-2">
-                       <span className="text-xs font-bold text-slate-400">Saldo:</span>
-                       <span className="text-sm font-black text-slate-900 dark:text-white">R$ {Number(client.balance || 0).toFixed(2)}</span>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); openDirectPushModal(client); }}
-                        className="p-2 bg-amber-500/10 rounded-xl text-amber-500"
-                        title="Enviar Notificação Push"
-                      >
-                        <Bell size={16} />
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); window.open(client.renewal_link, '_blank'); }}
-                        className="p-2 bg-primary/10 rounded-xl text-primary"
-                        title="Link de Renovação"
-                      >
-                        <LinkIcon size={16} />
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); openEditClient(client); }}
-                        className="p-2 bg-slate-100 dark:bg-white/10 rounded-xl text-slate-600 dark:text-slate-400"
-                        title="Editar"
-                      >
-                        <Edit size={16} />
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); copyAccessLink(client); }}
-                        className="p-2 bg-emerald-500/10 rounded-xl text-emerald-500"
-                        title="Copiar Link de Acesso"
-                      >
-                        <LinkIcon size={16} />
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); deleteClient(client); }}
-                        className="p-2 bg-rose-500/10 rounded-xl text-rose-500"
-                        title="Excluir"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
+                  idx={idx}
+                  client={client}
+                  onView={openViewClient}
+                  onDirectPush={openDirectPushModal}
+                  onEdit={openEditClient}
+                  onCopy={copyAccessLink}
+                  onDelete={deleteClient}
+                />
               ))}
             </div>
 
@@ -1203,27 +1293,12 @@ export default function Admin() {
                 </thead>
                 <tbody className="divide-y divide-black/5 dark:divide-white/5">
                   {plans.map((plan) => (
-                    <tr key={plan.id} className="hover:bg-black/[0.01] dark:hover:bg-white/[0.01] transition-colors">
-                      <td className="px-6 py-4 font-bold">{plan.name}</td>
-                      <td className="px-6 py-4 font-black text-primary">R$ {Number(plan.price || 0).toFixed(2)}</td>
-                      <td className="px-6 py-4 text-slate-500">{plan.duration}</td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-2">
-                          <button
-                            onClick={() => openEditPlan(plan)}
-                            className="p-2 text-slate-400 hover:text-primary transition-colors"
-                          >
-                            <Edit2 size={18} />
-                          </button>
-                          <button
-                            onClick={() => deletePlan(plan.id)}
-                            className="p-2 text-slate-400 hover:text-rose-500 transition-colors"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                    <PlanRow
+                      key={plan.id}
+                      plan={plan}
+                      onEdit={openEditPlan}
+                      onDelete={deletePlan}
+                    />
                   ))}
                 </tbody>
               </table>
@@ -1232,26 +1307,12 @@ export default function Admin() {
             {/* Mobile Cards */}
             <div className="md:hidden divide-y divide-black/5 dark:divide-white/5">
               {plans.map((plan) => (
-                <div key={plan.id} className="p-4 flex items-center justify-between">
-                  <div>
-                    <h4 className="font-bold text-base">{plan.name}</h4>
-                    <p className="text-sm font-black text-primary">R$ {Number(plan.price || 0).toFixed(2)} <span className="text-[10px] text-slate-400 font-normal">/ {plan.duration}</span></p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => openEditPlan(plan)}
-                      className="p-2 bg-primary/10 text-primary rounded-lg"
-                    >
-                      <Edit2 size={16} />
-                    </button>
-                    <button
-                      onClick={() => deletePlan(plan.id)}
-                      className="p-2 bg-rose-500/10 text-rose-500 rounded-lg"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </div>
+                <PlanCard
+                  key={plan.id}
+                  plan={plan}
+                  onEdit={openEditPlan}
+                  onDelete={deletePlan}
+                />
               ))}
             </div>
 
@@ -1296,42 +1357,12 @@ export default function Admin() {
                 </thead>
                 <tbody className="divide-y divide-black/5 dark:divide-white/5">
                   {resellers.map((reseller) => (
-                    <tr key={reseller.id} className="hover:bg-black/[0.01] dark:hover:bg-white/[0.01] transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold">
-                            {reseller.name?.charAt(0) || 'R'}
-                          </div>
-                          <span className="font-bold">{reseller.name || 'Sem Nome'}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-slate-500">{reseller.email}</td>
-                      <td className="px-6 py-4">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                          <Users size={12} />
-                          {reseller.clientCount ?? 0} cliente{reseller.clientCount !== 1 ? 's' : ''}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${reseller.role === 'master' ? 'bg-amber-500/10 text-amber-500' : 'bg-primary/10 text-primary'}`}>
-                          {reseller.role}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-xs text-slate-400">
-                        {new Date(reseller.created_at).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        {reseller.role !== 'master' && (
-                          <button
-                            onClick={() => deleteReseller(reseller)}
-                            disabled={submitting}
-                            className="p-2 text-slate-400 hover:text-rose-500 transition-colors disabled:opacity-50"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
+                    <ResellerRow
+                      key={reseller.id}
+                      reseller={reseller}
+                      onDelete={deleteReseller}
+                      submitting={submitting}
+                    />
                   ))}
                 </tbody>
               </table>

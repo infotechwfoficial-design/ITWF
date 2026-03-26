@@ -526,44 +526,74 @@ async function startServer() {
 
   app.post('/api/send-push', async (req, res) => {
     const { title, message, email, username, adminId } = req.body;
-    console.log(`Sending push for: ${username || email || 'all'} (Admin: ${adminId || 'global'})`);
+    console.log(`[Push API] Requisitado: ${username || email || 'all'} de Admin: ${adminId}`);
 
-    let query = supabase.from('push_subscriptions').select('subscription_json, admin_id');
-    
-    // Se for enviado por um revendedor (adminId presente), filtramos apenas os clientes dele
-    if (adminId) {
-      query = query.eq('admin_id', adminId);
+    try {
+      // 1. Verificar permissão e identificar o alvo
+      let filterUsername = username;
+      let filterEmail = email;
+
+      const { data: senderAdmin } = await supabase.from('admins').select('role').eq('user_id', adminId).single();
+      const isMaster = senderAdmin?.role === 'master';
+
+      if (username || email) {
+        // Push Direto: Verificar se o admin tem permissão para este cliente
+        const { data: clientData } = await supabase
+          .from('clients')
+          .select('username, email, admin_id')
+          .or(`username.eq.${username},email.eq.${email}`)
+          .maybeSingle();
+
+        if (!clientData) {
+          return res.status(404).json({ error: 'Cliente não encontrado.' });
+        }
+
+        if (!isMaster && clientData.admin_id !== adminId) {
+          return res.status(403).json({ error: 'Acesso negado. Este cliente pertence a outro revendedor.' });
+        }
+
+        filterUsername = clientData.username;
+        filterEmail = clientData.email;
+      }
+
+      // 2. Buscar assinaturas
+      let query = supabase.from('push_subscriptions').select('subscription_json, admin_id');
+      
+      if (filterUsername) {
+        query = query.eq('username', filterUsername);
+      } else if (filterEmail) {
+        query = query.eq('email', filterEmail);
+      } else if (adminId && !isMaster) {
+        // Broadcast apenas para os assinantes vinculados a este admin
+        query = query.eq('admin_id', adminId);
+      }
+
+      const { data: subscriptions, error } = await query;
+
+      if (error || !subscriptions) {
+        console.error('[Push API Error]', error);
+        return res.status(400).json({ error: 'Erro ao buscar inscritos' });
+      }
+
+      if (subscriptions.length === 0) {
+        return res.json({ success: true, count: 0, message: 'Nenhuma assinatura ativa encontrada para este alvo.' });
+      }
+
+      const promises = subscriptions.map((sub) => {
+        const payload = {
+          title,
+          body: message,
+          url: '/dashboard'
+        };
+        return sendPushNotification(sub.subscription_json, payload, sub.admin_id);
+      });
+
+      await Promise.all(promises);
+      res.json({ success: true, count: subscriptions.length });
+    } catch (err: any) {
+      console.error('[Push API Fatal Error]', err);
+      res.status(500).json({ error: 'Erro interno ao processar notificações' });
     }
-
-    if (username) {
-      query = query.eq('username', username);
-    } else if (email) {
-      query = query.eq('email', email);
-    }
-
-    const { data: subscriptions, error } = await query;
-    if (error || !subscriptions) {
-      console.error('Push fetch error:', error);
-      return res.status(400).json({ error: 'Failed to fetch subscriptions' });
-    }
-
-    if (subscriptions.length === 0) {
-      return res.json({ success: true, count: 0, message: 'Nenhum inscrito funcional encontrado para este filtro.' });
-    }
-
-    const appUrl = process.env.VITE_APP_URL || 'https://itwf.vercel.app';
-
-    const promises = subscriptions.map((sub) => {
-      const payload = {
-        title,
-        body: message,
-        url: '/dashboard'
-      };
-      return sendPushNotification(sub.subscription_json, payload, sub.admin_id);
-    });
-
-    await Promise.all(promises);
-    res.json({ success: true });
   });
 
   // Keep-alive: pinga a si mesmo a cada 5 min para o Render não dormir
@@ -669,72 +699,42 @@ async function startServer() {
   async function fetchSportsAgenda(): Promise<string> {
     try {
       console.log('[Sports Agenda] Gerando prompt...');
-      const now = new Date().toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
       const today = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long', day: 'numeric', month: 'long' });
       
-      const prompt = `System Prompt: Você é um curador de elite de agenda esportiva. 
-      Sua tarefa é fornecer os 5 jogos MAIS IMPORTANTES para HOJE (${today}) que serão transmitidos na TV Aberta do Brasil ou streaming gratuito.
+      const prompt = `Liste os 5 jogos de futebol MAIS IMPORTANTES para HOJE (${today}).
+      Critérios: Série A/B, Copa do Brasil, Libertadores, ou Grandes Ligas Europeias.
       
-      IMPORTANTE: Use sua ferramenta de busca para encontrar os jogos REAIS de março de 2026. Ignore qualquer dado do seu treinamento que mencione anos anteriores a 2025 ou eventos cancelados.
+      Formato: [EMOJI] TIME A x TIME B - Horário (Brasília) - Canal
+      Título: ⚽ AGENDA ESPORTIVA ⚽
       
-      HORÁRIO ATUAL: ${now} (Brasília)
-      
-      CRITÉRIOS DE SELEÇÃO (Prioridade):
-      1. Brasileirão Série A/B, Copa do Brasil, Libertadores, Sul-Americana.
-      2. Champions League, Europa League, Premier League, La Liga, Bundesliga, Serie A (Itália).
-      3. Grandes Clássicos ou Finais de outros esportes.
-      4. IGNORE ligas menores ou jogos irrelevantes para o grande público.
-      
-      REGRAS DE FORMATAÇÃO:
-      - Liste EXATAMENTE os 5 melhores jogos que AINDA NÃO TERMINARAM a partir de ${now}.
-      - Se houver jogos acontecendo agora, use o prefixo "🔥 AO VIVO:".
-      - Se forem em breve, use "🕒 EM BREVE:".
-      - Use o formato: [EMOJI] TIME A x TIME B - Horário (Brasília) - Canal/Streaming
-      - Título: ⚽ AGENDA DE ELITE ⚽\n🗓 ${today.toUpperCase()}
-      
-      Retorne APENAS o texto formatado.`;
+      Retorne APENAS o texto diretamente.`;
 
-      console.log('[Sports Agenda] Chamando Gemini...');
-      const response = await ai.models.generateContent({
-        model: 'gemini-1.5-flash',
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: prompt }]
+      console.log('[Sports Agenda] Chamando Gemini 1.5-Flash...');
+      
+      // Tentativa 1: Com Busca do Google (mais preciso, mas pode falhar dependendo da chave/região)
+      try {
+        const response = await ai.models.generateContent({
+          model: 'gemini-1.5-flash',
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          config: {
+            tools: [{ googleSearch: {} }]
           }
-        ],
-        config: {
-          systemInstruction: `Você é um assistente especializado em esportes. Sua missão é fornecer a agenda esportiva do dia de hoje (MARÇO DE 2026).
-              
-              IMPORTANTE:
-              1. Use OBRIGATORIAMENTE a ferramenta de busca (Google Search) para obter os dados em tempo real.
-              2. Ignore QUALQUER dado interno ou antigo que você tenha. Foque APENAS em resultados de busca para o ano de 2026.
-              3. Garanta que os jogos listados ainda não aconteceram hoje ou estão acontecendo agora.
-              4. Se não encontrar jogos para hoje, informe que não há eventos programados.
-              
-              Formato de saída:
-              - Use emojis para cada esporte.
-              - Liste o jogo, horário (Brasília) e onde assistir.`,
-          tools: [
-            {
-              googleSearch: {}
-            }
-          ]
-        }
-      });
+        });
 
-      console.log('[Sports Agenda] Resposta recebida do Gemini.');
-      
-      if (!response.text) {
-        console.warn('[Sports Agenda] Gemini retornou texto vazio ou indefinido.');
-        console.dir(response, { depth: null });
+        if (response.text) return response.text.trim();
+      } catch (toolErr) {
+        console.warn('[Sports Agenda] Busca Google falhou, tentando modo padrão...', toolErr);
       }
 
-      return response.text?.trim() || '';
+      // Tentativa 2: Modo Padrão (Sem ferramentas)
+      const fallbackResponse = await ai.models.generateContent({
+        model: 'gemini-1.5-flash',
+        contents: [{ role: 'user', parts: [{ text: prompt + " (Use seus dados internos se necessário para hoje)" }] }]
+      });
+
+      return fallbackResponse.text?.trim() || '';
     } catch (err: any) {
-      console.error('[Sports Agenda] Erro detalhado:', err);
-      // Log extra para erros da API do Google
-      if (err.response) console.error('[Sports Agenda] Dados da resposta de erro:', err.response);
+      console.error('[Sports Agenda Error]', err);
       return '';
     }
   }

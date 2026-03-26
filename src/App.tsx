@@ -4,32 +4,42 @@
  */
 
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { RefreshCw } from 'lucide-react';
 import { supabase } from './utils/supabase';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import Checkout from './pages/Checkout';
-import Success from './pages/Success';
-import Invoices from './pages/Invoices';
-import Support from './pages/Support';
-import Settings from './pages/Settings';
-import ForgotPassword from './pages/ForgotPassword';
-import Plans from './pages/Plans';
-import Tutorials from './pages/Tutorials';
-import Terms from './pages/Terms';
-import Maintenance from './pages/Maintenance';
-import Notifications from './pages/Notifications';
-import Admin from './pages/Admin';
-import AdminLogin from './pages/AdminLogin';
-import RequestContent from './pages/RequestContent';
-import UpdatePassword from './pages/UpdatePassword';
-import SaaS from './pages/SaaS';
-import PWAInstallModal from './components/PWAInstallModal';
 
+// Lazy loading pages for performance
+const Login = lazy(() => import('./pages/Login'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Sports = lazy(() => import('./pages/Sports'));
+const Checkout = lazy(() => import('./pages/Checkout'));
+const Success = lazy(() => import('./pages/Success'));
+const Invoices = lazy(() => import('./pages/Invoices'));
+const Support = lazy(() => import('./pages/Support'));
+const Settings = lazy(() => import('./pages/Settings'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const Plans = lazy(() => import('./pages/Plans'));
+const Tutorials = lazy(() => import('./pages/Tutorials'));
+const Terms = lazy(() => import('./pages/Terms'));
+const Maintenance = lazy(() => import('./pages/Maintenance'));
+const Notifications = lazy(() => import('./pages/Notifications'));
+const Admin = lazy(() => import('./pages/Admin'));
+const AdminLogin = lazy(() => import('./pages/AdminLogin'));
+const RequestContent = lazy(() => import('./pages/RequestContent'));
+const UpdatePassword = lazy(() => import('./pages/UpdatePassword'));
+const SaaS = lazy(() => import('./pages/SaaS'));
+
+import PWAInstallModal from './components/PWAInstallModal';
 import { ThemeProvider } from './context/ThemeContext';
 import { useRegisterSW } from 'virtual:pwa-register/react';
+
+const LoadingFallback = () => (
+  <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 gap-6">
+    <img src="/logo.png" alt="Logo" className="w-24 h-24 object-contain animate-pulse" />
+    <p className="text-primary font-bold animate-pulse uppercase tracking-widest text-sm">Carregando Experiência...</p>
+  </div>
+);
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
@@ -140,12 +150,7 @@ export default function App() {
 
   // Show a loading screen while resolving initial session
   if (isAuthenticated === null) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 gap-6">
-        <img src="/logo.png" alt="Logo" className="w-24 h-24 object-contain animate-pulse" />
-        <p className="text-primary font-bold animate-pulse uppercase tracking-widest text-sm">Carregando Segurança...</p>
-      </div>
-    );
+    return <LoadingFallback />;
   }
 
   if (isMaintenance) {
@@ -155,74 +160,80 @@ export default function App() {
   return (
     <ThemeProvider>
       <Router>
-        <Routes>
-          <Route
-            path="/"
-            element={
-              isAuthenticated ? (
-                <Navigate to={isSubdomain ? "/admin" : "/dashboard"} replace />
-              ) : (
-                <Login onLogin={() => setIsAuthenticated(true)} />
-              )
-            }
-          />
-          <Route path="/login" element={<Navigate to="/" replace />} />
-          <Route
-            path="/dashboard"
-            element={isAuthenticated ? <Dashboard /> : <Navigate to="/" />}
-          />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/update-password" element={<UpdatePassword />} />
-          <Route path="/terms" element={<Terms />} />
-          <Route path="/admin/login" element={<AdminLogin />} />
-          <Route path="/" element={isSubdomain ? <Navigate to="/login" /> : <SaaS />} />
-          <Route path="/revenda" element={<Navigate to="/" />} />
-          <Route path="/saas" element={<Navigate to="/" />} />
+        <Suspense fallback={<LoadingFallback />}>
+          <Routes>
+            <Route
+              path="/"
+              element={
+                isAuthenticated ? (
+                  <Navigate to={isSubdomain ? "/admin" : "/dashboard"} replace />
+                ) : (
+                  <Login onLogin={() => setIsAuthenticated(true)} />
+                )
+              }
+            />
+            <Route path="/login" element={<Navigate to="/" replace />} />
+            <Route
+              path="/dashboard"
+              element={isAuthenticated ? <Dashboard /> : <Navigate to="/" />}
+            />
+            <Route
+              path="/sports"
+              element={isAuthenticated ? <Sports /> : <Navigate to="/" />}
+            />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/update-password" element={<UpdatePassword />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route path="/" element={isSubdomain ? <Navigate to="/login" /> : <SaaS />} />
+            <Route path="/revenda" element={<Navigate to="/" />} />
+            <Route path="/saas" element={<Navigate to="/" />} />
 
-          <Route
-            path="/checkout"
-            element={isAuthenticated ? <Checkout /> : <Navigate to="/" />}
-          />
-          <Route
-            path="/success"
-            element={isAuthenticated ? <Success /> : <Navigate to="/" />}
-          />
-          <Route
-            path="/invoices"
-            element={isAuthenticated ? <Invoices /> : <Navigate to="/" />}
-          />
-          <Route
-            path="/support"
-            element={isAuthenticated ? <Support /> : <Navigate to="/" />}
-          />
-          <Route
-            path="/settings"
-            element={isAuthenticated ? <Settings /> : <Navigate to="/" />}
-          />
-          <Route
-            path="/plans"
-            element={isAuthenticated ? <Plans /> : <Navigate to="/" />}
-          />
-          <Route
-            path="/tutorials"
-            element={isAuthenticated ? <Tutorials /> : <Navigate to="/" />}
-          />
-          <Route
-            path="/notifications"
-            element={isAuthenticated ? <Notifications /> : <Navigate to="/" />}
-          />
-          <Route
-            path="/request-content"
-            element={isAuthenticated ? <RequestContent /> : <Navigate to="/" />}
-          />
+            <Route
+              path="/checkout"
+              element={isAuthenticated ? <Checkout /> : <Navigate to="/" />}
+            />
+            <Route
+              path="/success"
+              element={isAuthenticated ? <Success /> : <Navigate to="/" />}
+            />
+            <Route
+              path="/invoices"
+              element={isAuthenticated ? <Invoices /> : <Navigate to="/" />}
+            />
+            <Route
+              path="/support"
+              element={isAuthenticated ? <Support /> : <Navigate to="/" />}
+            />
+            <Route
+              path="/settings"
+              element={isAuthenticated ? <Settings /> : <Navigate to="/" />}
+            />
+            <Route
+              path="/plans"
+              element={isAuthenticated ? <Plans /> : <Navigate to="/" />}
+            />
+            <Route
+              path="/tutorials"
+              element={isAuthenticated ? <Tutorials /> : <Navigate to="/" />}
+            />
+            <Route
+              path="/notifications"
+              element={isAuthenticated ? <Notifications /> : <Navigate to="/" />}
+            />
+            <Route
+              path="/request-content"
+              element={isAuthenticated ? <RequestContent /> : <Navigate to="/" />}
+            />
 
-          <Route
-            path="/admin"
-            element={isAuthenticated && isAdmin ? <Admin /> : <Navigate to="/admin/login" />}
-          />
+            <Route
+              path="/admin"
+              element={isAuthenticated && isAdmin ? <Admin /> : <Navigate to="/admin/login" />}
+            />
 
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
+        </Suspense>
       </Router>
 
       {/* PWA Toast Notification */}
