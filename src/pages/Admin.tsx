@@ -172,6 +172,56 @@ const ResellerRow = React.memo(({ reseller, onDelete, submitting }: {
   </tr>
 ));
 
+const ResellerCard = React.memo(({ reseller, idx, onDelete, submitting }: {
+  reseller: any;
+  idx: number;
+  onDelete: (r: any) => void;
+  submitting: boolean;
+}) => (
+  <motion.div
+    initial={{ opacity: 0, x: -20 }}
+    animate={{ opacity: 1, x: 0 }}
+    transition={{ delay: idx * 0.05 }}
+    className="p-5 active:bg-black/5 dark:active:bg-white/5 transition-colors"
+  >
+    <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center gap-3">
+        <div className="size-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-black text-lg">
+          {reseller.name?.charAt(0) || 'R'}
+        </div>
+        <div>
+          <h4 className="font-bold text-slate-900 dark:text-white leading-tight">{reseller.name || 'Sem Nome'}</h4>
+          <p className="text-xs text-slate-500">{reseller.email}</p>
+        </div>
+      </div>
+      <div className="text-right">
+        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${reseller.role === 'master' ? 'bg-amber-500/10 text-amber-500' : 'bg-primary/10 text-primary'}`}>
+          {reseller.role}
+        </span>
+      </div>
+    </div>
+    <div className="flex items-center justify-between mt-4">
+      <div className="flex items-center gap-2">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+          <Users size={12} />
+          {reseller.clientCount ?? 0} cliente{reseller.clientCount !== 1 ? 's' : ''}
+        </span>
+      </div>
+      <div className="flex gap-2">
+        {reseller.role !== 'master' && (
+          <button
+            onClick={() => onDelete(reseller)}
+            disabled={submitting}
+            className="p-2 bg-rose-500/10 rounded-xl text-rose-500 disabled:opacity-50"
+          >
+            <Trash2 size={18} />
+          </button>
+        )}
+      </div>
+    </div>
+  </motion.div>
+));
+
 const PlanRow = React.memo(({ plan, onEdit, onDelete }: {
   plan: Plan;
   onEdit: (p: Plan) => void;
@@ -1438,7 +1488,8 @@ export default function Admin() {
                 Novo Revendedor
               </button>
             </div>
-            <div className="overflow-x-auto custom-scrollbar">
+            {/* Desktop Table */}
+            <div className="hidden md:block overflow-x-auto custom-scrollbar">
               <table className="w-full text-left">
                 <thead>
                   <tr className="bg-black/[0.02] dark:bg-white/5 text-slate-500 text-xs uppercase tracking-widest">
@@ -1464,6 +1515,22 @@ export default function Admin() {
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile Cards */}
+            <div className="md:hidden divide-y divide-black/5 dark:divide-white/5">
+              {resellers.filter(r => 
+                (r.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+                (r.name?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+              ).map((reseller, idx) => (
+                <ResellerCard
+                  key={reseller.id}
+                  idx={idx}
+                  reseller={reseller}
+                  onDelete={deleteReseller}
+                  submitting={submitting}
+                />
+              ))}
             </div>
           </motion.div>
         )}

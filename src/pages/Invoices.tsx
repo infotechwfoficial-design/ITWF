@@ -103,8 +103,8 @@ export default function Invoices() {
             </div>
           </div>
 
-          {/* Table */}
-          <div className="overflow-x-auto">
+          {/* Desktop Table */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-black/[0.01] dark:bg-white/[0.03] border-b border-black/5 dark:border-white/5">
@@ -158,6 +158,60 @@ export default function Invoices() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Cards */}
+          <div className="md:hidden divide-y divide-black/5 dark:divide-white/5">
+            {loading ? (
+              <div className="p-8 text-center text-slate-500">Carregando faturas...</div>
+            ) : invoices.length === 0 ? (
+              <div className="p-10 text-center text-slate-500 italic">Nenhuma fatura encontrada.</div>
+            ) : (
+              invoices.map((inv, idx) => (
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: idx * 0.05 }}
+                  key={inv.id}
+                  className="p-5 active:bg-black/5 dark:active:bg-white/5 transition-colors"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2.5 rounded-2xl ${inv.type === 'premium' ? 'bg-primary/10 text-primary' : inv.type === 'add' ? 'bg-amber-500/10 text-amber-500' : 'bg-rose-500/10 text-rose-500'}`}>
+                        {inv.type === 'premium' ? <Star size={24} /> : inv.type === 'add' ? <PlusSquare size={24} /> : <XCircle size={24} />}
+                      </div>
+                      <div>
+                        <h4 className={`font-bold ${inv.status === 'Cancelado' ? 'text-slate-400 line-through' : 'text-slate-900 dark:text-white'}`}>{inv.description}</h4>
+                        <p className="text-xs text-slate-500">{inv.date}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className={`font-black ${inv.status === 'Cancelado' ? 'text-slate-400 line-through' : 'text-slate-900 dark:text-white'}`}>{inv.value}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between mt-4 bg-black/[0.02] dark:bg-white/[0.02] p-3 rounded-2xl border border-black/5 dark:border-white/5">
+                    <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${inv.status === 'Pago' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' :
+                        inv.status === 'Pendente' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' :
+                          'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
+                      }`}>
+                      {inv.status === 'Pago' ? <CheckCircle2 size={12} /> : inv.status === 'Pendente' ? <Clock size={12} /> : <XCircle size={12} />}
+                      {inv.status}
+                    </div>
+
+                    <button
+                      disabled={inv.status !== 'Pago'}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all active:scale-95 ${inv.status === 'Pago' 
+                        ? 'bg-primary text-white shadow-lg shadow-primary/20' 
+                        : 'bg-slate-100 dark:bg-white/10 text-slate-400 opacity-50 cursor-not-allowed'}`}
+                    >
+                      <Download size={14} />
+                      PDF
+                    </button>
+                  </div>
+                </motion.div>
+              ))
+            )}
           </div>
 
           {/* Pagination */}

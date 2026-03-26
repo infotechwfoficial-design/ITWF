@@ -345,26 +345,26 @@ export default function Dashboard() {
           )}
         </AnimatePresence>
 
-        <header className="flex items-center justify-between pb-6 border-b border-black/5 dark:border-white/5">
-          <div>
-            <h2 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
+        <header className="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-black/5 dark:border-white/5 gap-4">
+          <div className="text-center md:text-left">
+            <h2 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
               Olá, {client?.name || 'Visitante'}
             </h2>
-            <p className="text-slate-500 dark:text-slate-400 mt-1">Bem-vindo de volta ao seu painel de controle.</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Bem-vindo de volta ao seu painel.</p>
           </div>
-          <div className="flex items-center gap-6">
-            <Link to="/notifications" className="relative text-slate-400 hover:text-primary transition-colors p-2 bg-black/5 dark:bg-white/5 rounded-xl">
+          <div className="flex items-center justify-center md:justify-end gap-4 md:gap-6">
+            <Link to="/notifications" className="relative text-slate-400 hover:text-primary transition-colors p-2.5 bg-black/5 dark:bg-white/5 rounded-2xl">
               <Bell size={24} />
-              <span className="absolute top-2 right-2 size-2 bg-red-500 rounded-full animate-pulse"></span>
+              <span className="absolute top-2.5 right-2.5 size-2 bg-red-500 rounded-full animate-pulse border-2 border-white dark:border-slate-900"></span>
             </Link>
             <div className="flex items-center gap-3">
-              <div className="text-right hidden md:block">
+              <div className="text-right hidden sm:block">
                 {isEditingName ? (
                   <div className="flex items-center gap-2">
                     <input
                       autoFocus
                       type="text"
-                      className="text-sm font-bold bg-white dark:bg-slate-800 border border-primary/30 rounded px-2 py-1 outline-none text-slate-900 dark:text-white"
+                      className="text-sm font-bold bg-white dark:bg-slate-800 border border-primary/30 rounded px-2 py-1 outline-none text-slate-900 dark:text-white w-32"
                       value={newName}
                       onChange={e => setNewName(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && handleUpdateName()}
@@ -384,14 +384,14 @@ export default function Dashboard() {
                     <Edit3 size={12} className="text-slate-400 group-hover:text-primary opacity-0 group-hover:opacity-100 transition-all" />
                   </div>
                 )}
-                <p className="text-xs text-slate-500">{client?.email || 'sem-email@empresa.com'}</p>
+                <p className="text-[10px] text-slate-500 truncate max-w-[150px]">{client?.email || 'sem-email@empresa.com'}</p>
               </div>
               
               <div 
                 className="relative group cursor-pointer"
                 onClick={() => fileInputRef.current?.click()}
               >
-                <div className="size-10 md:size-12 rounded-full bg-slate-200 dark:bg-slate-800 border-2 border-primary/50 overflow-hidden relative shadow-lg shadow-primary/10">
+                <div className="size-11 md:size-12 rounded-2xl bg-slate-200 dark:bg-slate-800 border-2 border-primary/30 overflow-hidden relative shadow-lg shadow-primary/5">
                   {uploadingAvatar && (
                     <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
                       <RefreshCw className="animate-spin text-white" size={16} />
@@ -522,27 +522,27 @@ export default function Dashboard() {
             className="md:col-span-2 rounded-3xl bg-slate-50 dark:bg-slate-900/40 backdrop-blur-md border border-black/5 dark:border-white/5 p-8 flex flex-col justify-center relative overflow-hidden shadow-sm dark:shadow-xl"
           >
             <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -mr-16 -mt-16"></div>
-            <div className="flex justify-between items-start z-10">
+            <div className="flex flex-col sm:flex-row justify-between items-start gap-4 z-10">
               <div>
-                <h3 className="text-lg font-medium text-slate-500 dark:text-slate-300 mb-1">Status da Assinatura</h3>
+                <h3 className="text-base md:text-lg font-medium text-slate-500 dark:text-slate-300 mb-1">Status da Assinatura</h3>
                 <div className="flex items-center gap-3 mt-2">
                   <span className={`flex h-3 w-3 rounded-full ${subStatus.dot} ${subStatus.shadow}`}></span>
-                  <span className={`text-4xl font-black ${subStatus.color}`}>{subStatus.label}</span>
+                  <span className={`text-3xl md:text-4xl font-black ${subStatus.color} tracking-tighter`}>{subStatus.label}</span>
                 </div>
                 {daysRemaining < 0 && (
-                  <p className="mt-2 text-rose-500 text-sm font-bold flex items-center gap-1">
+                  <p className="mt-2 text-rose-500 text-xs md:text-sm font-bold flex items-center gap-1">
                     <AlertTriangle size={14} /> Assinatura vencida há {Math.abs(daysRemaining)} dia(s)
                   </p>
                 )}
                 {daysRemaining >= 0 && daysRemaining <= 7 && (
-                  <p className="mt-2 text-orange-500 text-sm font-bold flex items-center gap-1">
-                    <AlertTriangle size={14} /> Apenas {daysRemaining} dia(s) restante(s)!
+                  <p className="mt-2 text-orange-500 text-xs md:text-sm font-bold flex items-center gap-1">
+                    <AlertTriangle size={14} /> {daysRemaining === 0 ? 'Vence hoje!' : `Apenas ${daysRemaining} dia(s) restante(s)!`}
                   </p>
                 )}
               </div>
-              <div className="text-right">
-                <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400 text-sm font-bold border border-orange-500/20">
-                  <Timer size={16} />
+              <div className="w-full sm:w-auto">
+                <span className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-2xl bg-orange-500/10 text-orange-600 dark:text-orange-400 text-xs font-black border border-orange-500/20 whitespace-nowrap">
+                  <Timer size={14} />
                   Vence em: {client?.expiration_date || 'N/A'}
                 </span>
               </div>
