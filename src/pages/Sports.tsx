@@ -59,7 +59,7 @@ const Sports = () => {
             </div>
 
             {/* API FUTEBOL WIDGET CONTAINER */}
-            <div className="w-full h-[800px] overflow-hidden bg-white/5 bg-slate-50 dark:bg-slate-950/20">
+            <div className="w-full h-[450px] md:h-[800px] overflow-hidden bg-white/5 bg-slate-50 dark:bg-slate-950/20">
               {activeTab === 'fixtures' ? (
                 <iframe 
                   key="fixtures"
