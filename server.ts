@@ -6,17 +6,21 @@ import { fileURLToPath } from 'url';
 import webpush from 'web-push';
 import dotenv from 'dotenv';
 import cron from 'node-cron';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenerativeAI as GoogleGenAI } from '@google/generative-ai';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
 
 dotenv.config();
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+const ai = new GoogleGenAI(process.env.GEMINI_API_KEY || '');
 
 // Note: Payment clients will be initialized dynamically per request
 // using data from the 'payment_settings' table in Supabase.
+
+// MEMÓRIA PARA MONITORAMENTO ESPORTIVO (SPORTMONKS)
+let lastMatchScores: Record<number, { home: number; away: number; name: string }> = {};
+let sportmonksPollingInterval: NodeJS.Timeout | null = null;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -64,22 +68,24 @@ async function startServer() {
       ];
 
       if (history && history.length > 0) {
-        contents = contents.concat(history);
+        const mappedHistory = history.map((h: any) => ({
+          role: h.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: h.content }]
+        }));
+        contents = contents.concat(mappedHistory);
       }
 
       contents.push({ role: 'user', parts: [{ text: message }] });
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-1.5-flash',
-        contents: contents
-      });
-
-      res.json({ reply: response.text });
-    } catch (err: any) {
-      console.error('Gemini error:', err);
-      res.status(500).json({ error: 'Erro ao processar mensagem com Inteligência Artificial' });
-    }
-  });
+      const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const result = await model.generateContent({ contents });
+      const response = await result.response;
+      res.json({ reply: response.text() });
+  } catch (err: any) {
+    console.error('Gemini error:', err);
+    res.status(500).json({ error: 'Erro ao processar mensagem com Inteligência Artificial' });
+  }
+});
 
   // Plans Endpoint
   app.get('/api/plans', async (req, res) => {
@@ -710,29 +716,11 @@ async function startServer() {
       Retorne APENAS o texto diretamente.`;
 
       console.log('[Sports Agenda] Chamando Gemini 1.5-Flash...');
+      const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
       
-      // Tentativa 1: Com Busca do Google (mais preciso, mas pode falhar dependendo da chave/região)
-      try {
-        const response = await ai.models.generateContent({
-          model: 'gemini-1.5-flash',
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          config: {
-            tools: [{ googleSearch: {} }]
-          }
-        });
-
-        if (response.text) return response.text.trim();
-      } catch (toolErr) {
-        console.warn('[Sports Agenda] Busca Google falhou, tentando modo padrão...', toolErr);
-      }
-
-      // Tentativa 2: Modo Padrão (Sem ferramentas)
-      const fallbackResponse = await ai.models.generateContent({
-        model: 'gemini-1.5-flash',
-        contents: [{ role: 'user', parts: [{ text: prompt + " (Use seus dados internos se necessário para hoje)" }] }]
-      });
-
-      return fallbackResponse.text?.trim() || '';
+      const result = await model.generateContent(prompt + " (Use seus dados internos ou busca se necessário)");
+      const response = await result.response;
+      return response.text()?.trim() || '';
     } catch (err: any) {
       console.error('[Sports Agenda Error]', err);
       return '';
@@ -749,28 +737,107 @@ async function startServer() {
         return res.status(500).json({ error: 'Não foi possível obter a agenda esportiva.' });
       }
 
+      // NOVO: Salvar a agenda na tabela de notificações para visualização no app
+      await supabase.from('notifications').insert([{
+        title: '⚽ Agenda Esportiva',
+        message: message,
+        type: 'info'
+      }]);
+
       const { data: subscriptions } = await supabase.from('push_subscriptions').select('subscription_json, admin_id');
       if (!subscriptions || subscriptions.length === 0) {
         return res.status(404).json({ error: 'Nenhum inscrito encontrado.' });
       }
 
-      const appUrl = process.env.VITE_APP_URL || 'https://itwf.vercel.app';
-      
       const promises = subscriptions.map((sub) => {
         const payload = {
           title: '⚽ Agenda Esportiva do Dia',
           body: message,
-          url: '/dashboard'
+          url: '/notifications'
         };
         return sendPushNotification(sub.subscription_json, payload, sub.admin_id);
       });
 
       await Promise.all(promises);
-      res.json({ success: true, message: 'Agenda enviada com sucesso!' });
+      res.json({ success: true, message: 'Agenda enviada e salva no sistema!' });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
+
+  // --- SERVIÇO SPORTMONKS (LIVE GOALS) ---
+  
+  async function checkLiveGoals() {
+    const token = process.env.SPORTMONKS_API_TOKEN;
+    if (!token) return;
+
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const url = `https://api.sportmonks.com/v3/football/leagues/date/${today}?api_token=${token}&include=today.scores;today.participants`;
+      
+      const res = await fetch(url);
+      const json = await res.json();
+      
+      if (!json.data || !Array.isArray(json.data)) return;
+
+      for (const league of json.data) {
+        if (!league.today || !Array.isArray(league.today)) continue;
+
+        for (const fixture of league.today) {
+          const fixtureId = fixture.id;
+          const participants = fixture.participants || [];
+          const scores = fixture.scores || [];
+
+          const homeTeam = participants.find((p: any) => p.meta?.location === 'home');
+          const awayTeam = participants.find((p: any) => p.meta?.location === 'away');
+          
+          if (!homeTeam || !awayTeam) continue;
+
+          // Placar atual (procurando pelo score_type que indica o placar total ou atual)
+          // Na v3, geralmente os scores têm campos como score.goals
+          const homeScore = scores.find((s: any) => s.participant_id === homeTeam.id && s.description === 'CURRENT')?.score?.goals || 0;
+          const awayScore = scores.find((s: any) => s.participant_id === awayTeam.id && s.description === 'CURRENT')?.score?.goals || 0;
+
+          const matchName = `${homeTeam.name} x ${awayTeam.name}`;
+
+          // Verifica se houve gol
+          if (lastMatchScores[fixtureId]) {
+            const last = lastMatchScores[fixtureId];
+            if (homeScore > last.home || awayScore > last.away) {
+              console.log(`[GOL!] ${matchName} (${homeScore} - ${awayScore})`);
+              
+              const message = `⚽ GOL DE PLACA!
+${matchName}
+Placar Atual: ${homeScore} - ${awayScore}`;
+
+              // Dispara Push
+              const { data: subs } = await supabase.from('push_subscriptions').select('subscription_json, admin_id');
+              if (subs) {
+                subs.forEach(sub => {
+                  sendPushNotification(sub.subscription_json, {
+                    title: '⚽ GOL EM TEMPO REAL!',
+                    body: message,
+                    url: '/sports'
+                  }, sub.admin_id);
+                });
+              }
+            }
+          }
+
+          // Atualiza estado
+          lastMatchScores[fixtureId] = { home: homeScore, away: awayScore, name: matchName };
+        }
+      }
+    } catch (err) {
+      console.error('[Sportmonks Polling Error]', err);
+    }
+  }
+
+  // Iniciar Polling a cada 60 segundos se o token existir
+  if (process.env.SPORTMONKS_API_TOKEN) {
+    console.log('[Sportmonks] Iniciando monitoramento de gols...');
+    sportmonksPollingInterval = setInterval(checkLiveGoals, 60000);
+  }
 
   // Cron Agenda Esportiva: Manhã (09:00 BRT / 12:00 UTC)
   cron.schedule('0 12 * * *', async () => {

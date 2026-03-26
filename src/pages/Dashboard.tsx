@@ -88,6 +88,7 @@ export default function Dashboard() {
   const [client, setClient] = useState<Client | null>(null);
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sportsAgenda, setSportsAgenda] = useState<string | null>(null);
   
   // Quick Edit States
   const [isEditingName, setIsEditingName] = useState(false);
@@ -137,6 +138,17 @@ export default function Dashboard() {
           .eq('user_id', user.id)
           .order('created_at', { ascending: false });
         if (userRequests) setRequests(userRequests);
+
+        // Fetch Latest Sports Agenda
+        const { data: agendaData } = await supabase
+          .from('notifications')
+          .select('message')
+          .eq('title', '⚽ Agenda Esportiva')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (agendaData) setSportsAgenda(agendaData.message);
       }
       setLoading(false);
     };
@@ -411,6 +423,52 @@ export default function Dashboard() {
                 </div>
               ))}
             </div>
+          </motion.div>
+
+          {sportsAgenda && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="md:col-span-3 rounded-3xl bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 p-6 relative overflow-hidden group shadow-lg shadow-amber-500/5"
+            >
+              <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                <Zap size={80} className="text-amber-500" />
+              </div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="size-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-lg shadow-amber-500/20">
+                  <Zap size={20} />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white">Agenda Esportiva do Dia ⚽</h3>
+              </div>
+              <div className="bg-white/50 dark:bg-black/20 backdrop-blur-sm rounded-2xl p-5 border border-amber-500/10">
+                <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed font-medium">
+                  {sportsAgenda}
+                </p>
+              </div>
+              <div className="mt-4 flex justify-end">
+                <Link to="/sports" className="text-xs font-black uppercase tracking-widest text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1">
+                  Ver Arena Completa <ExternalLink size={12} />
+                </Link>
+              </div>
+            </motion.div>
+          )}
+
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="md:col-span-3 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div className="size-3 bg-emerald-500 rounded-full animate-ping absolute inset-0"></div>
+                <div className="size-3 bg-emerald-500 rounded-full relative"></div>
+              </div>
+              <div>
+                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">Radar Esportivo ITWF Ativado:</span>
+                <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">Notificações de gols em tempo real estão ligadas.</span>
+              </div>
+            </div>
+            <Zap size={16} className="text-emerald-500 animate-pulse" />
           </motion.div>
 
           <motion.div
