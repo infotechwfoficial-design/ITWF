@@ -821,20 +821,32 @@ async function startServer() {
   async function fetchSportsAgenda(): Promise<string> {
     try {
       console.log('[Agenda Esportiva] Gerando prompt...');
-      const today = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long', day: 'numeric', month: 'long' });
       
-      const prompt = `Liste os 5 jogos de futebol MAIS IMPORTANTES para HOJE (${today}).
-      Critérios: Série A/B, Copa do Brasil, Libertadores, ou Grandes Ligas Europeias.
-      
-      Formato: [EMOJI] TIME A x TIME B - Horário (Brasília) - Canal
-      Título: ⚽ AGENDA ESPORTIVA ⚽
-      
-      Retorne APENAS o texto diretamente.`;
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }); // Ex: 26/03/2026
+      const fullDateText = now.toLocaleDateString('pt-BR', { 
+        timeZone: 'America/Sao_Paulo', 
+        weekday: 'long', 
+        day: 'numeric', 
+        month: 'long', 
+        year: 'numeric' 
+      });
 
-      console.log('[Agenda Esportiva] Chamando Gemini Flash...');
+      const prompt = `Consulte a programação de futebol para o dia EXATO de ${fullDateText} (${dateStr}).
+      Liste apenas os 5 jogos de futebol MAIS IMPORTANTES que ocorrem HOJE NESTA DATA.
+      
+      Critérios de importância: Série A/B do Brasileirão, Copa do Brasil, Libertadores, Champions League ou grandes ligas europeias.
+      
+      Formato de cada linha: [EMOJI] TIME A x TIME B - Horário (Brasília) - Canal de Transmissão
+      Título: ⚽ AGENDA ESPORTIVA - ${dateStr} ⚽
+      
+      Regra Crítica: Se não houver jogos importantes nesta data específica, informe que não há grandes confrontos programados para hoje. Retorne APENAS o texto da agenda diretamente, sem introduções ou explicações.`;
+
+      console.log(`[Agenda Esportiva] Chamando Gemini para a data: ${dateStr}...`);
       const model = ai.getGenerativeModel({ model: 'gemini-flash-latest' });
       
-      const result = await model.generateContent(prompt + " (Use seus dados internos ou busca se necessário)");
+      // Reforçamos a busca externa para garantir dados de hoje
+      const result = await model.generateContent(prompt + " (É obrigatório pesquisar na web para obter os horários e canais corretos desta data)");
       const response = await result.response;
       return response.text()?.trim() || '';
     } catch (err: any) {
