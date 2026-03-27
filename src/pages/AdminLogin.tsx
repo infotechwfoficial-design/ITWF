@@ -19,10 +19,13 @@ export default function AdminLogin() {
     try {
       const normalizedEmail = email.trim().toLowerCase();
       
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const authPromise = supabase.auth.signInWithPassword({
         email: normalizedEmail,
         password
       });
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout na Autenticação')), 10000));
+      
+      const { data, error } = await Promise.race([authPromise, timeoutPromise]) as any;
 
       if (error) throw error;
 

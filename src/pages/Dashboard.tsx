@@ -107,34 +107,36 @@ export default function Dashboard() {
     let channel: any;
 
     const fetchUserData = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      try {
+        const userPromise = supabase.auth.getUser();
+        const authTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Auth Timeout')), 10000));
+        const { data: { user } } = await Promise.race([userPromise, authTimeout]) as any;
 
-      if (user) {
-        // Inscrição Realtime para Pedidos
-        channel = supabase
-          .channel(`user_requests_${user.id}`)
-          .on(
-            'postgres_changes',
-            {
-              event: '*',
-              schema: 'public',
-              table: 'requests',
-              filter: `user_id=eq.${user.id}`
-            },
-            (payload) => {
-              if (payload.eventType === 'INSERT') {
-                setRequests(prev => [payload.new, ...prev]);
-              } else if (payload.eventType === 'UPDATE') {
-                setRequests(prev => prev.map(req => req.id === payload.new.id ? payload.new : req));
-              } else if (payload.eventType === 'DELETE') {
-                setRequests(prev => prev.filter(req => req.id !== payload.old.id));
+        if (user) {
+          // Inscrição Realtime para Pedidos
+          channel = supabase
+            .channel(`user_requests_${user.id}`)
+            .on(
+              'postgres_changes',
+              {
+                event: '*',
+                schema: 'public',
+                table: 'requests',
+                filter: `user_id=eq.${user.id}`
+              },
+              (payload) => {
+                if (payload.eventType === 'INSERT') {
+                  setRequests(prev => [payload.new, ...prev]);
+                } else if (payload.eventType === 'UPDATE') {
+                  setRequests(prev => prev.map(req => req.id === payload.new.id ? payload.new : req));
+                } else if (payload.eventType === 'DELETE') {
+                  setRequests(prev => prev.filter(req => req.id !== payload.old.id));
+                }
               }
-            }
-          )
-          .subscribe();
+            )
+            .subscribe();
 
-        // BUSCA EM PARALELO COM TIMEOUT DE SEGURANÇA
-        try {
+          // BUSCA EM PARALELO COM TIMEOUT DE SEGURANÇA
           const fetchPromise = Promise.all([
             supabase.from('clients').select('*').eq('user_id', user.id).single(),
             supabase.from('requests').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
@@ -165,11 +167,12 @@ export default function Dashboard() {
 
           if (requestsRes.data) setRequests(requestsRes.data);
           if (agendaRes.data) setSportsAgenda(agendaRes.data.message);
-        } catch (err) {
-          console.error('Dashboard: Erro ou Timeout ao carregar dados:', err);
         }
+      } catch (err) {
+        console.error('Dashboard: Erro ou Timeout ao carregar dados:', err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     fetchUserData();

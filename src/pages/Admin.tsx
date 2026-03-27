@@ -347,13 +347,20 @@ export default function Admin() {
   }, []);
 
   useEffect(() => {
-
     const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const role = localStorage.getItem('adminRole') || 'admin';
-        setCurrentAdmin({ id: user.id, role });
-      } else {
+      try {
+        const userPromise = supabase.auth.getUser();
+        const authTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Auth Timeout')), 10000));
+        const { data: { user } } = await Promise.race([userPromise, authTimeout]) as any;
+
+        if (user) {
+          const role = localStorage.getItem('adminRole') || 'admin';
+          setCurrentAdmin({ id: user.id, role });
+        } else {
+          navigate('/admin/login');
+        }
+      } catch (err) {
+        console.error('Admin Check Error:', err);
         navigate('/admin/login');
       }
     };

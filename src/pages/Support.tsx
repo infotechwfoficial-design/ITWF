@@ -20,25 +20,32 @@ export default function Support() {
 
   useEffect(() => {
     const fetchSupportInfo = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: clientData } = await supabase
-          .from('clients')
-          .select('admin_id')
-          .eq('user_id', user.id)
-          .single();
-          
-        if (clientData?.admin_id) {
-          const { data: adminData } = await supabase
+      try {
+        const userPromise = supabase.auth.getUser();
+        const authTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Auth Timeout')), 10000));
+        const { data: { user } } = await Promise.race([userPromise, authTimeout]) as any;
+
+        if (user) {
+          const { data: clientData } = await supabase
             .from('clients')
-            .select('support_number')
-            .eq('user_id', clientData.admin_id)
-            .single();
+            .select('admin_id')
+            .eq('user_id', user.id)
+            .maybeSingle();
             
-          if (adminData?.support_number) {
-            setSupportNumber(adminData.support_number);
+          if (clientData?.admin_id) {
+            const { data: adminData } = await supabase
+              .from('clients')
+              .select('support_number')
+              .eq('user_id', clientData.admin_id)
+              .maybeSingle();
+              
+            if (adminData?.support_number) {
+              setSupportNumber(adminData.support_number);
+            }
           }
         }
+      } catch (err) {
+        console.error('Error fetching support info:', err);
       }
     };
     fetchSupportInfo();

@@ -48,7 +48,9 @@ export default function Settings() {
   const fetchProfile = async () => {
     try {
       setLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
+      const sessionPromise = supabase.auth.getSession();
+      const authTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Auth Timeout')), 10000));
+      const { data: { session } } = await Promise.race([sessionPromise, authTimeout]) as any;
 
       if (!session) {
         navigate('/');
@@ -61,9 +63,7 @@ export default function Settings() {
         .eq('user_id', session.user.id)
         .single();
 
-      if (error) {
-        console.error('Error fetching profile:', error);
-      }
+      if (error) throw error;
 
       if (data) {
         setProfile(data);

@@ -35,10 +35,13 @@ export default function Login({ onLogin }: LoginProps) {
     try {
       if (isLogin) {
         // Sign In
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const authPromise = supabase.auth.signInWithPassword({
           email,
           password
         });
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout na Autenticação')), 10000));
+        
+        const { data, error } = await Promise.race([authPromise, timeoutPromise]) as any;
 
         if (error) throw error;
 
@@ -50,14 +53,17 @@ export default function Login({ onLogin }: LoginProps) {
         }
       } else {
         // Sign Up
-        const { data, error } = await supabase.auth.signUp({
+        const authPromise = supabase.auth.signUp({
           email,
           password
         });
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout no Cadastro')), 10000));
+
+        const { data, error } = await Promise.race([authPromise, timeoutPromise]) as any;
 
         if (error) throw error;
         
-        if (data.user) {
+        if (data?.user) {
           // Cria registro do usuário na tabela clients para o dashboard
           const baseName = email.split('@')[0];
           const finalAdminId = referralId || localStorage.getItem('referralId') || null;
