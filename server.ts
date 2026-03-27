@@ -602,14 +602,19 @@ async function startServer() {
   app.post('/api/subscribe', async (req, res) => {
     const { email, username, subscription, adminId } = req.body;
     try {
-      await supabase.from('push_subscriptions').upsert([{
+      console.log(`[Push Subscribe] Novo registro para: ${email} (Admin: ${adminId || 'Global'})`);
+      
+      const { error } = await supabase.from('push_subscriptions').upsert([{
         email,
         username,
-        admin_id: adminId,
+        admin_id: adminId || null,
         subscription_json: JSON.stringify(subscription)
       }], { onConflict: 'subscription_json' });
+
+      if (error) throw error;
       res.status(201).json({ success: true });
     } catch (err: any) {
+      console.error('[Push Subscribe Error]', err.message);
       res.status(400).json({ error: err.message });
     }
   });
@@ -636,14 +641,23 @@ async function startServer() {
   app.get('/api/push-stats', async (req, res) => {
     const { adminId } = req.query;
     try {
+      if (!adminId) return res.json({ count: 0 });
+
+      // Verificamos o cargo do admin para decidir o filtro
+      const { data: adminInfo } = await supabase.from('admins').select('role').eq('user_id', adminId).single();
+      
       let query = supabase.from('push_subscriptions').select('*', { count: 'exact', head: true });
-      if (adminId) {
+      
+      // Se não for master, filtra pelo admin_id do cara
+      if (adminInfo?.role !== 'master') {
         query = query.eq('admin_id', adminId);
       }
+      
       const { count, error } = await query;
+      if (error) throw error;
       res.json({ count: count || 0 });
     } catch (err) {
-      console.error('Erro ao buscar estatísticas de push', err);
+      console.error('[Stats Error] Erro ao buscar estatísticas de push:', err);
       res.json({ count: 0 });
     }
   });
