@@ -841,11 +841,19 @@ async function startServer() {
       
       Regra Crítica: Se não houver jogos importantes nesta data específica, informe que não há grandes confrontos programados para hoje. Retorne APENAS o texto da agenda diretamente, sem introduções ou explicações.`;
 
-      console.log(`[Agenda Esportiva] Chamando Gemini para a data: ${dateStr}...`);
-      const model = ai.getGenerativeModel({ model: 'gemini-flash-latest' });
+      console.log(`[Agenda Esportiva] Chamando Gemini com Busca Google para a data: ${dateStr}...`);
+      const model = ai.getGenerativeModel({ 
+        model: 'gemini-1.5-flash',
+        tools: [{ googleSearchRetrieval: {} }] as any
+      });
       
-      // Reforçamos a busca externa para garantir dados de hoje
-      const result = await model.generateContent(prompt + " (É obrigatório pesquisar na web para obter os horários e canais corretos desta data)");
+      // Prompt ultra-específico para evitar alucinações de 2024/2025
+      const finalPrompt = `${prompt} 
+      IMPORTANTE: Use sua ferramenta de busca para encontrar os jogos REAIS que acontecem hoje, ${fullDateText} (${dateStr}). 
+      NÃO use dados de treinamento de anos passados (2024 ou 2025). 
+      Pesquise especificamente por: "Jogos de futebol Brasileirão hoje ${dateStr}", "Jogos Champions League hoje ${dateStr}", etc.`;
+
+      const result = await model.generateContent(finalPrompt);
       const response = await result.response;
       return response.text()?.trim() || '';
     } catch (err: any) {
