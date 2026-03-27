@@ -239,46 +239,56 @@ export default function App() {
         </Suspense>
       </Router>
 
-      {/* PWA Toast Notification */}
+      {/* PWA Update Modal Centralizado */}
       <AnimatePresence>
         {(offlineReady || needRefresh) && (
-          <motion.div
-            initial={{ opacity: 0, y: 50, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            className="fixed bottom-6 right-6 z-[9999] bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl p-5 rounded-3xl shadow-2xl border border-black/5 dark:border-white/10 flex flex-col gap-4 min-w-[320px] max-w-[400px]"
-          >
-            <div className="flex items-center gap-4">
-              <div className="size-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center animate-pulse">
-                <RefreshCw size={24} />
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-6">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-950/60 backdrop-blur-md"
+              onClick={close}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-sm bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 shadow-2xl border border-white/10 flex flex-col items-center text-center gap-6"
+            >
+              <div className="size-20 rounded-3xl bg-primary/10 text-primary flex items-center justify-center animate-bounce shadow-inner">
+                <RefreshCw size={40} />
               </div>
-              <div className="flex flex-col">
-                <h4 className="font-bold text-slate-900 dark:text-white text-lg tracking-tight leading-tight">
-                  {offlineReady ? 'App Offline Pronto!' : 'Nova Versão! 🚀'}
+              
+              <div className="space-y-2">
+                <h4 className="font-black text-2xl text-slate-900 dark:text-white tracking-tight uppercase">
+                  {offlineReady ? 'Sistema Pronto!' : 'Nova Atualização!'}
                 </h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                  {offlineReady ? 'O sistema está pronto para uso sem internet.' : 'Acabamos de lançar melhorias incríveis.'}
+                <p className="text-sm text-slate-500 dark:text-slate-400 font-medium leading-relaxed px-4">
+                  {offlineReady 
+                    ? 'O ITWF já pode ser usado totalmente offline no seu dispositivo.' 
+                    : 'Lançamos melhorias críticas de performance e segurança para sua experiência.'}
                 </p>
               </div>
-            </div>
-            
-            <div className="flex gap-2">
-              {needRefresh && (
+              
+              <div className="flex flex-col gap-3 w-full">
+                {needRefresh && (
+                  <button
+                    onClick={() => updateServiceWorker(true)}
+                    className="w-full bg-primary hover:bg-primary/90 text-white py-4 rounded-2xl text-sm font-black uppercase tracking-widest shadow-xl shadow-primary/30 transition-all active:scale-95"
+                  >
+                    ATUALIZAR AGORA 🚀
+                  </button>
+                )}
                 <button
-                  onClick={() => updateServiceWorker(true)}
-                  className="flex-1 bg-primary hover:bg-primary/90 text-white py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-primary/20 transition-all active:scale-95"
+                  onClick={close}
+                  className="w-full bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 dark:text-slate-400 py-3 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all"
                 >
-                  Atualizar Agora
+                  DEIXAR PARA DEPOIS
                 </button>
-              )}
-              <button
-                onClick={close}
-                className="flex-1 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-900 dark:text-white py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest transition-all"
-              >
-                Ignorar
-              </button>
-            </div>
-          </motion.div>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
       {showInstallModal && (
