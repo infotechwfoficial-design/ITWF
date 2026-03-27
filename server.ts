@@ -323,19 +323,24 @@ async function startServer() {
         badge: payload.badge || logo
       };
 
-      // 1. Tentar enviar via Web Push (Se for JSON válido de VAPID)
       if (subscriptionJson && subscriptionJson.startsWith('{')) {
         const pushSubscription = JSON.parse(subscriptionJson);
         await webpush.sendNotification(pushSubscription, JSON.stringify(finalPayload))
           .catch(async (err) => {
+            console.error(`[Push Web Error] Falha detalhada:`, {
+              status: err.statusCode,
+              body: err.body,
+              endpoint: pushSubscription.endpoint?.substring(0, 30) + '...'
+            });
+
             if (err.statusCode === 404 || err.statusCode === 410) {
-              console.log(`[Push Web] Removendo inscrição inválida (${err.statusCode})`);
+              console.log(`[Push Web] Removendo inscrição inválida/expirada (${err.statusCode})`);
               await supabase.from('push_subscriptions').delete().eq('subscription_json', subscriptionJson);
             }
           });
       }
     } catch (e) {
-      console.error('[Erro Push Web] Falha ao enviar:', e);
+      console.error('[Erro Crítico Push Web] Falha no envio ou processamento:', e);
     }
   }
 
@@ -801,13 +806,7 @@ async function startServer() {
 
     const summary = `Verificação de vencimento concluída. ${notifiedToday.size} notificações enviadas hoje em ${brTime}.`;
     console.log('[Cron] ' + summary);
-    
-    // Log do sistema para monitoramento no Dashboard
-    await supabase.from('notifications').insert([{
-      title: '⚙️ Sistema: Verificação de Vencimento',
-      message: summary,
-      type: 'system'
-    }]);
+    // REMOVIDO: Inserção de notificações de sistema na tabela pública para evitar poluição no painel do cliente.
   });
 
   // Limpar controle de duplicatas à meia-noite (3h UTC = 0h BR)
@@ -1004,30 +1003,32 @@ Placar Atual: ${homeScore} - ${awayScore}`;
         type: 'info'
       }]);
 
-      // Enviar para TODOS (Broadcast)
+      // Enviar para TODOS (Broadcast) em paralelo
       const payload = {
         title: '⚽ Agenda Esportiva do Dia',
         body: message,
         url: '/dashboard'
       };
 
-      // A. Web Push All
       const { data: webSubs } = await supabase.from('push_subscriptions').select('subscription_json, admin_id');
-      if (webSubs) {
-        for (const sub of webSubs) {
-          await sendPushNotification(sub.subscription_json, payload, sub.admin_id);
-        }
-      }
-
-      // B. FCM All
       const { data: fcmTokens } = await supabase.from('fcm_tokens').select('token');
-      if (fcmTokens) {
-        for (const fcm of fcmTokens) {
-          await sendFcmNotification(fcm.token, payload);
-        }
+
+      const promises: Promise<any>[] = [];
+
+      if (webSubs) {
+        webSubs.forEach(sub => {
+          promises.push(sendPushNotification(sub.subscription_json, payload, sub.admin_id));
+        });
       }
 
-      console.log('[Cron] Agenda Esportiva (Manhã) enviada.');
+      if (fcmTokens) {
+        fcmTokens.forEach(fcm => {
+          promises.push(sendFcmNotification(fcm.token, payload));
+        });
+      }
+
+      await Promise.allSettled(promises);
+      console.log(`[Cron] Agenda Esportiva (Manhã) enviada para ${promises.length} destinos.`);
     } catch (e) {
       console.error('[Cron] Falha na Agenda Esportiva (Manhã):', e);
     }
@@ -1047,30 +1048,22 @@ Placar Atual: ${homeScore} - ${awayScore}`;
         type: 'info'
       }]);
 
-      // Enviar para TODOS (Broadcast)
+      // Enviar para TODOS em paralelo
       const payload = {
         title: '⚽ Agenda Esportiva do Dia',
         body: message,
         url: '/dashboard'
       };
 
-      // A. Web Push All
       const { data: webSubs } = await supabase.from('push_subscriptions').select('subscription_json, admin_id');
-      if (webSubs) {
-        for (const sub of webSubs) {
-          await sendPushNotification(sub.subscription_json, payload, sub.admin_id);
-        }
-      }
-
-      // B. FCM All
       const { data: fcmTokens } = await supabase.from('fcm_tokens').select('token');
-      if (fcmTokens) {
-        for (const fcm of fcmTokens) {
-          await sendFcmNotification(fcm.token, payload);
-        }
-      }
 
-      console.log('[Cron] Agenda Esportiva (Tarde) enviada.');
+      const promises: Promise<any>[] = [];
+      if (webSubs) webSubs.forEach(sub => promises.push(sendPushNotification(sub.subscription_json, payload, sub.admin_id)));
+      if (fcmTokens) fcmTokens.forEach(fcm => promises.push(sendFcmNotification(fcm.token, payload)));
+
+      await Promise.allSettled(promises);
+      console.log(`[Cron] Agenda Esportiva (Tarde) enviada.`);
     } catch (e) {
       console.error('[Cron] Falha na Agenda Esportiva (Tarde):', e);
     }
@@ -1090,30 +1083,22 @@ Placar Atual: ${homeScore} - ${awayScore}`;
         type: 'info'
       }]);
 
-      // Enviar para TODOS (Broadcast)
+      // Enviar para TODOS em paralelo
       const payload = {
         title: '⚽ Agenda Esportiva do Dia',
         body: message,
         url: '/dashboard'
       };
 
-      // A. Web Push All
       const { data: webSubs } = await supabase.from('push_subscriptions').select('subscription_json, admin_id');
-      if (webSubs) {
-        for (const sub of webSubs) {
-          await sendPushNotification(sub.subscription_json, payload, sub.admin_id);
-        }
-      }
-
-      // B. FCM All
       const { data: fcmTokens } = await supabase.from('fcm_tokens').select('token');
-      if (fcmTokens) {
-        for (const fcm of fcmTokens) {
-          await sendFcmNotification(fcm.token, payload);
-        }
-      }
 
-      console.log('[Cron] Agenda Esportiva (Noite) enviada.');
+      const promises: Promise<any>[] = [];
+      if (webSubs) webSubs.forEach(sub => promises.push(sendPushNotification(sub.subscription_json, payload, sub.admin_id)));
+      if (fcmTokens) fcmTokens.forEach(fcm => promises.push(sendFcmNotification(fcm.token, payload)));
+
+      await Promise.allSettled(promises);
+      console.log(`[Cron] Agenda Esportiva (Noite) enviada.`);
     } catch (e) {
       console.error('[Cron] Falha na Agenda Esportiva (Noite):', e);
     }
