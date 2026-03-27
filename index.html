@@ -12,21 +12,6 @@
 
 <body>
   <div id="root"></div>
-  <script type="module">
-    import { registerSW } from 'virtual:pwa-register'
-
-    const updateSW = registerSW({
-      onNeedRefresh() {
-        // Provide an update notification to the user if you wish, or just auto-update and reload
-        if (confirm('Nova atualização disponível. Recarregar agora?')) {
-          updateSW(true)
-        }
-      },
-      onOfflineReady() {
-        console.log('App ready to work offline')
-      },
-    })
-  </script>
   <script type="module" src="/src/main.tsx"></script>
 </body>
 
