@@ -133,34 +133,41 @@ export default function Dashboard() {
           )
           .subscribe();
 
-        // BUSCA EM PARALELO PARA VELOCIDADE MÁXIMA
-        const [clientRes, requestsRes, agendaRes] = await Promise.all([
-          supabase.from('clients').select('*').eq('user_id', user.id).single(),
-          supabase.from('requests').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-          supabase.from('notifications').select('message').eq('title', '⚽ Agenda Esportiva').order('created_at', { ascending: false }).limit(1).maybeSingle()
-        ]);
+        // BUSCA EM PARALELO COM TIMEOUT DE SEGURANÇA
+        try {
+          const fetchPromise = Promise.all([
+            supabase.from('clients').select('*').eq('user_id', user.id).single(),
+            supabase.from('requests').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+            supabase.from('notifications').select('message').eq('title', '⚽ Agenda Esportiva').order('created_at', { ascending: false }).limit(1).maybeSingle()
+          ]);
 
-        if (clientRes.data) {
-          const clientData = clientRes.data;
-          setClient(clientData);
-          
-          if ('Notification' in window && Notification.permission === 'default') {
-            setShowPushBanner(true);
-          } else if ('Notification' in window && Notification.permission === 'granted') {
-            subscribeUserToPush(clientData.email, clientData.username, clientData.admin_id);
+          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Queries')), 10000));
+          const [clientRes, requestsRes, agendaRes] = await Promise.race([fetchPromise, timeoutPromise]) as any;
+
+          if (clientRes.data) {
+            const clientData = clientRes.data;
+            setClient(clientData);
+            
+            if ('Notification' in window && Notification.permission === 'default') {
+              setShowPushBanner(true);
+            } else if ('Notification' in window && Notification.permission === 'granted') {
+              subscribeUserToPush(clientData.email, clientData.username, clientData.admin_id);
+            }
+
+            if (!clientData.onboarding_completed) {
+              setShowWelcomeModal(true);
+            } else {
+              const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
+              const pwaTutorialSeen = localStorage.getItem('pwa_tutorial_seen') === 'true';
+              if (isStandalone && !pwaTutorialSeen) setShowWelcomeModal(true);
+            }
           }
 
-          if (!clientData.onboarding_completed) {
-            setShowWelcomeModal(true);
-          } else {
-            const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
-            const pwaTutorialSeen = localStorage.getItem('pwa_tutorial_seen') === 'true';
-            if (isStandalone && !pwaTutorialSeen) setShowWelcomeModal(true);
-          }
+          if (requestsRes.data) setRequests(requestsRes.data);
+          if (agendaRes.data) setSportsAgenda(agendaRes.data.message);
+        } catch (err) {
+          console.error('Dashboard: Erro ou Timeout ao carregar dados:', err);
         }
-
-        if (requestsRes.data) setRequests(requestsRes.data);
-        if (agendaRes.data) setSportsAgenda(agendaRes.data.message);
       }
       setLoading(false);
     };

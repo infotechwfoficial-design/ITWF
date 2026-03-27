@@ -74,11 +74,15 @@ export default function App() {
     const checkSession = async () => {
       try {
         console.log('App: Verificando sessão e permissões...');
-        const { data: { session } } = await supabase.auth.getSession();
+        
+        // Timeout de segurança para evitar travamento infinito
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Supabase')), 10000));
+        
+        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any;
         
         if (session?.user) {
           setIsAuthenticated(true);
-          // Busca role de admin em paralelo ou logo após
           const { data: adminData } = await supabase
             .from('admins')
             .select('id')
@@ -90,7 +94,7 @@ export default function App() {
           setIsAdmin(false);
         }
       } catch (err) {
-        console.error('App: Erro na inicialização:', err);
+        console.error('App: Erro ou Timeout na inicialização:', err);
         setIsAuthenticated(false);
         setIsAdmin(false);
       }
@@ -272,14 +276,16 @@ export default function App() {
               </div>
               
               <div className="flex flex-col gap-3 w-full">
-                {needRefresh && (
                   <button
-                    onClick={() => updateServiceWorker(true)}
+                    onClick={() => {
+                      updateServiceWorker(true);
+                      // Fallback: se não recarregar em 1.5s, força o recarregamento
+                      setTimeout(() => window.location.reload(), 1500);
+                    }}
                     className="w-full bg-primary hover:bg-primary/90 text-white py-4 rounded-2xl text-sm font-black uppercase tracking-widest shadow-xl shadow-primary/30 transition-all active:scale-95"
                   >
                     ATUALIZAR AGORA 🚀
                   </button>
-                )}
                 <button
                   onClick={close}
                   className="w-full bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 dark:text-slate-400 py-3 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all"
