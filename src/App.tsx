@@ -65,52 +65,55 @@ export default function App() {
   };
 
   useEffect(() => {
-    // CAPTURA GLOBAL DO LINK DE INDICAÇÃO (?ref=...)
-    // Isso garante que não importa em qual aba o cliente caia primeiro (/plans, /login, /), 
-    // ele ficará eternamente vinculado ao revendedor nas memórias do dispositivo.
     const params = new URLSearchParams(window.location.search);
     const referralId = params.get('ref');
     if (referralId) {
       localStorage.setItem('referralId', referralId);
     }
 
-    console.log('App: Verificando sessão do Supabase...');
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('App: Sessão recuperada:', !!session);
-      setIsAuthenticated(!!session);
-      if (session?.user) {
-        supabase
-          .from('admins')
-          .select('id')
-          .eq('user_id', session.user.id)
-          .maybeSingle()
-          .then(({ data }) => setIsAdmin(!!data));
-      } else {
+    const checkSession = async () => {
+      try {
+        console.log('App: Verificando sessão e permissões...');
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          setIsAuthenticated(true);
+          // Busca role de admin em paralelo ou logo após
+          const { data: adminData } = await supabase
+            .from('admins')
+            .select('id')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+          setIsAdmin(!!adminData);
+        } else {
+          setIsAuthenticated(false);
+          setIsAdmin(false);
+        }
+      } catch (err) {
+        console.error('App: Erro na inicialização:', err);
+        setIsAuthenticated(false);
         setIsAdmin(false);
       }
-    }).catch(err => {
-      console.error('App: Erro ao recuperar sessão:', err);
-      setIsAuthenticated(false); // Fallback para não ficar carregando infinito
-    });
+    };
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log('App: Mudança de estado Auth:', _event, !!session);
-      
+    checkSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (_event === 'PASSWORD_RECOVERY') {
         window.location.href = '/update-password';
         return;
       }
 
-      setIsAuthenticated(!!session);
-      if (session?.user) {
-        supabase
+      const isAuth = !!session;
+      setIsAuthenticated(isAuth);
+      
+      if (isAuth && session?.user) {
+        const { data: adminData } = await supabase
           .from('admins')
           .select('id')
           .eq('user_id', session.user.id)
-          .maybeSingle()
-          .then(({ data }) => setIsAdmin(!!data));
+          .maybeSingle();
+        setIsAdmin(!!adminData);
       } else {
         setIsAdmin(false);
       }

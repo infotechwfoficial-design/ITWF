@@ -124,12 +124,9 @@ export default function Login({ onLogin }: LoginProps) {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-background-dark relative overflow-hidden font-sans">
-      {/* Background Image with Blur */}
-      <div
-        className="absolute inset-0 z-0 opacity-10 dark:opacity-40 bg-cover bg-center"
-        style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&q=80)' }}
-      />
-      <div className="absolute inset-0 bg-white/50 dark:bg-black/60 z-0" />
+      {/* Background Gradient Otimizado */}
+      <div className="absolute inset-0 z-0 bg-gradient-to-br from-slate-50 to-slate-200 dark:from-slate-950 dark:to-slate-900" />
+      <div className="absolute inset-0 opacity-30 dark:opacity-20 z-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-from)_0%,_transparent_70%)] from-primary/20" />
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}

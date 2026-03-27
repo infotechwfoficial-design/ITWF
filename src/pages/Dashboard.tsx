@@ -133,55 +133,34 @@ export default function Dashboard() {
           )
           .subscribe();
 
-        // Fetch Client Data
-        const { data: clientData } = await supabase
-          .from('clients')
-          .select('*')
-          .eq('user_id', user.id)
-          .single();
+        // BUSCA EM PARALELO PARA VELOCIDADE MÁXIMA
+        const [clientRes, requestsRes, agendaRes] = await Promise.all([
+          supabase.from('clients').select('*').eq('user_id', user.id).single(),
+          supabase.from('requests').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+          supabase.from('notifications').select('message').eq('title', '⚽ Agenda Esportiva').order('created_at', { ascending: false }).limit(1).maybeSingle()
+        ]);
 
-        if (clientData) {
+        if (clientRes.data) {
+          const clientData = clientRes.data;
           setClient(clientData);
           
-          // Verifica se precisa mostrar o banner de notificações
           if ('Notification' in window && Notification.permission === 'default') {
             setShowPushBanner(true);
           } else if ('Notification' in window && Notification.permission === 'granted') {
             subscribeUserToPush(clientData.email, clientData.username, clientData.admin_id);
           }
 
-          // Verifica Onboarding
           if (!clientData.onboarding_completed) {
             setShowWelcomeModal(true);
           } else {
-            // Se já fez onboarding, verifica se está no PWA e ainda não viu o tutorial do PWA
             const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
             const pwaTutorialSeen = localStorage.getItem('pwa_tutorial_seen') === 'true';
-            
-            if (isStandalone && !pwaTutorialSeen) {
-              setShowWelcomeModal(true);
-            }
+            if (isStandalone && !pwaTutorialSeen) setShowWelcomeModal(true);
           }
         }
 
-        // Fetch Requests
-        const { data: userRequests } = await supabase
-          .from('requests')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
-        if (userRequests) setRequests(userRequests);
-
-        // Fetch Latest Sports Agenda
-        const { data: agendaData } = await supabase
-          .from('notifications')
-          .select('message')
-          .eq('title', '⚽ Agenda Esportiva')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        
-        if (agendaData) setSportsAgenda(agendaData.message);
+        if (requestsRes.data) setRequests(requestsRes.data);
+        if (agendaRes.data) setSportsAgenda(agendaRes.data.message);
       }
       setLoading(false);
     };
@@ -473,27 +452,22 @@ export default function Dashboard() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="md:col-span-3 rounded-3xl bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 p-6 relative overflow-hidden group shadow-lg shadow-amber-500/5"
+              className="md:col-span-3 rounded-3xl bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 p-5 relative overflow-hidden group shadow-lg shadow-amber-500/5 flex flex-col md:flex-row items-center justify-between gap-4"
             >
-              <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                <Zap size={80} className="text-amber-500" />
-              </div>
-              <div className="flex items-center gap-3 mb-4">
-                <div className="size-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-lg shadow-amber-500/20">
-                  <Zap size={20} />
+              <div className="flex items-center gap-4">
+                <div className="size-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-lg shadow-amber-500/20 shrink-0">
+                  <Zap size={22} />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white">Agenda Esportiva do Dia ⚽</h3>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">Jogos de Hoje ⚽</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1 max-w-[250px] md:max-w-md">
+                    {sportsAgenda}
+                  </p>
+                </div>
               </div>
-              <div className="bg-white/50 dark:bg-black/20 backdrop-blur-sm rounded-2xl p-5 border border-amber-500/10">
-                <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed font-medium">
-                  {sportsAgenda}
-                </p>
-              </div>
-              <div className="mt-4 flex justify-end">
-                <Link to="/sports" className="text-xs font-black uppercase tracking-widest text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1">
-                  Ver Arena Completa <ExternalLink size={12} />
-                </Link>
-              </div>
+              <Link to="/sports" className="bg-amber-500 hover:bg-amber-600 text-white px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 shadow-md shadow-amber-500/20">
+                Ver na Arena
+              </Link>
             </motion.div>
           )}
 
