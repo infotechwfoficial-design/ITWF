@@ -8,6 +8,7 @@ import { useState, useEffect, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { RefreshCw } from 'lucide-react';
 import { supabase } from './utils/supabase';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Lazy loading pages for performance
 const Login = lazy(() => import('./pages/Login'));
@@ -45,6 +46,7 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [isMaintenance, setIsMaintenance] = useState(false);
+  const [sessionTimeout, setSessionTimeout] = useState(false);
 
   // Lógica de Subdomínio (Opção A para Vercel)
   const hostname = window.location.hostname;
@@ -75,11 +77,8 @@ export default function App() {
       try {
         console.log('App: Verificando sessão e permissões...');
         
-        // Timeout de segurança para evitar travamento infinito
-        const sessionPromise = supabase.auth.getSession();
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Supabase')), 10000));
-        
-        const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]) as any;
+        // Removido timeout de 10s para evitar falhas em conexões lentas
+        const { data: { session } } = await supabase.auth.getSession();
         
         if (session?.user) {
           setIsAuthenticated(true);
@@ -102,6 +101,13 @@ export default function App() {
 
     checkSession();
 
+    // Adiciona um aviso após 15 segundos se ainda estiver carregando
+    const loadingTimer = setTimeout(() => {
+      if (isAuthenticated === null) {
+        setSessionTimeout(true);
+      }
+    }, 15000);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (_event === 'PASSWORD_RECOVERY') {
         window.location.href = '/update-password';
@@ -123,8 +129,11 @@ export default function App() {
       }
     });
 
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(loadingTimer);
+    };
+  }, [isAuthenticated]);
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: any) => {
@@ -157,7 +166,30 @@ export default function App() {
 
   // Show a loading screen while resolving initial session
   if (isAuthenticated === null) {
-    return <LoadingFallback />;
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 gap-6 p-6 text-center">
+        <img src="/logo.png" alt="Logo" className="w-24 h-24 object-contain animate-pulse" />
+        <p className="text-primary font-bold animate-pulse uppercase tracking-widest text-sm">Carregando Experiência...</p>
+        
+        {sessionTimeout && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="mt-4 flex flex-col items-center gap-4"
+          >
+            <p className="text-xs text-slate-500 max-w-[250px]">
+              O carregamento está demorando mais que o normal. Verifique sua conexão.
+            </p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="text-xs font-bold text-primary underline"
+            >
+              Recarregar Página
+            </button>
+          </motion.div>
+        )}
+      </div>
+    );
   }
 
   if (isMaintenance) {
@@ -165,8 +197,9 @@ export default function App() {
   }
 
   return (
-    <ThemeProvider>
-      <Router>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <Router>
         <Suspense fallback={<LoadingFallback />}>
           <Routes>
             <Route
@@ -306,6 +339,7 @@ export default function App() {
           }}
         />
       )}
-    </ThemeProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }

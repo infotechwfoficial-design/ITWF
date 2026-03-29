@@ -349,9 +349,7 @@ export default function Admin() {
   useEffect(() => {
     const checkUser = async () => {
       try {
-        const userPromise = supabase.auth.getUser();
-        const authTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Auth Timeout')), 10000));
-        const { data: { user } } = await Promise.race([userPromise, authTimeout]) as any;
+        const { data: { user } } = await supabase.auth.getUser();
 
         if (user) {
           const role = localStorage.getItem('adminRole') || 'admin';

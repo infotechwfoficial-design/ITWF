@@ -25,18 +25,13 @@ export default function Invoices() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const userPromise = supabase.auth.getUser();
-        const authTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Auth Timeout')), 10000));
-        const { data: { user } } = await Promise.race([userPromise, authTimeout]) as any;
+        const { data: { user } } = await supabase.auth.getUser();
 
         if (user) {
-          const fetchPromise = Promise.all([
+          const [clientRes, invoicesRes] = await Promise.all([
             supabase.from('clients').select('*').eq('user_id', user.id).single(),
             supabase.from('invoices').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
           ]);
-
-          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Queries Timeout')), 10000));
-          const [clientRes, invoicesRes] = await Promise.race([fetchPromise, timeoutPromise]) as any;
 
           if (clientRes.data) setClient(clientRes.data);
           if (invoicesRes.data) setInvoices(invoicesRes.data);

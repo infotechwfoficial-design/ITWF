@@ -48,9 +48,7 @@ export default function Settings() {
   const fetchProfile = async () => {
     try {
       setLoading(true);
-      const sessionPromise = supabase.auth.getSession();
-      const authTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Auth Timeout')), 10000));
-      const { data: { session } } = await Promise.race([sessionPromise, authTimeout]) as any;
+      const { data: { session } } = await supabase.auth.getSession();
 
       if (!session) {
         navigate('/');

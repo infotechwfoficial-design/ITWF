@@ -44,18 +44,13 @@ export default function RequestContent() {
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const userPromise = supabase.auth.getUser();
-        const authTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Auth Timeout')), 10000));
-        const { data: { user } } = await Promise.race([userPromise, authTimeout]) as any;
+        const { data: { user } } = await supabase.auth.getUser();
 
         if (user) {
-          const fetchPromise = Promise.all([
+          const [clientRes, favRes] = await Promise.all([
             supabase.from('clients').select('*').eq('user_id', user.id).single(),
             supabase.from('favorites').select('content_id').eq('user_id', user.id)
           ]);
-
-          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Queries Timeout')), 10000));
-          const [clientRes, favRes] = await Promise.race([fetchPromise, timeoutPromise]) as any;
 
           if (clientRes.data) {
             const clientData = clientRes.data;

@@ -35,13 +35,10 @@ export default function Login({ onLogin }: LoginProps) {
     try {
       if (isLogin) {
         // Sign In
-        const authPromise = supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password
         });
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout na Autenticação')), 10000));
-        
-        const { data, error } = await Promise.race([authPromise, timeoutPromise]) as any;
 
         if (error) throw error;
 
@@ -53,13 +50,10 @@ export default function Login({ onLogin }: LoginProps) {
         }
       } else {
         // Sign Up
-        const authPromise = supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password
         });
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout no Cadastro')), 10000));
-
-        const { data, error } = await Promise.race([authPromise, timeoutPromise]) as any;
 
         if (error) throw error;
         

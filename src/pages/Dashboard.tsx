@@ -108,9 +108,7 @@ export default function Dashboard() {
 
     const fetchUserData = async () => {
       try {
-        const userPromise = supabase.auth.getUser();
-        const authTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Auth Timeout')), 10000));
-        const { data: { user } } = await Promise.race([userPromise, authTimeout]) as any;
+        const { data: { user } } = await supabase.auth.getUser();
 
         if (user) {
           // Inscrição Realtime para Pedidos
@@ -136,15 +134,12 @@ export default function Dashboard() {
             )
             .subscribe();
 
-          // BUSCA EM PARALELO COM TIMEOUT DE SEGURANÇA
-          const fetchPromise = Promise.all([
+          // BUSCA EM PARALELO - TIMEOUT REMOVIDO PARA ESTABILIDADE
+          const [clientRes, requestsRes, agendaRes] = await Promise.all([
             supabase.from('clients').select('*').eq('user_id', user.id).single(),
             supabase.from('requests').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
             supabase.from('notifications').select('message').eq('title', '⚽ Agenda Esportiva').order('created_at', { ascending: false }).limit(1).maybeSingle()
           ]);
-
-          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Queries')), 10000));
-          const [clientRes, requestsRes, agendaRes] = await Promise.race([fetchPromise, timeoutPromise]) as any;
 
           if (clientRes.data) {
             const clientData = clientRes.data;
