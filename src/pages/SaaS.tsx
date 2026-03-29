@@ -232,7 +232,7 @@ export default function SaaS() {
                 className="p-8 bg-white dark:bg-slate-900 rounded-[2.5rem] border border-black/5 dark:border-white/5 shadow-sm hover:shadow-2xl hover:translate-y-[-10px] transition-all group"
               >
                 <div className="size-14 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  {React.cloneElement(f.icon as React.ReactElement, { size: 28 })}
+                  {React.cloneElement(f.icon as React.ReactElement<any>, { size: 28 })}
                 </div>
                 <h3 className="text-xl font-black mb-4">{f.title}</h3>
                 <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed">{f.description}</p>

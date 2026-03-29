@@ -425,7 +425,8 @@ export default function Admin() {
       email: client.email,
       expiration_date: client.expiration_date,
       balance: client.balance,
-      renewal_link: client.renewal_link
+      renewal_link: client.renewal_link,
+      password: ''
     });
     setIsClientModalOpen(true);
   }, []);
