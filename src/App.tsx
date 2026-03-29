@@ -61,9 +61,15 @@ export default function App() {
     updateServiceWorker,
   } = useRegisterSW();
 
+  const [updateDismissed, setUpdateDismissed] = useState(() => 
+    sessionStorage.getItem('pwa_update_dismissed') === 'true'
+  );
+
   const close = () => {
     setOfflineReady(false);
     setNeedRefresh(false);
+    setUpdateDismissed(true);
+    sessionStorage.setItem('pwa_update_dismissed', 'true');
   };
 
   // Efeito 1: Verificação INICIAL da sessão (executa apenas uma vez)
@@ -288,12 +294,9 @@ export default function App() {
 
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
-        </Suspense>
-      </Router>
-
-      {/* PWA Update Modal Centralizado */}
+        </Suspens      {/* PWA Update Modal Centralizado */}
       <AnimatePresence>
-        {(offlineReady || needRefresh) && (
+        {(needRefresh && !updateDismissed) && (
           <div className="fixed inset-0 z-[99999] flex items-center justify-center p-6">
             <motion.div
               initial={{ opacity: 0 }}
@@ -314,26 +317,25 @@ export default function App() {
               
               <div className="space-y-2">
                 <h4 className="font-black text-2xl text-slate-900 dark:text-white tracking-tight uppercase">
-                  {offlineReady ? 'Sistema Pronto!' : 'Nova Atualização!'}
+                  Nova Atualização!
                 </h4>
                 <p className="text-sm text-slate-500 dark:text-slate-400 font-medium leading-relaxed px-4">
-                  {offlineReady 
-                    ? 'O ITWF já pode ser usado totalmente offline no seu dispositivo.' 
-                    : 'Lançamos melhorias críticas de performance e segurança para sua experiência.'}
+                  Lançamos melhorias críticas de performance e segurança para sua experiência.  
                 </p>
               </div>
               
               <div className="flex flex-col gap-3 w-full">
-                  <button
-                    onClick={() => {
-                      updateServiceWorker(true);
-                      // Fallback: se não recarregar em 1.5s, força o recarregamento
-                      setTimeout(() => window.location.reload(), 1500);
-                    }}
-                    className="w-full bg-primary hover:bg-primary/90 text-white py-4 rounded-2xl text-sm font-black uppercase tracking-widest shadow-xl shadow-primary/30 transition-all active:scale-95"
-                  >
-                    ATUALIZAR AGORA 🚀
-                  </button>
+                <button
+                  onClick={() => {
+                    sessionStorage.removeItem('pwa_update_dismissed');
+                    updateServiceWorker(true);
+                    // Fallback: se não recarregar em 1.5s, força o recarregamento
+                    setTimeout(() => window.location.reload(), 1500);
+                  }}
+                  className="w-full bg-primary hover:bg-primary/90 text-white py-4 rounded-2xl text-sm font-black uppercase tracking-widest shadow-xl shadow-primary/30 transition-all active:scale-95"
+                >
+                  ATUALIZAR AGORA 🚀
+                </button>
                 <button
                   onClick={close}
                   className="w-full bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 dark:text-slate-400 py-3 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all"
@@ -344,6 +346,7 @@ export default function App() {
             </motion.div>
           </div>
         )}
+      </AnimatePresence>       )}
       </AnimatePresence>
       {showInstallModal && (
         <PWAInstallModal
