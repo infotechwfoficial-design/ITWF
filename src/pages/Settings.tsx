@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   User,
   Mail,
@@ -10,12 +10,16 @@ import {
   Save,
   ChevronRight,
   Loader2,
-  LogOut
+  LogOut,
+  Smartphone,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import Toast from '../components/Toast';
 import { supabase } from '../utils/supabase';
+import { subscribeUserToPush, unsubscribeFromPush } from '../utils/push';
 
 interface ToastState {
   message: string;
@@ -30,6 +34,9 @@ export default function Settings() {
   const [uploading, setUploading] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'notifications'>('profile');
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [checkingPush, setCheckingPush] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -42,8 +49,47 @@ export default function Settings() {
   }, []);
 
   useEffect(() => {
+    checkPushStatus();
     fetchProfile();
   }, []);
+
+  const checkPushStatus = async () => {
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+      try {
+        const register = await navigator.serviceWorker.ready;
+        const subscription = await register.pushManager.getSubscription();
+        setPushEnabled(!!subscription);
+      } catch (err) {
+        console.error('Error checking push status:', err);
+      }
+    }
+  };
+
+  const togglePush = async () => {
+    if (!profile) return;
+    setCheckingPush(true);
+    try {
+      if (pushEnabled) {
+        await unsubscribeFromPush(profile.email);
+        setPushEnabled(false);
+        showToast('Notificações desativadas com sucesso.', 'success');
+      } else {
+        await subscribeUserToPush(profile.email, profile.username, profile.admin_id);
+        const register = await navigator.serviceWorker.ready;
+        const subscription = await register.pushManager.getSubscription();
+        if (subscription) {
+          setPushEnabled(true);
+          showToast('Notificações ativadas com sucesso!', 'success');
+        } else {
+          showToast('Não foi possível ativar as notificações. Verifique as permissões do navegador.', 'error');
+        }
+      }
+    } catch (err) {
+      showToast('Erro ao alterar configuração de notificações.', 'error');
+    } finally {
+      setCheckingPush(false);
+    }
+  };
 
   const fetchProfile = async () => {
     const timeout = setTimeout(() => {
@@ -231,27 +277,48 @@ export default function Settings() {
               </div>
             </div>
 
-            <nav className="bg-slate-50 dark:bg-slate-900/40 border border-black/5 dark:border-white/10 rounded-2xl overflow-hidden shadow-sm">
-              <button className="w-full flex items-center justify-between px-5 py-4 bg-primary/10 text-primary border-l-4 border-primary font-bold text-sm">
+            <nav className="bg-white/40 dark:bg-slate-900/40 border border-black/5 dark:border-white/10 rounded-2xl overflow-hidden shadow-sm">
+              <button 
+                onClick={() => setActiveTab('profile')}
+                className={`w-full flex items-center justify-between px-5 py-4 transition-all font-bold text-sm ${
+                  activeTab === 'profile' 
+                  ? 'bg-primary/10 text-primary border-l-4 border-primary' 
+                  : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'
+                }`}
+              >
                 <div className="flex items-center gap-3">
                   <User size={18} />
                   <span>Dados Pessoais</span>
                 </div>
-                <ChevronRight size={16} />
+                <ChevronRight size={16} className={`transition-transform ${activeTab === 'profile' ? 'translate-x-1' : ''}`} />
               </button>
-              <button className="w-full flex items-center justify-between px-5 py-4 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white transition-colors font-medium text-sm">
+              <button 
+                onClick={() => setActiveTab('security')}
+                className={`w-full flex items-center justify-between px-5 py-4 transition-all font-bold text-sm ${
+                  activeTab === 'security' 
+                  ? 'bg-primary/10 text-primary border-l-4 border-primary' 
+                  : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'
+                }`}
+              >
                 <div className="flex items-center gap-3">
                   <Lock size={18} />
                   <span>Segurança</span>
                 </div>
-                <ChevronRight size={16} />
+                <ChevronRight size={16} className={`transition-transform ${activeTab === 'security' ? 'translate-x-1' : ''}`} />
               </button>
-              <button className="w-full flex items-center justify-between px-5 py-4 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white transition-colors font-medium text-sm">
+              <button 
+                onClick={() => setActiveTab('notifications')}
+                className={`w-full flex items-center justify-between px-5 py-4 transition-all font-bold text-sm ${
+                  activeTab === 'notifications' 
+                  ? 'bg-primary/10 text-primary border-l-4 border-primary' 
+                  : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5'
+                }`}
+              >
                 <div className="flex items-center gap-3">
                   <Bell size={18} />
                   <span>Notificações</span>
                 </div>
-                <ChevronRight size={16} />
+                <ChevronRight size={16} className={`transition-transform ${activeTab === 'notifications' ? 'translate-x-1' : ''}`} />
               </button>
               <button
                 onClick={async () => {
@@ -273,85 +340,177 @@ export default function Settings() {
           </div>
 
           {/* Form Area */}
-          <div className="lg:col-span-2">
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="bg-slate-50 dark:bg-slate-900/40 border border-black/5 dark:border-white/10 rounded-2xl p-8 space-y-8 shadow-sm"
-            >
-              <div className="space-y-6">
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white border-b border-black/5 dark:border-white/5 pb-4">Informações Básicas</h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Nome Completo</label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <User size={18} className="text-slate-500" />
-                      </div>
-                      <input
-                        type="text"
-                        value={formData.name}
-                        onChange={e => setFormData({ ...formData, name: e.target.value })}
-                        className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-800/50 border border-black/10 dark:border-white/10 rounded-xl text-slate-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2 opacity-60">
-                    <label className="text-sm font-medium text-slate-500 dark:text-slate-400">E-mail (Não alterável)</label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <Mail size={18} className="text-slate-500" />
-                      </div>
-                      <input
-                        type="email"
-                        disabled
-                        value={formData.email}
-                        className="w-full pl-10 pr-4 py-2.5 bg-slate-100 dark:bg-slate-900/50 border border-black/5 dark:border-white/5 rounded-xl text-slate-500 dark:text-slate-400 focus:outline-none cursor-not-allowed"
-                        title="Para alterar seu e-mail de acesso, entre em contato com o suporte."
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-6 pt-4">
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white border-b border-black/5 dark:border-white/5 pb-4">Segurança da Conta</h3>
-                <div className="flex items-center justify-between p-4 bg-slate-100 dark:bg-white/5 rounded-xl border border-black/5 dark:border-white/5">
-                  <div className="flex items-center gap-4">
-                    <div className="size-10 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 flex items-center justify-center">
-                      <Shield size={20} />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-slate-900 dark:text-white">Autenticação em Duas Etapas</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">Adicione uma camada extra de segurança.</p>
-                    </div>
-                  </div>
-                  <div className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" defaultChecked />
-                    <div className="w-11 h-6 bg-slate-300 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-4 pt-6 border-t border-black/5 dark:border-white/5">
-                <button
-                  onClick={() => fetchProfile()}
-                  disabled={saving}
-                  className="px-6 py-2.5 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-all font-medium disabled:opacity-50"
+          <div className="lg:col-span-2 relative overflow-hidden min-h-[500px]">
+            <AnimatePresence mode="wait">
+              {activeTab === 'profile' && (
+                <motion.div
+                  key="profile"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.2 }}
+                  className="bg-white/40 dark:bg-slate-900/40 border border-black/5 dark:border-white/10 rounded-[2.5rem] p-8 space-y-8 shadow-sm backdrop-blur-md"
                 >
-                  Descartar
-                </button>
-                <button
-                  onClick={handleSaveProfile}
-                  disabled={saving}
-                  className="px-8 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-white font-bold shadow-lg shadow-primary/20 flex items-center gap-2 transition-all disabled:opacity-50"
+                  <div className="space-y-6">
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-white border-b border-black/5 dark:border-white/5 pb-4">Informações Básicas</h3>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Nome Completo</label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <User size={18} className="text-slate-500" />
+                          </div>
+                          <input
+                            type="text"
+                            value={formData.name}
+                            onChange={e => setFormData({ ...formData, name: e.target.value })}
+                            className="w-full pl-10 pr-4 py-2.5 bg-white/50 dark:bg-slate-800/50 border border-black/10 dark:border-white/10 rounded-2xl text-slate-900 dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2 opacity-60">
+                        <label className="text-sm font-medium text-slate-500 dark:text-slate-400">E-mail (Não alterável)</label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <Mail size={18} className="text-slate-500" />
+                          </div>
+                          <input
+                            type="email"
+                            disabled
+                            value={formData.email}
+                            className="w-full pl-10 pr-4 py-2.5 bg-slate-100/50 dark:bg-slate-900/50 border border-black/5 dark:border-white/5 rounded-2xl text-slate-500 dark:text-slate-400 focus:outline-none cursor-not-allowed"
+                            title="Para alterar seu e-mail de acesso, entre em contato com o suporte."
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-4 pt-6 border-t border-black/5 dark:border-white/5">
+                    <button
+                      onClick={() => fetchProfile()}
+                      disabled={saving}
+                      className="px-6 py-2.5 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-all font-medium disabled:opacity-50"
+                    >
+                      Descartar
+                    </button>
+                    <button
+                      onClick={handleSaveProfile}
+                      disabled={saving}
+                      className="px-8 py-2.5 rounded-2xl bg-primary hover:bg-primary/90 text-white font-bold shadow-lg shadow-primary/20 flex items-center gap-2 transition-all disabled:opacity-50"
+                    >
+                      {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                      {saving ? 'Salvando...' : 'Salvar Alterações'}
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+
+              {activeTab === 'security' && (
+                <motion.div
+                  key="security"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.2 }}
+                  className="bg-white/40 dark:bg-slate-900/40 border border-black/5 dark:border-white/10 rounded-[2.5rem] p-8 space-y-8 shadow-sm backdrop-blur-md"
                 >
-                  {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-                  {saving ? 'Salvando...' : 'Salvar Alterações'}
-                </button>
-              </div>
-            </motion.div>
+                  <div className="space-y-6">
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-white border-b border-black/5 dark:border-white/5 pb-4">Segurança da Conta</h3>
+                    
+                    <div className="grid grid-cols-1 gap-6">
+                      <div className="p-6 bg-slate-100/50 dark:bg-white/5 rounded-[2rem] border border-black/5 dark:border-white/5">
+                         <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className="size-12 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 flex items-center justify-center">
+                                <Shield size={24} />
+                              </div>
+                              <div>
+                                <p className="font-bold text-slate-900 dark:text-white">Autenticação em Duas Etapas</p>
+                                <p className="text-sm text-slate-500 dark:text-slate-400">Proteja sua conta com um nível extra de segurança.</p>
+                              </div>
+                            </div>
+                            <div className="relative inline-flex items-center cursor-pointer">
+                              <input type="checkbox" className="sr-only peer" defaultChecked />
+                              <div className="w-12 h-6.5 bg-slate-300 dark:bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                            </div>
+                         </div>
+                      </div>
+
+                      <div className="p-6 bg-slate-100/50 dark:bg-white/5 rounded-[2rem] border border-black/5 dark:border-white/5 flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="size-12 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-500 flex items-center justify-center">
+                            <Lock size={24} />
+                          </div>
+                          <div>
+                            <p className="font-bold text-slate-900 dark:text-white">Alterar Senha</p>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">Recomendamos trocar a senha a cada 90 dias.</p>
+                          </div>
+                        </div>
+                        <button className="px-5 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-black/5 dark:border-white/10 text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all">
+                          Atualizar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {activeTab === 'notifications' && (
+                <motion.div
+                  key="notifications"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.2 }}
+                  className="bg-white/40 dark:bg-slate-900/40 border border-black/5 dark:border-white/10 rounded-[2.5rem] p-8 space-y-8 shadow-sm backdrop-blur-md"
+                >
+                  <div className="space-y-6">
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-white border-b border-black/5 dark:border-white/5 pb-4">Preferências de Notificação</h3>
+                    
+                    <div className="grid grid-cols-1 gap-6">
+                      <div className="p-8 bg-slate-100/50 dark:bg-white/5 rounded-[2rem] border border-black/5 dark:border-white/10 flex flex-col md:flex-row md:items-center justify-between gap-6 transition-all">
+                        <div className="flex items-start gap-4">
+                          <div className={`size-14 rounded-[1.2rem] flex items-center justify-center transition-colors ${pushEnabled ? 'bg-primary/10 text-primary' : 'bg-slate-200 dark:bg-white/10 text-slate-400'}`}>
+                            <Smartphone size={28} />
+                          </div>
+                          <div>
+                            <p className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+                              Notificações Push
+                              {pushEnabled && <CheckCircle2 size={16} className="text-emerald-500" />}
+                            </p>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-sm">
+                              Receba alertas de vencimento, pagamentos aprovados e gols em tempo real direto no seu dispositivo.
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-4">
+                          {checkingPush && <Loader2 className="animate-spin text-primary" size={18} />}
+                          <div 
+                            onClick={!checkingPush ? togglePush : undefined}
+                            className={`relative inline-flex items-center cursor-pointer transition-all ${checkingPush ? 'opacity-50 cursor-wait' : ''}`}
+                          >
+                            <div className={`w-14 h-7 rounded-full transition-colors duration-300 ${pushEnabled ? 'bg-primary' : 'bg-slate-300 dark:bg-slate-700'}`}>
+                              <div className={`absolute top-1 left-1 bg-white size-5 rounded-full transition-transform duration-300 shadow-sm ${pushEnabled ? 'translate-x-7' : 'translate-x-0'}`} />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-6 rounded-2xl bg-amber-500/5 border border-amber-500/10 flex items-start gap-3">
+                        <AlertCircle className="text-amber-500 shrink-0" size={20} />
+                        <p className="text-xs text-amber-700 dark:text-amber-400/80 leading-relaxed font-medium">
+                          Nota: Notificações push requerem um navegador compatível e o Service Worker registrado. 
+                          Se você não estiver recebendo, certifique-se de que permitiu as notificações nas configurações do navegador.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </div>

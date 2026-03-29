@@ -76,3 +76,26 @@ export async function subscribeUserToPush(email: string, username?: string, admi
     console.warn('[Push] Navegador não suporta Service Worker ou Push Manager.');
   }
 }
+export async function unsubscribeFromPush(email: string) {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+  try {
+    const register = await navigator.serviceWorker.ready;
+    const subscription = await register.pushManager.getSubscription();
+
+    if (subscription) {
+      await subscription.unsubscribe();
+      console.log('[Push] Inscrição removida do navegador.');
+
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://itwf.onrender.com';
+      await fetch(`${apiUrl}/api/unsubscribe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, subscription_json: JSON.stringify(subscription) })
+      });
+      console.log('[Push] Inscrição removida do servidor.');
+    }
+  } catch (err: any) {
+    console.error('[Push Unsubscribe Error]', err.message);
+  }
+}

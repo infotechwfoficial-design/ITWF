@@ -314,6 +314,16 @@ async function startServer() {
     res.status(201).json({ success: true });
   });
 
+  app.post('/api/unsubscribe', async (req, res) => {
+    const { email, subscription_json } = req.body;
+    if (subscription_json) {
+      await supabase.from('push_subscriptions').delete().eq('subscription_json', subscription_json);
+    } else if (email) {
+      await supabase.from('push_subscriptions').delete().eq('email', email);
+    }
+    res.json({ success: true });
+  });
+
   app.post('/api/register-fcm', async (req, res) => {
     const { email, token, device_type } = req.body;
     const { data: client } = await supabase.from('clients').select('user_id').eq('email', email).maybeSingle();
