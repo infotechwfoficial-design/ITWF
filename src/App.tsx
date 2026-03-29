@@ -294,69 +294,72 @@ export default function App() {
 
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
-        </Suspens      {/* PWA Update Modal Centralizado */}
-      <AnimatePresence>
-        {(needRefresh && !updateDismissed) && (
-          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-6">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-950/60 backdrop-blur-md"
-              onClick={close}
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-sm bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 shadow-2xl border border-white/10 flex flex-col items-center text-center gap-6"
-            >
-              <div className="size-20 rounded-3xl bg-primary/10 text-primary flex items-center justify-center animate-bounce shadow-inner">
-                <RefreshCw size={40} />
-              </div>
-              
-              <div className="space-y-2">
-                <h4 className="font-black text-2xl text-slate-900 dark:text-white tracking-tight uppercase">
-                  Nova Atualização!
-                </h4>
-                <p className="text-sm text-slate-500 dark:text-slate-400 font-medium leading-relaxed px-4">
-                  Lançamos melhorias críticas de performance e segurança para sua experiência.  
-                </p>
-              </div>
-              
-              <div className="flex flex-col gap-3 w-full">
-                <button
-                  onClick={() => {
-                    sessionStorage.removeItem('pwa_update_dismissed');
-                    updateServiceWorker(true);
-                    // Fallback: se não recarregar em 1.5s, força o recarregamento
-                    setTimeout(() => window.location.reload(), 1500);
-                  }}
-                  className="w-full bg-primary hover:bg-primary/90 text-white py-4 rounded-2xl text-sm font-black uppercase tracking-widest shadow-xl shadow-primary/30 transition-all active:scale-95"
-                >
-                  ATUALIZAR AGORA 🚀
-                </button>
-                <button
-                  onClick={close}
-                  className="w-full bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 dark:text-slate-400 py-3 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all"
-                >
-                  DEIXAR PARA DEPOIS
-                </button>
-              </div>
-            </motion.div>
-          </div>
+        </Suspense>
+        </Router>
+
+        {/* PWA Update Modal Centralizado */}
+        <AnimatePresence>
+          {(needRefresh && !updateDismissed) && (
+            <div className="fixed inset-0 z-[99999] flex items-center justify-center p-6">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="absolute inset-0 bg-slate-950/60 backdrop-blur-md"
+                onClick={close}
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                className="relative w-full max-w-sm bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 shadow-2xl border border-white/10 flex flex-col items-center text-center gap-6"
+              >
+                <div className="size-20 rounded-3xl bg-primary/10 text-primary flex items-center justify-center animate-bounce shadow-inner">
+                  <RefreshCw size={40} />
+                </div>
+                
+                <div className="space-y-2">
+                  <h4 className="font-black text-2xl text-slate-900 dark:text-white tracking-tight uppercase">
+                    Nova Atualização!
+                  </h4>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 font-medium leading-relaxed px-4">
+                    Lançamos melhorias críticas de performance e segurança para sua experiência.  
+                  </p>
+                </div>
+                
+                <div className="flex flex-col gap-3 w-full">
+                  <button
+                    onClick={() => {
+                      sessionStorage.removeItem('pwa_update_dismissed');
+                      updateServiceWorker(true);
+                      // Fallback: se não recarregar em 1.5s, força o recarregamento
+                      setTimeout(() => window.location.reload(), 1500);
+                    }}
+                    className="w-full bg-primary hover:bg-primary/90 text-white py-4 rounded-2xl text-sm font-black uppercase tracking-widest shadow-xl shadow-primary/30 transition-all active:scale-95"
+                  >
+                    ATUALIZAR AGORA 🚀
+                  </button>
+                  <button
+                    onClick={close}
+                    className="w-full bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 dark:text-slate-400 py-3 rounded-2xl text-xs font-bold uppercase tracking-widest transition-all"
+                  >
+                    DEIXAR PARA DEPOIS
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {showInstallModal && (
+          <PWAInstallModal
+            deferredPrompt={deferredPrompt}
+            onClose={() => {
+              setShowInstallModal(false);
+              localStorage.setItem('pwa_install_dismissed', 'true');
+            }}
+          />
         )}
-      </AnimatePresence>       )}
-      </AnimatePresence>
-      {showInstallModal && (
-        <PWAInstallModal
-          deferredPrompt={deferredPrompt}
-          onClose={() => {
-            setShowInstallModal(false);
-            localStorage.setItem('pwa_install_dismissed', 'true');
-          }}
-        />
-      )}
       </ThemeProvider>
     </ErrorBoundary>
   );
