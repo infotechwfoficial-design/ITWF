@@ -46,6 +46,11 @@ export default function Settings() {
   }, []);
 
   const fetchProfile = async () => {
+    const timeout = setTimeout(() => {
+      setLoading(false);
+      console.warn('Settings: Timeout de 8s no carregamento do perfil.');
+    }, 8000);
+
     try {
       setLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
@@ -59,9 +64,11 @@ export default function Settings() {
         .from('clients')
         .select('*')
         .eq('user_id', session.user.id)
-        .single();
+        .maybeSingle();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Settings: Erro ao buscar dados:', error);
+      }
 
       if (data) {
         setProfile(data);
@@ -76,6 +83,7 @@ export default function Settings() {
       console.error('Error fetching profile:', error);
     } finally {
       setLoading(false);
+      clearTimeout(timeout);
     }
   };
 

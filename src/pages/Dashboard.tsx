@@ -109,16 +109,30 @@ export default function Dashboard() {
     let channel: any;
 
     const fetchDashboardData = async () => {
+      // Timeout de segurança: se carregar por mais de 5s, libera a tela
+      const timeout = setTimeout(() => {
+        setLoading(prev => {
+          if (prev) {
+            console.warn('Dashboard: Timeout de 5s atingido. Forçando abertura do painel.');
+            return false;
+          }
+          return prev;
+        });
+      }, 5000);
+
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        console.log('Dashboard: Iniciando busca de dados...');
+        const { data: { session } } = await supabase.auth.getSession();
+        const user = session?.user;
 
         if (!user) {
+          console.log('Dashboard: Nenhum usuário encontrado na sessão.');
           setLoading(false);
+          clearTimeout(timeout);
           return;
         }
 
         // 1. CARREGAMENTO ESSENCIAL: Perfil do Cliente
-        // Buscamos o cliente de forma independente para liberar o loading principal o quanto antes
         const { data: clientData, error: clientError } = await supabase
           .from('clients')
           .select('*')
@@ -151,6 +165,7 @@ export default function Dashboard() {
 
         // LIBERAMOS O LOADING PRINCIPAL AQUI
         setLoading(false);
+        clearTimeout(timeout);
 
         // 2. CARREGAMENTO SECUNDÁRIO: Pedidos e Agenda (Em paralelo, sem travar o UI)
         fetchSecondaryData(user.id);
@@ -172,6 +187,7 @@ export default function Dashboard() {
       } catch (err) {
         console.error('Dashboard: Erro crítico no carregamento:', err);
         setLoading(false);
+        clearTimeout(timeout);
       }
     };
 

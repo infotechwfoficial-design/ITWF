@@ -106,16 +106,18 @@ export default function App() {
 
     checkSession();
 
-    // Aviso após 15 segundos se ainda estiver no carregamento inicial
-    const loadingTimer = setTimeout(() => {
-      setSessionTimeout(prev => {
-        // Só ativa o timeout se ainda não há estado definido
-        if (isAuthenticated === null) return true;
-        return prev;
-      });
-    }, 15000);
+    checkSession();
 
-    return () => clearTimeout(loadingTimer);
+    // Timeout de segurança: se o App ficar preso em "null" (Carregando Experiência) por mais de 10s, 
+    // forçamos uma decisão para não travar o usuário.
+    const safetyTimer = setTimeout(() => {
+      if (isAuthenticated === null) {
+        console.warn('App: timeout de segurança atingido. Forçando redirecionamento.');
+        setIsAuthenticated(false);
+      }
+    }, 10000);
+
+    return () => clearTimeout(safetyTimer);
   }, []); // <- Array vazio: executa apenas na montagem
 
   // Efeito 2: Listener de mudanças de autenticação em tempo real
