@@ -248,6 +248,9 @@ export default function Settings() {
               <button
                 onClick={async () => {
                   await supabase.auth.signOut();
+                  localStorage.removeItem('isAdminAuthenticated');
+                  localStorage.removeItem('adminRole');
+                  localStorage.removeItem('currentUser');
                   navigate('/');
                 }}
                 className="w-full flex items-center justify-between px-5 py-4 text-rose-500 hover:bg-rose-500/10 transition-colors font-bold text-sm border-t border-black/5 dark:border-white/5"

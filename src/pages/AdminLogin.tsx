@@ -16,15 +16,24 @@ export default function AdminLogin() {
     setLoading(true);
     setError('');
 
+    // Timeout de segurança: se algo travar, libera o botão após 15 segundos
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+      setError('A operação demorou mais que o esperado. Verifique sua conexão e tente novamente.');
+    }, 15000);
+
     try {
       const normalizedEmail = email.trim().toLowerCase();
-      
-      const { data, error } = await supabase.auth.signInWithPassword({
+
+      // Garante que não há sessão conflitante antes de logar
+      await supabase.auth.signOut();
+
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email: normalizedEmail,
         password
       });
 
-      if (error) throw error;
+      if (signInError) throw signInError;
 
       if (data.user) {
         // Verificar se o usuário está na tabela de admins
@@ -35,19 +44,23 @@ export default function AdminLogin() {
           .single();
 
         if (adminError || !adminData) {
+          // Não é admin: faz logout e exibe erro
           await supabase.auth.signOut();
           throw new Error('Acesso negado. Você não tem permissão administrativa para acessar este painel.');
         }
 
         localStorage.setItem('isAdminAuthenticated', 'true');
         localStorage.setItem('adminRole', adminData.role);
+        clearTimeout(safetyTimer);
         navigate('/admin');
       }
     } catch (err: any) {
       let msg = err.message || 'Credenciais administrativas inválidas.';
       if (msg.includes('Invalid login credentials')) msg = 'E-mail ou senha administrativos incorretos.';
+      if (msg.includes('Email not confirmed')) msg = 'Por favor, confirme seu e-mail antes de entrar.';
       setError(msg);
     } finally {
+      clearTimeout(safetyTimer);
       setLoading(false);
     }
   };

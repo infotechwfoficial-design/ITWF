@@ -63,6 +63,10 @@ export default function Sidebar({ items, title = "ITWF", logoUrl = "/logo.png", 
 
   const handleLogout = onLogout || (async () => {
     await supabase.auth.signOut();
+    // Limpar dados administrativos do cache local
+    localStorage.removeItem('isAdminAuthenticated');
+    localStorage.removeItem('adminRole');
+    localStorage.removeItem('currentUser');
     navigate('/');
   });
 

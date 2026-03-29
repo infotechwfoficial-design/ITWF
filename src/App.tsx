@@ -66,6 +66,7 @@ export default function App() {
     setNeedRefresh(false);
   };
 
+  // Efeito 1: Verificação INICIAL da sessão (executa apenas uma vez)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const referralId = params.get('ref');
@@ -75,25 +76,23 @@ export default function App() {
 
     const checkSession = async () => {
       try {
-        console.log('App: Verificando sessão e permissões...');
-        
-        // Removido timeout de 10s para evitar falhas em conexões lentas
+        console.log('App: Verificando sessão inicial...');
         const { data: { session } } = await supabase.auth.getSession();
-        
+
         if (session?.user) {
-          setIsAuthenticated(true);
           const { data: adminData } = await supabase
             .from('admins')
             .select('id')
             .eq('user_id', session.user.id)
             .maybeSingle();
           setIsAdmin(!!adminData);
+          setIsAuthenticated(true);
         } else {
           setIsAuthenticated(false);
           setIsAdmin(false);
         }
       } catch (err) {
-        console.error('App: Erro ou Timeout na inicialização:', err);
+        console.error('App: Erro na verificação de sessão inicial:', err);
         setIsAuthenticated(false);
         setIsAdmin(false);
       }
@@ -101,22 +100,41 @@ export default function App() {
 
     checkSession();
 
-    // Adiciona um aviso após 15 segundos se ainda estiver carregando
+    // Aviso após 15 segundos se ainda estiver no carregamento inicial
     const loadingTimer = setTimeout(() => {
-      if (isAuthenticated === null) {
-        setSessionTimeout(true);
-      }
+      setSessionTimeout(prev => {
+        // Só ativa o timeout se ainda não há estado definido
+        if (isAuthenticated === null) return true;
+        return prev;
+      });
     }, 15000);
 
+    return () => clearTimeout(loadingTimer);
+  }, []); // <- Array vazio: executa apenas na montagem
+
+  // Efeito 2: Listener de mudanças de autenticação em tempo real
+  useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      console.log('App: Auth state changed ->', _event);
+
       if (_event === 'PASSWORD_RECOVERY') {
         window.location.href = '/update-password';
         return;
       }
 
+      if (_event === 'SIGNED_OUT') {
+        // Limpa tudo e redireciona
+        localStorage.removeItem('isAdminAuthenticated');
+        localStorage.removeItem('adminRole');
+        localStorage.removeItem('currentUser');
+        setIsAuthenticated(false);
+        setIsAdmin(false);
+        return;
+      }
+
       const isAuth = !!session;
       setIsAuthenticated(isAuth);
-      
+
       if (isAuth && session?.user) {
         const { data: adminData } = await supabase
           .from('admins')
@@ -129,11 +147,8 @@ export default function App() {
       }
     });
 
-    return () => {
-      subscription.unsubscribe();
-      clearTimeout(loadingTimer);
-    };
-  }, [isAuthenticated]);
+    return () => subscription.unsubscribe();
+  }, []); // <- Array vazio: registra o listener apenas uma vez
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: any) => {
