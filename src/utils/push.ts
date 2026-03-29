@@ -24,8 +24,12 @@ export async function subscribeUserToPush(email: string, username?: string, admi
       // 1. Solicitar permissão se ainda não foi concedida
       if (Notification.permission === 'default') {
         const permission = await Notification.requestPermission();
-        if (permission !== 'granted') return;
+        if (permission !== 'granted') {
+          console.log('[Push] Permissão negada pelo usuário.');
+          return;
+        }
       } else if (Notification.permission === 'denied') {
+        console.warn('[Push] Permissão já está bloqueada no navegador.');
         return;
       }
 
@@ -37,6 +41,7 @@ export async function subscribeUserToPush(email: string, username?: string, admi
 
       if (!subscription) {
         // Só cria nova subscription se ainda não existe uma
+        console.log('[Push] Criando nova inscrição...');
         subscription = await register.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
@@ -44,21 +49,30 @@ export async function subscribeUserToPush(email: string, username?: string, admi
       }
 
       // 4. Enviar (ou re-confirmar) ao servidor
-      const apiUrl = import.meta.env.VITE_API_URL || '';
-      try {
-        await fetch(`${apiUrl}/api/subscribe`, {
-          method: 'POST',
-          body: JSON.stringify({ email, username, subscription, adminId }),
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-      } catch (fetchErr) {
-        console.warn('Não foi possível registrar push no servidor:', fetchErr);
+      // DETERMINAÇÃO DINÂMICA DA API: Prioriza VITE_API_URL, depois URL da Render conhecida, depois localhost
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://itwf.onrender.com';
+      
+      console.log('[Push] Registrando inscrição no servidor:', apiUrl);
+      
+      const response = await fetch(`${apiUrl}/api/subscribe`, {
+        method: 'POST',
+        body: JSON.stringify({ email, username, subscription, adminId }),
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `Erro HTTP: ${response.status}`);
       }
 
+      console.log('[Push] Usuário registrado com sucesso no servidor.');
+
     } catch (err: any) {
-      console.error('Erro no push:', err);
+      console.error('[Push Client Error]', err.message);
     }
+  } else {
+    console.warn('[Push] Navegador não suporta Service Worker ou Push Manager.');
   }
 }

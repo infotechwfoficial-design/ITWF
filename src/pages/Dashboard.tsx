@@ -88,6 +88,8 @@ export default function Dashboard() {
   const [client, setClient] = useState<Client | null>(null);
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingRequests, setLoadingRequests] = useState(false);
+  const [loadingSports, setLoadingSports] = useState(false);
   const [sportsAgenda, setSportsAgenda] = useState<string | null>(null);
   
   // Quick Edit States
@@ -106,71 +108,101 @@ export default function Dashboard() {
   useEffect(() => {
     let channel: any;
 
-    const fetchUserData = async () => {
+    const fetchDashboardData = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
 
-        if (user) {
-          // Inscrição Realtime para Pedidos
-          channel = supabase
-            .channel(`user_requests_${user.id}`)
-            .on(
-              'postgres_changes',
-              {
-                event: '*',
-                schema: 'public',
-                table: 'requests',
-                filter: `user_id=eq.${user.id}`
-              },
-              (payload) => {
-                if (payload.eventType === 'INSERT') {
-                  setRequests(prev => [payload.new, ...prev]);
-                } else if (payload.eventType === 'UPDATE') {
-                  setRequests(prev => prev.map(req => req.id === payload.new.id ? payload.new : req));
-                } else if (payload.eventType === 'DELETE') {
-                  setRequests(prev => prev.filter(req => req.id !== payload.old.id));
-                }
-              }
-            )
-            .subscribe();
+        if (!user) {
+          setLoading(false);
+          return;
+        }
 
-          // BUSCA EM PARALELO - TIMEOUT REMOVIDO PARA ESTABILIDADE
-          const [clientRes, requestsRes, agendaRes] = await Promise.all([
-            supabase.from('clients').select('*').eq('user_id', user.id).single(),
-            supabase.from('requests').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-            supabase.from('notifications').select('message').eq('title', '⚽ Agenda Esportiva').order('created_at', { ascending: false }).limit(1).maybeSingle()
-          ]);
+        // 1. CARREGAMENTO ESSENCIAL: Perfil do Cliente
+        // Buscamos o cliente de forma independente para liberar o loading principal o quanto antes
+        const { data: clientData, error: clientError } = await supabase
+          .from('clients')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle();
 
-          if (clientRes.data) {
-            const clientData = clientRes.data;
-            setClient(clientData);
-            
-            if ('Notification' in window && Notification.permission === 'default') {
-              setShowPushBanner(true);
-            } else if ('Notification' in window && Notification.permission === 'granted') {
-              subscribeUserToPush(clientData.email, clientData.username, clientData.admin_id);
-            }
+        if (clientError) {
+          console.error('Erro ao buscar dados do cliente:', clientError);
+        }
 
-            if (!clientData.onboarding_completed) {
-              setShowWelcomeModal(true);
-            } else {
-              const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
-              const pwaTutorialSeen = localStorage.getItem('pwa_tutorial_seen') === 'true';
-              if (isStandalone && !pwaTutorialSeen) setShowWelcomeModal(true);
-            }
+        if (clientData) {
+          setClient(clientData);
+          
+          // Configuração de Notificações
+          if ('Notification' in window && Notification.permission === 'default') {
+            setShowPushBanner(true);
+          } else if ('Notification' in window && Notification.permission === 'granted') {
+            subscribeUserToPush(clientData.email, clientData.username, clientData.admin_id);
           }
 
-          if (requestsRes.data) setRequests(requestsRes.data);
-          if (agendaRes.data) setSportsAgenda(agendaRes.data.message);
+          // Modal de boas-vindas
+          if (!clientData.onboarding_completed) {
+            setShowWelcomeModal(true);
+          } else {
+            const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
+            const pwaTutorialSeen = localStorage.getItem('pwa_tutorial_seen') === 'true';
+            if (isStandalone && !pwaTutorialSeen) setShowWelcomeModal(true);
+          }
         }
+
+        // LIBERAMOS O LOADING PRINCIPAL AQUI
+        setLoading(false);
+
+        // 2. CARREGAMENTO SECUNDÁRIO: Pedidos e Agenda (Em paralelo, sem travar o UI)
+        fetchSecondaryData(user.id);
+
+        // 3. REALTIME CHANNEL
+        channel = supabase
+          .channel(`user_requests_${user.id}`)
+          .on(
+            'postgres_changes',
+            { event: '*', schema: 'public', table: 'requests', filter: `user_id=eq.${user.id}` },
+            (payload) => {
+              if (payload.eventType === 'INSERT') setRequests(prev => [payload.new, ...prev]);
+              else if (payload.eventType === 'UPDATE') setRequests(prev => prev.map(req => req.id === payload.new.id ? payload.new : req));
+              else if (payload.eventType === 'DELETE') setRequests(prev => prev.filter(req => req.id !== payload.old.id));
+            }
+          )
+          .subscribe();
+
       } catch (err) {
-        console.error('Dashboard: Erro ou Timeout ao carregar dados:', err);
-      } finally {
+        console.error('Dashboard: Erro crítico no carregamento:', err);
         setLoading(false);
       }
     };
 
-    fetchUserData();
+    const fetchSecondaryData = async (uid: string) => {
+      setLoadingRequests(true);
+      setLoadingSports(true);
+
+      // BUSCA PEDIDOS
+      supabase.from('requests')
+        .select('*')
+        .eq('user_id', uid)
+        .order('created_at', { ascending: false })
+        .then(({ data }) => {
+          if (data) setRequests(data);
+          setLoadingRequests(false);
+        });
+
+      // BUSCA AGENDA ESPORTIVA (Com Cache)
+      supabase.from('notifications')
+        .select('message')
+        .eq('title', '⚽ Agenda Esportiva')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data) setSportsAgenda(data.message);
+          setLoadingSports(false);
+        });
+    };
+
+    fetchDashboardData();
 
     return () => {
       if (channel) supabase.removeChannel(channel);
@@ -453,7 +485,7 @@ export default function Dashboard() {
             </div>
           </motion.div>
 
-          {sportsAgenda && (
+          {sportsAgenda ? (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -461,12 +493,12 @@ export default function Dashboard() {
             >
               <div className="flex items-center gap-4">
                 <div className="size-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-lg shadow-amber-500/20 shrink-0">
-                  <Zap size={22} />
+                  <Zap size={22} className={loadingSports ? "animate-pulse" : ""} />
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-slate-900 dark:text-white">Jogos de Hoje ⚽</h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1 max-w-[250px] md:max-w-md">
-                    {sportsAgenda}
+                    {loadingSports ? "Atualizando arena..." : sportsAgenda}
                   </p>
                 </div>
               </div>
@@ -474,7 +506,15 @@ export default function Dashboard() {
                 Ver na Arena
               </Link>
             </motion.div>
-          )}
+          ) : loadingSports ? (
+            <div className="md:col-span-3 h-24 rounded-3xl bg-slate-100 dark:bg-white/5 animate-pulse flex items-center px-8 gap-4">
+              <div className="size-12 rounded-2xl bg-slate-200 dark:bg-slate-800"></div>
+              <div className="flex-1 space-y-2">
+                <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-1/4"></div>
+                <div className="h-3 bg-slate-200 dark:bg-slate-800 rounded w-full"></div>
+              </div>
+            </div>
+          ) : null}
 
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
@@ -583,16 +623,24 @@ export default function Dashboard() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {requests.map((req) => (
-              <RequestCard key={req.id} req={req} />
-            ))}
-            {requests.length === 0 && (
-              <div className="col-span-full py-10 bg-slate-50 dark:bg-white/5 rounded-3xl border border-dashed border-black/10 dark:border-white/10 text-center">
-                <p className="text-slate-500 text-sm italic">Você ainda não fez nenhum pedido de conteúdo.</p>
-                <Link to="/request-content" className="text-primary text-sm font-bold hover:underline mt-2 inline-block">
-                  Começar a pedir agora
-                </Link>
-              </div>
+            {loadingRequests ? (
+              [1, 2, 3].map(n => (
+                <div key={n} className="h-32 rounded-3xl bg-slate-100 dark:bg-white/5 animate-pulse"></div>
+              ))
+            ) : (
+              <>
+                {requests.map((req) => (
+                  <RequestCard key={req.id} req={req} />
+                ))}
+                {requests.length === 0 && (
+                  <div className="col-span-full py-10 bg-slate-50 dark:bg-white/5 rounded-3xl border border-dashed border-black/10 dark:border-white/10 text-center">
+                    <p className="text-slate-500 text-sm italic">Você ainda não fez nenhum pedido de conteúdo.</p>
+                    <Link to="/request-content" className="text-primary text-sm font-bold hover:underline mt-2 inline-block">
+                      Começar a pedir agora
+                    </Link>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </section>
