@@ -106,8 +106,6 @@ export default function App() {
 
     checkSession();
 
-    checkSession();
-
     // Timeout de segurança: se o App ficar preso em "null" (Carregando Experiência) por mais de 10s, 
     // forçamos uma decisão para não travar o usuário.
     const safetyTimer = setTimeout(() => {
@@ -332,10 +330,14 @@ export default function App() {
                 <div className="flex flex-col gap-3 w-full">
                   <button
                     onClick={() => {
+                      console.log('[PWA] Iniciando atualização crítica...');
                       sessionStorage.removeItem('pwa_update_dismissed');
                       updateServiceWorker(true);
-                      // Fallback: se não recarregar em 1.5s, força o recarregamento
-                      setTimeout(() => window.location.reload(), 1500);
+                      // Fallback: se não recarregar em 1.5s (skipWaiting falhou ou demorou), força o recarregamento
+                      setTimeout(() => {
+                        console.warn('[PWA] Fallback de recarregamento ativado.');
+                        window.location.reload();
+                      }, 2000);
                     }}
                     className="w-full bg-primary hover:bg-primary/90 text-white py-4 rounded-2xl text-sm font-black uppercase tracking-widest shadow-xl shadow-primary/30 transition-all active:scale-95"
                   >
