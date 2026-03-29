@@ -68,7 +68,13 @@ async function startServer() {
     credentials: true
   }));
 
-  app.use(express.json());
+  app.use(express.json({
+    verify: (req: any, res, buf) => {
+      if (req.originalUrl.startsWith('/api/webhooks/stripe')) {
+        req.rawBody = buf;
+      }
+    }
+  }));
 
   // Chatbot Gemini Endpoint
   app.post('/api/chat', async (req, res) => {
@@ -495,8 +501,33 @@ async function startServer() {
   // Webhook Stripe
   app.post('/api/webhooks/stripe', async (req, res) => {
     try {
-      // Nota: Para produção, deveríamos validar a assinatura com stripe.webhooks.constructEvent
-      const event = req.body;
+      const sig = req.headers['stripe-signature'];
+      
+      // 1. Tentar pegar o segredo do banco de dados (payment_settings)
+      const { data: setting } = await supabase.from('payment_settings').select('webhook_secret').eq('provider', 'stripe').single();
+      let webhookSecret = setting?.webhook_secret || process.env.STRIPE_WEBHOOK_SECRET;
+
+      if (!webhookSecret) {
+        console.warn('[Stripe Webhook] Aviso: Webhook Secret não configurado no banco ou no .env.');
+        // Para não quebrar durante migração, se não houver segredo, fazemos o processamento simples como fallback temporário
+        // ou você pode forçar erro: throw new Error('STRIPE_WEBHOOK_SECRET não configurado.');
+      }
+
+      let event;
+
+      if (webhookSecret && sig) {
+        try {
+          // Criamos o cliente stripe aqui pois as credenciais podem vir do banco também se necessário
+          const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', { apiVersion: '2025-02-24' as any });
+          event = stripe.webhooks.constructEvent((req as any).rawBody, sig, webhookSecret);
+        } catch (err: any) {
+          console.error(`[Stripe Webhook] Erro de assinatura: ${err.message}`);
+          return res.status(400).send(`Webhook Error: ${err.message}`);
+        }
+      } else {
+        // Fallback inseguro se não houver segredo (comportamento anterior) até configurar
+        event = req.body;
+      }
 
       if (event.type === 'checkout.session.completed') {
         const session = event.data.object;
@@ -504,9 +535,9 @@ async function startServer() {
       }
 
       res.json({ received: true });
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro no Webhook do Stripe:', err);
-      res.status(400).send(`Erro no Webhook`);
+      res.status(400).send(`Erro no Webhook: ${err.message}`);
     }
   });
 

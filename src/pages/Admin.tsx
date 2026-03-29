@@ -39,6 +39,7 @@ import { motion } from 'motion/react';
 import { Client, Notification, Plan } from '../types';
 import { supabase } from '../utils/supabase';
 import Toast from '../components/Toast';
+import ConfirmModal from '../components/ConfirmModal';
 
 interface ToastState {
   message: string;
@@ -335,6 +336,34 @@ export default function Admin() {
     type: 'info' as Notification['type']
   });
 
+  // Confirm Modal State
+  const [confirmConfig, setConfirmConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    type: 'danger' | 'info' | 'warning';
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    type: 'info'
+  });
+
+  const openConfirm = (title: string, message: string, onConfirm: () => void, type: 'danger' | 'info' | 'warning' = 'info') => {
+    setConfirmConfig({
+      isOpen: true,
+      title,
+      message,
+      onConfirm: async () => {
+        await onConfirm();
+        setConfirmConfig(prev => ({ ...prev, isOpen: false }));
+      },
+      type
+    });
+  };
+
   const openEditPlan = useCallback((plan: Plan) => {
     setEditingPlan(plan);
     setPlanForm({
@@ -352,13 +381,27 @@ export default function Admin() {
         const { data: { user } } = await supabase.auth.getUser();
 
         if (user) {
-          const role = localStorage.getItem('adminRole') || 'admin';
-          setCurrentAdmin({ id: user.id, role });
+          // BUSCA SEGURA: Buscar o role diretamente do banco de dados, ignorando o localStorage
+          const { data: adminData } = await supabase
+            .from('admins')
+            .select('role')
+            .eq('user_id', user.id)
+            .single();
+
+          if (adminData) {
+            setCurrentAdmin({ id: user.id, role: adminData.role });
+            // Opcionalmente atualizamos o localStorage apenas para fins de UI não crítica (ex: mostrar Sidebar)
+            localStorage.setItem('adminRole', adminData.role);
+          } else {
+            // Se o cara está logado mas não é admin (removido da tabela), expulsa
+            await supabase.auth.signOut();
+            navigate('/admin/login');
+          }
         } else {
           navigate('/admin/login');
         }
       } catch (err) {
-        console.error('Admin Check Error:', err);
+        console.error('Erro na verificação de admin:', err);
         navigate('/admin/login');
       }
     };
@@ -399,19 +442,24 @@ export default function Admin() {
     showToast('Link de acesso copiado!', 'success');
   }, [showToast]);
 
-  const deleteClient = async (client: Client) => {
-    if (window.confirm(`Tem certeza que deseja excluir o cliente ${client.name}? Esta ação apagará permanentemente todos os pedidos, faturas e registros de notificação vinculados.`)) {
-      try {
-        setSubmitting(true);
-        await performClientCleanup(client);
-        showToast('Cliente e acesso ao App completamente excluídos!', 'success');
-        fetchClients();
-      } catch (err: any) {
-        showToast('Erro crítico ao excluir conta do cliente: ' + err.message, 'error');
-      } finally {
-        setSubmitting(false);
-      }
-    }
+  const deleteClient = (client: Client) => {
+    openConfirm(
+      'Excluir Cliente',
+      `Tem certeza que deseja excluir o cliente ${client.name}? Esta ação apagará permanentemente todos os pedidos, faturas e registros de notificação vinculados.`,
+      async () => {
+        try {
+          setSubmitting(true);
+          await performClientCleanup(client);
+          showToast('Cliente e acesso ao App completamente excluídos!', 'success');
+          fetchClients();
+        } catch (err: any) {
+          showToast('Erro crítico ao excluir conta do cliente: ' + err.message, 'error');
+        } finally {
+          setSubmitting(false);
+        }
+      },
+      'danger'
+    );
   };
 
   const fetchAdminSettings = async () => {
@@ -859,13 +907,18 @@ export default function Admin() {
     }
   };
 
-  const deleteNotif = async (id: number) => {
-    if (window.confirm('Tem certeza que deseja excluir esta notificação?')) {
-      const apiUrl = import.meta.env.VITE_API_URL || '';
-      await fetch(`${apiUrl}/api/notifications/${id}`, { method: 'DELETE' });
-      fetchNotifications();
-      showToast('Notificação excluída.', 'success');
-    }
+  const deleteNotif = (id: number) => {
+    openConfirm(
+      'Excluir Notificação',
+      'Tem certeza que deseja excluir esta notificação?',
+      async () => {
+        const apiUrl = import.meta.env.VITE_API_URL || '';
+        await fetch(`${apiUrl}/api/notifications/${id}`, { method: 'DELETE' });
+        fetchNotifications();
+        showToast('Notificação excluída.', 'success');
+      },
+      'danger'
+    );
   };
 
   const sendSportsAgenda = async () => {
@@ -918,17 +971,22 @@ export default function Admin() {
     }
   };
 
-  const deletePlan = async (id: number) => {
-    if (window.confirm('Tem certeza que deseja excluir este plano?')) {
-      try {
-        const apiUrl = import.meta.env.VITE_API_URL || '';
-        await fetch(`${apiUrl}/api/plans/${id}`, { method: 'DELETE' });
-        showToast('Plano excluído com sucesso!', 'success');
-        fetchPlans();
-      } catch (err) {
-        showToast('Erro ao excluir plano.', 'error');
-      }
-    }
+  const deletePlan = (id: number) => {
+    openConfirm(
+      'Excluir Plano',
+      'Tem certeza que deseja excluir este plano?',
+      async () => {
+        try {
+          const apiUrl = import.meta.env.VITE_API_URL || '';
+          await fetch(`${apiUrl}/api/plans/${id}`, { method: 'DELETE' });
+          showToast('Plano excluído com sucesso!', 'success');
+          fetchPlans();
+        } catch (err) {
+          showToast('Erro ao excluir plano.', 'error');
+        }
+      },
+      'danger'
+    );
   };
 
 
@@ -972,57 +1030,62 @@ export default function Admin() {
     }
   };
 
-  const deleteReseller = async (reseller: any) => {
+  const deleteReseller = (reseller: any) => {
     const warning = reseller.clientCount > 0 
       ? `ATENÇÃO: Este revendedor possui ${reseller.clientCount} clientes vinculados. Ao excluir o revendedor, TODOS os seus clientes, pedidos e faturas também serão excluídos permanentemente. Deseja continuar?`
       : `Tem certeza que deseja remover o acesso de revendedor de ${reseller.name || reseller.email}?`;
 
-    if (window.confirm(warning)) {
-      try {
-        setSubmitting(true);
-        
-        // 1. Limpeza em Cascata: Deletar todos os clientes vinculados
-        if (reseller.user_id) {
-          const { data: linkedClients, error: fetchErr } = await supabase
-            .from('clients')
-            .select('*')
-            .eq('admin_id', reseller.user_id);
+    openConfirm(
+      'Excluir Revendedor',
+      warning,
+      async () => {
+        try {
+          setSubmitting(true);
           
-          if (fetchErr) throw fetchErr;
-          
-          if (linkedClients && linkedClients.length > 0) {
-            for (const client of linkedClients) {
-              await performClientCleanup(client);
+          // 1. Limpeza em Cascata: Deletar todos os clientes vinculados
+          if (reseller.user_id) {
+            const { data: linkedClients, error: fetchErr } = await supabase
+              .from('clients')
+              .select('*')
+              .eq('admin_id', reseller.user_id);
+            
+            if (fetchErr) throw fetchErr;
+            
+            if (linkedClients && linkedClients.length > 0) {
+              for (const client of linkedClients) {
+                await performClientCleanup(client);
+              }
+            }
+
+            // 2. Limpar pedidos que possam estar vinculados diretamente ao admin_id
+            await supabase.from('requests').delete().eq('admin_id', reseller.user_id);
+          }
+
+          // 3. Deletar o registro de administrador
+          const { error: adminErr } = await supabase.from('admins').delete().eq('id', reseller.id);
+          if (adminErr) throw adminErr;
+
+          // 3. Deletar a conta no Supabase Auth
+          if (reseller.user_id) {
+            const apiUrl = import.meta.env.VITE_API_URL || '';
+            try {
+              await fetch(`${apiUrl}/api/users/${reseller.user_id}`, { method: 'DELETE' });
+            } catch (err) {
+              console.error('Erro ao remover Auth do revendedor:', err);
             }
           }
 
-          // 2. Limpar pedidos que possam estar vinculados diretamente ao admin_id
-          await supabase.from('requests').delete().eq('admin_id', reseller.user_id);
+          showToast('Revendedor e todos os seus vínculos foram excluídos!', 'success');
+          fetchResellers();
+          fetchClients(); // Atualizar lista de clientes também pois foram apagados em cascata
+        } catch (err: any) {
+          showToast('Erro na exclusão em cascata: ' + err.message, 'error');
+        } finally {
+          setSubmitting(false);
         }
-
-        // 3. Deletar o registro de administrador
-        const { error: adminErr } = await supabase.from('admins').delete().eq('id', reseller.id);
-        if (adminErr) throw adminErr;
-
-        // 3. Deletar a conta no Supabase Auth
-        if (reseller.user_id) {
-          const apiUrl = import.meta.env.VITE_API_URL || '';
-          try {
-            await fetch(`${apiUrl}/api/users/${reseller.user_id}`, { method: 'DELETE' });
-          } catch (err) {
-            console.error('Erro ao remover Auth do revendedor:', err);
-          }
-        }
-
-        showToast('Revendedor e todos os seus vínculos foram excluídos!', 'success');
-        fetchResellers();
-        fetchClients(); // Atualizar lista de clientes também pois foram apagados em cascata
-      } catch (err: any) {
-        showToast('Erro na exclusão em cascata: ' + err.message, 'error');
-      } finally {
-        setSubmitting(false);
-      }
-    }
+      },
+      'danger'
+    );
   };
 
   const handleLogout = () => {
@@ -2280,6 +2343,16 @@ export default function Admin() {
         </div>
       )}
 
+      {/* Confirm Modal Reutilizável */}
+      <ConfirmModal
+        isOpen={confirmConfig.isOpen}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        onConfirm={confirmConfig.onConfirm}
+        onClose={() => setConfirmConfig(prev => ({ ...prev, isOpen: false }))}
+        type={confirmConfig.type}
+        loading={submitting}
+      />
     </Layout>
   );
 }
