@@ -58,6 +58,13 @@ function AppContent() {
     sessionStorage.setItem('pwa_update_dismissed', 'true');
   };
 
+  // Efeito para atualização automática do PWA sem pedir confirmação
+  useEffect(() => {
+    if (needRefresh) {
+      updateServiceWorker(true);
+    }
+  }, [needRefresh, updateServiceWorker]);
+
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
@@ -102,15 +109,6 @@ function AppContent() {
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Suspense>
-
-            <AnimatePresence>
-              {needRefresh && !updateDismissed && (
-                <motion.div initial={{ y: 100 }} animate={{ y: 0 }} className="fixed bottom-6 right-6 z-50 bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-xl">
-                  <p>Nova atualização disponível!</p>
-                  <button onClick={() => updateServiceWorker(true)} className="bg-primary text-white px-4 py-2 mt-2 rounded-lg">Atualizar</button>
-                </motion.div>
-              )}
-            </AnimatePresence>
 
             {showInstallModal && (
               <PWAInstallModal 
