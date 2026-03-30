@@ -451,6 +451,45 @@ async function startServer() {
     }
   });
 
+  app.get('/api/notifications', async (req, res) => {
+    try {
+      const { data, error } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
+      if (error) throw error;
+      res.json(data || []);
+    } catch (err: any) {
+      console.error('[Notifications API Error]', err);
+      res.status(500).json({ error: 'Erro ao carregar notificações' });
+    }
+  });
+
+  app.post('/api/notifications', async (req, res) => {
+    try {
+      const { title, message, type } = req.body;
+      const { data, error } = await supabase.from('notifications').insert([{ title, message, type }]).select().single();
+      if (error) throw error;
+      res.status(201).json(data);
+    } catch (err: any) {
+      console.error('[Notifications API Error]', err);
+      res.status(500).json({ error: 'Erro ao criar notificação' });
+    }
+  });
+
+  app.get('/api/push-stats', async (req, res) => {
+    try {
+      const { adminId } = req.query;
+      let query = supabase.from('push_subscriptions').select('*', { count: 'exact', head: true });
+      if (adminId) {
+        query = query.eq('admin_id', adminId);
+      }
+      const { count, error } = await query;
+      if (error) throw error;
+      res.json({ count: count || 0 });
+    } catch (err: any) {
+      console.error('[Push Stats API Error]', err);
+      res.status(500).json({ error: 'Erro ao buscar estatísticas de push' });
+    }
+  });
+
   // Webhooks
   app.post('/api/webhooks/mercadopago', async (req, res) => {
     try {

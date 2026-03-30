@@ -10,6 +10,7 @@ interface WelcomeModalProps {
 
 const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose, clientName }) => {
   const [currentStep, setCurrentStep] = React.useState(0);
+  const [isVideoFinished, setIsVideoFinished] = React.useState(false);
   const steps = [
     { title: 'Veja como renovar sua assinatura em segundos' },
     { title: 'Aprenda a fazer pedidos de novos conteúdos' },
@@ -19,6 +20,7 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose, clientName
   React.useEffect(() => {
     if (!isOpen) {
       setCurrentStep(0);
+      setIsVideoFinished(false);
       return;
     }
 
@@ -116,17 +118,24 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose, clientName
                   </div>
 
                 <div className="flex flex-col gap-3 mt-4">
-                  <button
-                    onClick={onClose}
-                    className="w-full bg-primary hover:bg-primary/90 text-white px-4 md:px-8 py-4 md:py-6 rounded-xl md:rounded-[1.5rem] font-black uppercase tracking-[0.1em] md:tracking-[0.2em] text-[10px] md:text-sm shadow-[0_15px_40px_-10px_rgba(var(--primary-rgb),0.5)] transition-all active:scale-[0.97] flex items-center justify-center gap-2 md:gap-3 relative overflow-hidden group animate-pulse-subtle"
-                  >
-                    <span className="relative z-10 flex items-center gap-2">
-                      COMEÇAR AGORA <span className="text-xs">▶</span>
-                    </span>
-                    <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-                  </button>
+                  {isVideoFinished ? (
+                    <button
+                      onClick={onClose}
+                      className="w-full bg-primary hover:bg-primary/90 text-white px-4 md:px-8 py-4 md:py-6 rounded-xl md:rounded-[1.5rem] font-black uppercase tracking-[0.1em] md:tracking-[0.2em] text-[10px] md:text-sm shadow-[0_15px_40px_-10px_rgba(var(--primary-rgb),0.5)] transition-all active:scale-[0.97] flex items-center justify-center gap-2 md:gap-3 relative overflow-hidden group animate-pulse-subtle"
+                    >
+                      <span className="relative z-10 flex items-center gap-2">
+                        COMEÇAR AGORA <span className="text-xs">▶</span>
+                      </span>
+                      <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                    </button>
+                  ) : (
+                    <div className="w-full bg-slate-100 dark:bg-white/5 border border-black/5 dark:border-white/5 text-slate-400 dark:text-slate-500 px-4 md:px-8 py-4 md:py-6 rounded-xl md:rounded-[1.5rem] font-bold uppercase tracking-[0.1em] md:tracking-[0.2em] text-[10px] md:text-sm flex items-center justify-center gap-2 md:gap-3 cursor-not-allowed">
+                      <PlayCircle size={18} className="animate-pulse" />
+                      Termine de Assistir para Entrar
+                    </div>
+                  )}
                   <p className="text-center text-[8px] md:text-[10px] text-slate-400 dark:text-slate-600 font-black uppercase tracking-[0.2em] md:tracking-[0.4em]">
-                    Seu acesso está pronto!
+                    {isVideoFinished ? 'Seu acesso está pronto!' : 'Assista ao vídeo da direita'}
                   </p>
                 </div>
               </div>
@@ -138,39 +147,53 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose, clientName
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 size-32 md:size-64 bg-primary/20 rounded-full blur-[60px] md:blur-[100px]"></div>
               
               <div className="w-full max-w-[400px] mx-auto z-10 transition-transform hover:scale-[1.02] duration-500">
-                <div 
-                  className="relative w-full h-0 shadow-[0_30px_60px_rgba(0,0,0,0.6)] overflow-hidden rounded-[2rem] border-2 md:border-4 border-slate-900 dark:border-slate-800"
-                  style={{ paddingTop: '177.7778%', willChange: 'transform' }}
-                >
-                  <iframe 
-                    loading="lazy" 
-                    className="absolute inset-0 w-full h-full border-none p-0 m-0"
-                    src="https://www.canva.com/design/DAHD4du1Sc4/bX4V-gbFTm887xQ65zOIWA/watch?embed" 
-                    allowFullScreen 
-                    allow="fullscreen"
-                    title="Tutorial ITWF"
+                <div className="relative w-full shadow-[0_30px_60px_rgba(0,0,0,0.6)] overflow-hidden rounded-[2rem] border-2 md:border-4 border-slate-900 dark:border-slate-800 bg-black">
+                  <video 
+                    src="/tutorial.mp4" 
+                    autoPlay 
+                    playsInline 
+                    controls 
+                    controlsList="nodownload"
+                    onEnded={() => setIsVideoFinished(true)}
+                    onError={() => setIsVideoFinished(true)}
+                    className="w-full h-auto aspect-[9/16] object-contain"
                   />
+                  
+                  {isVideoFinished && (
+                    <div className="absolute inset-0 z-20 bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-500">
+                      <Sparkles size={48} className="text-primary mb-4 animate-pulse" />
+                      <h3 className="text-white font-black uppercase text-xl md:text-2xl mb-6 leading-tight">Você está<br/>Pronto!</h3>
+                      <button
+                        onClick={onClose}
+                        className="bg-primary hover:bg-primary/90 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-sm shadow-[0_15px_40px_-5px_rgba(var(--primary-rgb),0.6)] transition-all active:scale-[0.97] flex items-center gap-3 animate-pulse-subtle w-full justify-center"
+                      >
+                        Acessar Painel <PlayCircle size={20} />
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="mt-4 text-center">
-                  <a 
-                    href="https://www.canva.com/design/DAHD4du1Sc4/bX4V-gbFTm887xQ65zOIWA/watch?utm_content=DAHD4du1Sc4&utm_campaign=designshare&utm_medium=embeds&utm_source=link" 
-                    target="_blank" 
-                    rel="noopener"
-                    className="text-[10px] text-slate-400 hover:text-primary transition-colors font-bold uppercase tracking-widest"
-                  >
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
                     TUTORIAL ITWF RENOVAÇÕES
-                  </a>
+                  </p>
                 </div>
               </div>
             </div>
               
-            {/* Float Close Button */}
-            <button
-              onClick={onClose}
-              className="absolute top-8 right-8 z-30 p-4 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/20 rounded-2xl transition-all text-white shadow-2xl active:scale-90 group"
-            >
-              <X size={28} className="group-hover:rotate-180 transition-transform duration-500" />
-            </button>
+            {/* Float Close Button - Appears only after video is finished */}
+            <AnimatePresence>
+              {isVideoFinished && (
+                <motion.button
+                  initial={{ opacity: 0, scale: 0.8, rotate: -90 }}
+                  animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                  exit={{ opacity: 0, scale: 0.8, rotate: 90 }}
+                  onClick={onClose}
+                  className="absolute top-8 right-8 z-30 p-4 bg-white/10 hover:bg-white/20 backdrop-blur-xl border border-white/20 rounded-2xl transition-all text-white shadow-2xl active:scale-90 group"
+                >
+                  <X size={28} className="group-hover:rotate-180 transition-transform duration-500" />
+                </motion.button>
+              )}
+            </AnimatePresence>
           </motion.div>
         </div>
       )}
