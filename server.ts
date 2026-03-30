@@ -491,10 +491,18 @@ async function startServer() {
   
   if (process.env.SPORTMONKS_API_TOKEN) setInterval(checkLiveGoals, 60000);
 
-  // Static
+  // Static (apenas se o dist existir - frontend pode estar na Vercel separadamente)
   if (process.env.NODE_ENV === 'production') {
-    app.use(express.static(path.join(__dirname, 'dist')));
-    app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'dist', 'index.html')));
+    const distPath = path.join(__dirname, 'dist');
+    const indexPath = path.join(distPath, 'index.html');
+    const { existsSync } = await import('fs');
+    if (existsSync(indexPath)) {
+      app.use(express.static(distPath));
+      app.get('*', (req, res) => res.sendFile(indexPath));
+      console.log('[Server] Servindo frontend estático a partir de dist/');
+    } else {
+      console.log('[Server] Frontend não encontrado em dist/ - modo API apenas (frontend na Vercel)');
+    }
   } else {
     const vite = await createViteServer({ server: { middlewareMode: true }, appType: 'spa' });
     app.use(vite.middlewares);
