@@ -56,16 +56,27 @@
     50% { background-position: 100% 50%; }
   }
 
-  .animate-float {
-    animation: float 3s ease-in-out infinite;
+  @keyframes marquee {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
   }
 
-  .animate-pulse-subtle {
-    animation: pulse-subtle 3s ease-in-out infinite;
+  @keyframes swing {
+     0%, 100% { transform: rotate(0deg); }
+     25% { transform: rotate(10deg); }
+     75% { transform: rotate(-10deg); }
   }
 
-  .animate-gradient-x {
-    background-size: 200% 200%;
-    animation: gradient-x 15s ease infinite;
+  .animate-marquee {
+    display: inline-flex;
+    animation: marquee 30s linear infinite;
+  }
+
+  .animate-swing {
+    animation: swing 2s ease-in-out infinite;
+  }
+
+  .animate-spin-slow {
+    animation: spin 8s linear infinite;
   }
 }

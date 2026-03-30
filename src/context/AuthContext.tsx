@@ -177,20 +177,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           lastUserId.current = currentUser?.id ?? null;
           
           if (currentUser) {
-            // Define o isAdmin imediatamente baseado no JWT para que o App.tsx rode o roteador sem erros
             const isRoleAdmin = currentUser.app_metadata?.role === 'admin';
             const prefersAdmin = localStorage.getItem('isAdminAuthenticated') === 'true';
             setIsAdmin(isRoleAdmin || prefersAdmin);
             
-            // Busca o perfil de forma desvinculada (assíncrona pura) 
-            // para DESTRAVAR o "Carregando" instantaneamente!
-            fetchProfile(currentUser).catch(console.error);
+            // Na primeira carga (F5), aguardamos o perfil carregar 
+            // para evitar que o Dashboard mostre "Visitante" indevidamente.
+            await fetchProfile(currentUser).catch(console.error);
           }
           setLoading(false);
         }
       } catch (err) {
         console.error('AuthContext: Erro na inicialização:', err);
-        // Em caso de catch (como travamento na volta de 2º plano), liberamos a UI assim mesmo e tentamos continuar
         if (mounted) setLoading(false);
       }
     };

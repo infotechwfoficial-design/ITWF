@@ -339,19 +339,20 @@ async function startServer() {
     try {
       const { title, message, email, username, adminId } = req.body;
       
-      // Constrói query de busca de inscrições de forma flexível
+      let query = supabase.from('push_subscriptions').select('subscription_json, admin_id');
+      
       let orFilter = [];
       if (username) orFilter.push(`username.eq.${username}`);
       if (email) orFilter.push(`email.eq.${email}`);
       
-      if (orFilter.length === 0) {
-        return res.status(400).json({ error: 'Identificador (email ou username) não fornecido' });
+      if (orFilter.length > 0) {
+        query = query.or(orFilter.join(','));
+      } else if (adminId) {
+        // Se for broadcast mas tiver adminId, filtra pelos inscritos daquele admin
+        query = query.eq('admin_id', adminId);
       }
-
-      const { data: subs } = await supabase
-        .from('push_subscriptions')
-        .select('subscription_json, admin_id')
-        .or(orFilter.join(','));
+      
+      const { data: subs } = await query;
 
       if (subs && subs.length > 0) {
         const promises = subs.map(s => sendPushNotification(s.subscription_json, { title, body: message, url: '/dashboard' }, s.admin_id || adminId));

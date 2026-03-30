@@ -332,179 +332,117 @@ export default function Dashboard() {
     <Layout>
       <div className="flex flex-col gap-6 max-w-7xl mx-auto">
         
-        {/* Banner de Boas-vindas Mob / Perfil Compacto */}
-        <section className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-6 shadow-xl shadow-black/5 border border-black/5 dark:border-white/5 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-            <Sparkles size={120} className="text-primary rotate-12" />
-          </div>
+        {/* NOVO CABEÇALHO UNIFICADO E COMPACTO (Sugestão 1) */}
+        <section className="relative bg-white dark:bg-slate-900 rounded-[2rem] p-5 shadow-xl border border-black/5 dark:border-white/5 overflow-hidden transition-all">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-16 -mt-16" />
           
-          <div className="flex flex-col md:flex-row items-center gap-6 relative z-10">
-            {/* Avatar Section */}
-            <div className="relative">
-              <div className="size-24 md:size-32 rounded-[2rem] overflow-hidden ring-4 ring-primary/10 bg-slate-100 dark:bg-white/5 flex items-center justify-center group/avatar">
-                {uploadingAvatar ? (
-                  <RefreshCw className="animate-spin text-primary" size={32} />
-                ) : client?.avatar_url ? (
-                  <img src={client.avatar_url} alt="Profile" className="size-full object-cover" />
-                ) : (
-                  <User className="text-slate-400" size={48} />
-                )}
-                <button 
-                  onClick={() => fileInputRef.current?.click()}
-                  className="absolute inset-0 bg-black/40 opacity-0 group-hover/avatar:opacity-100 flex items-center justify-center transition-opacity rounded-[2rem]"
-                >
-                  <Camera className="text-white" size={24} />
-                </button>
+          <div className="flex flex-col lg:flex-row items-center gap-6 relative z-10">
+            {/* Perfil Compacto */}
+            <div className="flex items-center gap-4 flex-1 w-full">
+              <div className="relative group/avatar shrink-0">
+                <div className="size-16 rounded-2xl overflow-hidden ring-2 ring-primary/10 bg-slate-100 dark:bg-white/5 flex items-center justify-center">
+                  {uploadingAvatar ? (
+                    <RefreshCw className="animate-spin text-primary" size={20} />
+                  ) : client?.avatar_url ? (
+                    <img src={client.avatar_url} alt="Profile" className="size-full object-cover" />
+                  ) : (
+                    <User className="text-slate-400" size={24} />
+                  )}
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="absolute inset-0 bg-black/40 opacity-0 group-hover/avatar:opacity-100 flex items-center justify-center transition-opacity rounded-2xl"
+                  >
+                    <Camera className="text-white" size={16} />
+                  </button>
+                </div>
+                <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleAvatarUpload} />
               </div>
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                className="hidden" 
-                accept="image/*" 
-                onChange={handleAvatarUpload}
-              />
-              <div className={`absolute -bottom-2 -right-2 px-3 py-1 rounded-full text-[10px] font-black uppercase text-white shadow-lg ${status.dot} ${status.shadow}`}>
-                {status.label}
-              </div>
-            </div>
 
-            <div className="flex-1 text-center md:text-left space-y-2">
-              <div className="flex flex-col md:flex-row items-center gap-2 md:gap-4">
-                {isEditingName ? (
-                  <div className="flex items-center gap-2 bg-slate-50 dark:bg-white/5 p-1 px-3 rounded-2xl border border-primary/20">
-                    <input
-                      value={newName}
-                      onChange={(e) => setNewName(e.target.value)}
-                      className="bg-transparent font-black text-2xl outline-none w-48 text-center md:text-left"
-                      autoFocus
-                    />
-                    <button onClick={handleUpdateName} className="p-2 text-emerald-500 hover:bg-emerald-500/10 rounded-xl transition-colors">
-                      <Check size={20} />
-                    </button>
-                    <button onClick={() => setIsEditingName(false)} className="p-2 text-rose-500 hover:bg-rose-500/10 rounded-xl transition-colors">
-                      <X size={20} />
-                    </button>
-                  </div>
-                ) : (
-                  <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-3">
-                    Olá, {client?.name || 'Visitante'}
-                    <button onClick={() => setIsEditingName(true)} className="p-2 text-slate-400 hover:text-primary transition-colors">
-                      <Edit3 size={18} />
-                    </button>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl font-black text-slate-900 dark:text-white uppercase truncate">
+                    {client?.name || 'Visitante'}
                   </h1>
-                )}
+                  <button onClick={() => setIsEditingName(true)} className="text-slate-400 hover:text-primary transition-colors">
+                    <Edit3 size={14} />
+                  </button>
+                </div>
+                <p className="text-[10px] font-bold text-slate-500 flex items-center gap-1 uppercase tracking-tight">
+                  <Cloud size={12} className="text-primary" />
+                  @{client?.username || 'itwf.user'}
+                </p>
               </div>
-              <p className="text-slate-500 dark:text-slate-400 font-medium text-sm md:text-base flex items-center justify-center md:justify-start gap-2">
-                <Cloud size={18} className="text-primary" />
-                {client ? `Conectado como @${client.username}` : 'Sua experiência premium ITWF começa aqui.'}
-              </p>
             </div>
 
-            <div className="flex gap-3">
-               <button 
-                onClick={signOut}
-                className="p-4 rounded-3xl bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white transition-all active:scale-95"
-                title="Sair"
+            {/* Status Rápido Unificado */}
+            <div className="flex flex-wrap items-center justify-center lg:justify-end gap-3 w-full lg:w-auto">
+              <div className="px-4 py-3 rounded-2xl bg-slate-50 dark:bg-white/5 border border-black/5 flex items-center gap-3">
+                <div className="size-8 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center">
+                  <Timer size={18} />
+                </div>
+                <div>
+                  <p className="text-[9px] font-black text-slate-400 uppercase leading-none mb-1">Expira em</p>
+                  <p className={`text-sm font-black ${status.color}`}>{daysRemaining} dias</p>
+                </div>
+              </div>
+
+              <div className="px-4 py-3 rounded-2xl bg-slate-50 dark:bg-white/5 border border-black/5 flex items-center gap-3">
+                <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+                  <Wallet size={18} />
+                </div>
+                <div>
+                  <p className="text-[9px] font-black text-slate-400 uppercase leading-none mb-1">Saldo</p>
+                  <p className="text-sm font-black text-slate-900 dark:text-white">{formatCurrency(client?.balance || 0)}</p>
+                </div>
+              </div>
+
+              <Link 
+                to="/plans" 
+                className="px-6 py-3 bg-primary text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
               >
-                <LogOut size={24} />
-              </button>
+                Renovar
+              </Link>
             </div>
           </div>
         </section>
 
-        {/* Status Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <motion.div whileHover={{ y: -5 }} className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] shadow-lg border border-black/5 dark:border-white/5 space-y-4">
-            <div className="size-14 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center shadow-inner">
-              <Timer size={28} />
+        {/* Banner de Aviso Dinâmico (Letreiro) */}
+        {notifications.length > 0 && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-primary/5 border border-primary/10 rounded-2xl p-2 px-4 flex items-center gap-4 overflow-hidden"
+          >
+            <div className="flex items-center gap-2 text-primary shrink-0 font-black text-[10px] uppercase tracking-tighter">
+              <Bell size={14} className="animate-bounce" /> Informativo:
             </div>
-            <div>
-              <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Expira em</p>
-              <h3 className={`text-3xl font-black ${status.color}`}>{daysRemaining} dias</h3>
-            </div>
-          </motion.div>
-
-          <motion.div whileHover={{ y: -5 }} className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] shadow-lg border border-black/5 dark:border-white/5 space-y-4">
-            <div className="size-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shadow-inner">
-              <Wallet size={28} />
-            </div>
-            <div>
-              <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Saldo Atual</p>
-              <h3 className="text-3xl font-black text-slate-900 dark:text-white">{formatCurrency(client?.balance || 0)}</h3>
-            </div>
-          </motion.div>
-
-          <motion.div whileHover={{ y: -5 }} className="bg-white dark:bg-slate-900 p-6 rounded-[2rem] shadow-lg border border-black/5 dark:border-white/5 space-y-4 lg:col-span-2">
-             <div className="flex justify-between items-start">
-               <div className="size-14 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shadow-inner">
-                <Zap size={28} />
+            <div className="flex-1 overflow-hidden relative h-5">
+              <div className="absolute whitespace-nowrap animate-marquee flex items-center gap-8">
+                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                  {notifications[0].title}: {notifications[0].message}
+                </span>
+                <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                  {notifications[0].title}: {notifications[0].message}
+                </span>
               </div>
-              <Link to="/plans" className="px-4 py-2 bg-primary/10 text-primary rounded-xl text-[10px] font-black uppercase hover:bg-primary hover:text-white transition-all">
-                Renovar Agora
-              </Link>
-             </div>
-             <div>
-              <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Assinatura</p>
-              <h3 className="text-2xl font-black text-slate-900 dark:text-white truncate">
-                {client?.expiration_date ? `Vence em ${client.expiration_date}` : 'Consultando plano...'}
-              </h3>
             </div>
           </motion.div>
-        </div>
+        )}
+
 
         {/* Main Content Area */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Área de Conteúdo Principal */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           
-          {/* Notifications Column */}
+          {/* Coluna Lateral: Agenda Esportiva (Mais estreita e compacta) */}
           <div className="lg:col-span-1 space-y-6">
-             <section className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 shadow-xl border border-black/5 dark:border-white/5 h-fit">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-2">
-                  <Bell size={20} className="text-primary" />
-                  Avisos ITWF
-                </h2>
-                {notifications.length > 0 && (
-                   <span className="size-6 bg-primary text-white rounded-full flex items-center justify-center text-[10px] font-bold">
-                    {notifications.length}
-                  </span>
-                )}
-              </div>
-              
-              <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                {notifications.length === 0 ? (
-                  <div className="py-8 text-center space-y-3">
-                    <Cloud size={40} className="mx-auto text-slate-200 dark:text-slate-800" />
-                    <p className="text-sm text-slate-400 font-medium">Tudo tranquilo por enquanto.</p>
-                  </div>
-                ) : (
-                  notifications.map((notif) => (
-                    <motion.div 
-                      key={notif.id}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      className="p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-black/5 dark:border-white/5 space-y-2 hover:border-primary/30 transition-colors"
-                    >
-                      <div className="flex items-center justify-between">
-                         <span className="text-[10px] font-black text-primary uppercase tracking-widest">{notif.title}</span>
-                         <span className="text-[10px] text-slate-400 font-medium">{new Date(notif.created_at).toLocaleDateString()}</span>
-                      </div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed italic">
-                        "{notif.message}"
-                      </p>
-                    </motion.div>
-                  ))
-                )}
-              </div>
-            </section>
-
-             {/* Agenda Esportiva */}
-             <section className="bg-gradient-to-br from-indigo-600 to-primary rounded-[2rem] p-6 shadow-xl shadow-primary/20 text-white relative overflow-hidden group">
+             <section className="bg-gradient-to-br from-indigo-600 to-primary rounded-[2rem] p-5 shadow-xl shadow-primary/20 text-white relative overflow-hidden group h-full max-h-[500px]">
               <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:scale-110 transition-transform">
-                 <RefreshCw size={100} className="animate-spin-slow" />
+                 <RefreshCw size={80} className="animate-spin-slow" />
               </div>
               
-              <h2 className="text-lg font-black uppercase tracking-tight mb-4 flex items-center gap-2">
-                <LayoutDashboard size={20} />
+              <h2 className="text-sm font-black uppercase tracking-tight mb-4 flex items-center gap-2">
+                <LayoutDashboard size={18} />
                 Jogos Hoje
               </h2>
               
@@ -513,50 +451,50 @@ export default function Dashboard() {
                   <RefreshCw className="animate-spin" size={24} />
                 </div>
               ) : sportsAgenda ? (
-                <div className="space-y-3 bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20">
-                  <p className="text-xs font-medium leading-relaxed whitespace-pre-wrap">{sportsAgenda}</p>
+                <div className="space-y-3 bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 h-[calc(100%-4rem)] overflow-y-auto custom-scrollbar">
+                  <p className="text-[11px] font-bold leading-relaxed whitespace-pre-wrap">{sportsAgenda}</p>
                 </div>
               ) : (
-                <div className="text-center py-4 space-y-2">
-                  <AlertTriangle className="mx-auto" size={24} />
-                  <p className="text-xs font-bold uppercase">Agenda Indisponível</p>
+                <div className="text-center py-8 space-y-2">
+                  <AlertTriangle className="mx-auto text-white/50" size={24} />
+                  <p className="text-[10px] font-black uppercase">Sem Jogos no Momento</p>
                 </div>
               )}
             </section>
           </div>
 
-          {/* Requests Main Column */}
-          <div className="lg:col-span-2 space-y-6">
-            <section className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 shadow-xl border border-black/5 dark:border-white/5 min-h-fit relative overflow-hidden">
+          {/* Coluna Principal: Meus Pedidos (Expandida para ocupar o resto) */}
+          <div className="lg:col-span-3 space-y-6">
+            <section className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 shadow-xl border border-black/5 dark:border-white/5 min-h-fit relative overflow-hidden h-full">
                <div className="absolute -top-10 -right-10 size-40 bg-primary/5 rounded-full blur-3xl" />
                
-               <div className="flex items-center justify-between mb-8 relative z-10">
+               <div className="flex items-center justify-between mb-6 relative z-10">
                 <div className="space-y-1">
-                  <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-3">
-                    <MessageSquare size={24} className="text-primary" />
+                  <h2 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-3">
+                    <MessageSquare size={20} className="text-primary" />
                     Meus Pedidos
                   </h2>
-                  <p className="text-xs font-medium text-slate-400">Status dos seus pedidos de filmes e séries.</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Status dos seus conteúdos solicitados.</p>
                 </div>
-                <Link to="/request-content" className="p-3 bg-primary text-white rounded-2xl shadow-lg shadow-primary/30 hover:scale-105 active:scale-95 transition-all">
-                  <Plus size={24} />
+                <Link to="/request-content" className="p-2 bg-primary text-white rounded-xl shadow-lg shadow-primary/30 hover:scale-105 active:scale-95 transition-all">
+                  <Plus size={20} />
                 </Link>
               </div>
 
               {loadingExtras ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-4">
-                   <RefreshCw className="animate-spin text-primary" size={40} />
-                   <span className="text-sm font-black text-slate-400 uppercase">Consultando seu histórico...</span>
+                   <RefreshCw className="animate-spin text-primary" size={32} />
+                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sincronizando pedidos...</span>
                 </div>
               ) : requests.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 bg-slate-50 dark:bg-white/5 rounded-3xl border-2 border-dashed border-black/5 dark:border-white/5 group">
-                  <div className="size-20 bg-slate-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <Plus className="text-slate-400" size={32} />
+                <div className="flex flex-col items-center justify-center py-16 bg-slate-50 dark:bg-white/5 rounded-3xl border-2 border-dashed border-black/5 dark:border-white/5 group">
+                  <div className="size-16 bg-slate-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                    <Plus className="text-slate-400" size={24} />
                   </div>
-                  <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase">Nenhum Pedido</h3>
-                  <p className="text-sm text-slate-500 mb-6 font-medium">Você ainda não solicitou nenhum conteúdo.</p>
-                  <Link to="/request-content" className="bg-primary hover:bg-primary/90 text-white px-8 py-3 rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-primary/20">
-                    Começar Agora
+                  <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase">Nenhum Pedido</h3>
+                  <p className="text-xs text-slate-500 mb-6 font-medium">Você ainda não solicitou nenhum conteúdo.</p>
+                  <Link to="/request-content" className="bg-primary hover:bg-primary/90 text-white px-6 py-2 rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-primary/20">
+                    Novo Pedido
                   </Link>
                 </div>
               ) : (
@@ -568,72 +506,72 @@ export default function Dashboard() {
               )}
               
               {requests.length > 0 && (
-                <div className="mt-8 flex justify-center">
-                  <Link to="/request-content" className="text-xs font-black text-slate-400 hover:text-primary transition-colors flex items-center gap-2 uppercase tracking-widest">
-                    Ver todos os pedidos <ArrowRight size={14} />
+                <div className="mt-6 flex justify-center">
+                  <Link to="/request-content" className="text-[10px] font-black text-slate-400 hover:text-primary transition-colors flex items-center gap-2 uppercase tracking-widest leading-none">
+                    Ver todos os pedidos <ArrowRight size={12} />
                   </Link>
                 </div>
               )}
             </section>
-
-            {/* Quick Support / Links Section */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-               <motion.div whileHover={{ scale: 1.02 }} className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-[2rem] p-6 text-white shadow-xl shadow-black/10 flex items-center justify-between group">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-primary font-black uppercase text-xs tracking-tighter">
-                       <Zap size={14} fill="currentColor" /> Atendimento VIP
-                    </div>
-                    <h4 className="text-xl font-black uppercase tracking-tight">Suporte 24h</h4>
-                    <Link to="/support" className="flex items-center gap-2 text-[10px] font-bold text-slate-400 group-hover:text-white transition-colors">
-                      Falar com atendente <ArrowRight size={12} />
-                    </Link>
-                  </div>
-                  <div className="size-16 rounded-2xl bg-white/5 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                     <MessageSquare size={32} />
-                  </div>
-               </motion.div>
-
-               <motion.div whileHover={{ scale: 1.02 }} className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 shadow-xl border border-black/5 dark:border-white/5 flex items-center justify-between group">
-                  <div className="space-y-2 text-slate-900 dark:text-white">
-                     <div className="flex items-center gap-2 text-amber-500 font-black uppercase text-xs tracking-tighter">
-                       <Star size={14} fill="currentColor" /> Aprenda Mais
-                    </div>
-                    <h4 className="text-xl font-black uppercase tracking-tight">Tutoriais</h4>
-                    <Link to="/tutorials" className="flex items-center gap-2 text-[10px] font-bold text-slate-400 hover:text-primary transition-colors">
-                      Ver guias em vídeo <ArrowRight size={12} />
-                    </Link>
-                  </div>
-                   <div className="size-16 rounded-2xl bg-slate-50 dark:bg-white/5 flex items-center justify-center group-hover:bg-amber-500/10 transition-colors">
-                     <HelpCircle size={32} className="text-amber-500" />
-                  </div>
-               </motion.div>
-            </div>
           </div>
         </div>
 
-        {/* PWA/Support Banner */}
+        {/* Links de Acesso Rápido / Suporte (Fila única compacta) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <motion.div whileHover={{ scale: 1.01 }} className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-[2rem] p-5 text-white shadow-xl shadow-black/10 flex items-center justify-between group">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-primary font-black uppercase text-[10px] tracking-tighter">
+                    <Zap size={12} fill="currentColor" /> Atendimento VIP
+                </div>
+                <h4 className="text-lg font-black uppercase tracking-tight">Suporte 24h</h4>
+                <Link to="/support" className="flex items-center gap-2 text-[10px] font-bold text-slate-400 group-hover:text-white transition-colors">
+                  Falar com atendente <ArrowRight size={10} />
+                </Link>
+              </div>
+              <div className="size-14 rounded-2xl bg-white/5 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                  <MessageSquare size={24} />
+              </div>
+            </motion.div>
+
+            <motion.div whileHover={{ scale: 1.01 }} className="bg-white dark:bg-slate-900 rounded-[2rem] p-5 shadow-xl border border-black/5 dark:border-white/5 flex items-center justify-between group">
+              <div className="space-y-2 text-slate-900 dark:text-white">
+                  <div className="flex items-center gap-2 text-amber-500 font-black uppercase text-[10px] tracking-tighter">
+                    <Star size={12} fill="currentColor" /> Aprenda Mais
+                </div>
+                <h4 className="text-lg font-black uppercase tracking-tight">Tutoriais</h4>
+                <Link to="/tutorials" className="flex items-center gap-2 text-[10px] font-bold text-slate-400 hover:text-primary transition-colors">
+                  Ver guias em vídeo <ArrowRight size={10} />
+                </Link>
+              </div>
+                <div className="size-14 rounded-2xl bg-slate-50 dark:bg-white/5 flex items-center justify-center group-hover:bg-amber-500/10 transition-colors">
+                  <HelpCircle size={24} className="text-amber-500" />
+              </div>
+            </motion.div>
+        </div>
+
+        {/* PWA/Support Banner (Mais minimalista) */}
         {showPushBanner && (
            <motion.div 
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
-            className="bg-primary/10 border border-primary/20 rounded-[2rem] p-6 overflow-hidden relative"
+            className="bg-primary/5 border border-primary/10 rounded-[2rem] p-5 overflow-hidden relative"
           >
-             <button onClick={() => setShowPushBanner(false)} className="absolute top-4 right-4 text-primary/50 hover:text-primary transition-colors">
-               <X size={20} />
+             <button onClick={() => setShowPushBanner(false)} className="absolute top-4 right-4 text-primary/30 hover:text-primary">
+               <X size={16} />
              </button>
              <div className="flex flex-col md:flex-row items-center gap-6">
-                <div className="size-16 rounded-2xl bg-primary text-white flex items-center justify-center shrink-0">
-                  <Bell size={32} className="animate-swing" />
+                <div className="size-12 rounded-xl bg-primary text-white flex items-center justify-center shrink-0">
+                  <Bell size={20} className="animate-swing" />
                 </div>
                 <div className="flex-1 text-center md:text-left">
-                  <h4 className="font-black text-primary uppercase text-lg">Mantenha-se informado!</h4>
-                  <p className="text-sm text-primary/70 font-medium">Ative as notificações para receber avisos de manutenção, promoções e prazos de vencimento diretamente no seu aparelho.</p>
+                  <h4 className="font-black text-primary uppercase text-sm">Notificações Ativas</h4>
+                  <p className="text-xs text-primary/70 font-medium">Receba avisos de manutenção e prazos diretamente no seu aparelho.</p>
                 </div>
                 <button 
                   onClick={handleEnablePush}
-                  className="px-8 py-3 bg-primary text-white rounded-xl font-black text-sm uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
+                  className="px-6 py-2 bg-primary text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
                 >
-                  Ativar Notificações
+                  Ativar
                 </button>
              </div>
           </motion.div>
