@@ -22,13 +22,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
 
-  const fetchProfile = useCallback(async (userId: string, email?: string) => {
+  const fetchProfile = useCallback(async (user: User) => {
     try {
-      // 1. Tenta buscar na tabela de clientes
+      const isRoleAdmin = user.app_metadata?.role === 'admin';
+      const prefersAdmin = localStorage.getItem('isAdminAuthenticated') === 'true';
+
+      // Define secure admin access straight from the JWT
+      setIsAdmin(isRoleAdmin || prefersAdmin); 
+
+      if (prefersAdmin || isRoleAdmin) {
+        // 1. Tenta buscar na tabela de admins primeiro se houver preferência ou se for admin por JWT e preferir admin
+        const { data: adminData, error: adminError } = await supabase
+          .from('admins')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (adminError) {
+          console.error('AuthContext: Erro ao buscar perfil de admin:', adminError);
+        }
+
+        if (adminData && prefersAdmin) {
+          setProfile(adminData);
+          return;
+        }
+      }
+
+      // 2. Tenta buscar na tabela de clientes
       const { data: clientData, error: clientError } = await supabase
         .from('clients')
         .select('*')
-        .eq('user_id', userId)
+        .eq('user_id', user.id)
         .maybeSingle();
 
       if (clientError) {
@@ -57,38 +81,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         } else {
           setProfile(clientData);
         }
-        setIsAdmin(false);
+
+        // Se encontrou como cliente, mas tem flag de admin perdida e não é admin real no JWT, vamos remover
+        if (prefersAdmin && !isRoleAdmin) {
+           localStorage.removeItem('isAdminAuthenticated');
+        }
         return;
       }
 
-      // 2. Se não for cliente, tenta buscar na tabela de admins
-      const { data: adminData, error: adminError } = await supabase
-        .from('admins')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
+      // 3. Se não achou cliente e é admin via JWT (mas não tinha preferência de login ainda), carrega o perfil admin padrão
+      if (isRoleAdmin) {
+        const { data: adminFallback, error: adminFallbackError } = await supabase
+          .from('admins')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle();
 
-      if (adminError) {
-        console.error('AuthContext: Erro ao buscar perfil de admin:', adminError);
+        if (adminFallback) {
+          setProfile(adminFallback);
+          localStorage.setItem('isAdminAuthenticated', 'true');
+          return;
+        }
       }
 
-      if (adminData) {
-        setProfile(adminData);
-        setIsAdmin(true);
-        return;
-      }
-
-      // 3. AUTO-CURA (Apenas para Clientes): Se não encontrou em nenhum lugar e é um novo usuário
-      if (userId && email) {
+      // 4. AUTO-CURA (Apenas para Clientes): Se não encontrou em nenhum lugar e é um novo usuário
+      if (user.id && user.email) {
         console.warn('AuthContext: Perfil não encontrado. Criando perfil de cliente padrão...');
-        const baseName = email.split('@')[0];
+        const baseName = user.email.split('@')[0];
         const { data: newProfile, error: createError } = await supabase
           .from('clients')
           .insert([{
-            user_id: userId,
+            user_id: user.id,
             username: `${baseName}_${Math.floor(Math.random() * 1000)}`,
             name: baseName,
-            email: email,
+            email: user.email,
             expiration_date: '',
             admin_id: localStorage.getItem('referralId') || null
           }])
@@ -97,7 +123,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         if (!createError && newProfile) {
           setProfile(newProfile);
-          setIsAdmin(false);
+          if (!isRoleAdmin) {
+            setIsAdmin(false);
+          }
         }
       }
     } catch (err) {
@@ -107,7 +135,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshProfile = async () => {
     if (user) {
-      await fetchProfile(user.id);
+      await fetchProfile(user);
     }
   };
 
@@ -134,7 +162,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(initialSession?.user ?? null);
           
           if (initialSession?.user) {
-            await fetchProfile(initialSession.user.id, initialSession.user.email);
+            await fetchProfile(initialSession.user);
           }
           setLoading(false);
         }
@@ -151,12 +179,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('AuthContext: Auth event ->', _event);
       
       if (mounted) {
+        // Se houve mudança no usuário, ligar o loading para que as rotas aguardem o fetchProfile
+        if (newSession?.user?.id !== session?.user?.id) {
+          setLoading(true);
+        }
+
         setSession(newSession);
         const newUser = newSession?.user ?? null;
         setUser(newUser);
         
         if (newUser) {
-          await fetchProfile(newUser.id, newUser.email);
+          await fetchProfile(newUser);
         } else {
           setProfile(null);
           setIsAdmin(false);

@@ -36,21 +36,30 @@ export default function AdminLogin() {
       if (signInError) throw signInError;
 
       if (data.user) {
-        // Verificar se o usuário está na tabela de admins
-        const { data: adminData, error: adminError } = await supabase
-          .from('admins')
-          .select('role')
-          .eq('user_id', data.user.id)
-          .single();
+        const isRoleAdmin = data.user.app_metadata?.role === 'admin';
+        const jwtRole = data.user.app_metadata?.adminRole;
+        
+        let finalRole = jwtRole;
 
-        if (adminError || !adminData) {
-          // Não é admin: faz logout e exibe erro
-          await supabase.auth.signOut();
-          throw new Error('Acesso negado. Você não tem permissão administrativa para acessar este painel.');
+        // Fallback: se por algum motivo a claim não estiver no token (ex: acabou de ser criado sem trigger)
+        if (!isRoleAdmin) {
+          const { data: adminData } = await supabase
+            .from('admins')
+            .select('role')
+            .eq('user_id', data.user.id)
+            .maybeSingle();
+
+          if (!adminData) {
+            // Não é admin: faz logout e exibe erro
+            await supabase.auth.signOut();
+            throw new Error('Acesso negado. Você não tem permissão administrativa para acessar este painel.');
+          }
+          finalRole = adminData.role;
         }
 
         localStorage.setItem('isAdminAuthenticated', 'true');
-        localStorage.setItem('adminRole', adminData.role);
+        if (finalRole) localStorage.setItem('adminRole', finalRole);
+        
         clearTimeout(safetyTimer);
         navigate('/admin');
       }
