@@ -108,7 +108,7 @@ const RequestCard = React.memo(({ req }: { req: any }) => (
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { profile: contextProfile, signOut } = useAuth();
+  const { profile: contextProfile, signOut, refreshProfile } = useAuth();
   
   const [client, setClient] = useState<Client | null>(null);
   const [requests, setRequests] = useState<any[]>([]);
@@ -235,6 +235,7 @@ export default function Dashboard() {
         .eq('user_id', client.user_id);
 
       if (error) throw error;
+      await refreshProfile();
       setClient({ ...client, name: newName.trim() });
       setIsEditingName(false);
       showToast('Nome atualizado com sucesso!', 'success');
@@ -269,7 +270,7 @@ export default function Dashboard() {
         .eq('user_id', client.user_id);
 
       if (updateError) throw updateError;
-
+      await refreshProfile();
       setClient({ ...client, avatar_url: publicUrl });
       showToast('Foto de perfil atualizada!', 'success');
     } catch (err: any) {
@@ -302,6 +303,7 @@ export default function Dashboard() {
         .update({ onboarding_completed: true })
         .eq('user_id', client.user_id);
       
+      await refreshProfile();
       setClient({ ...client, onboarding_completed: true });
     } catch (err) {
       console.warn('Erro ao salvar status de onboarding:', err);

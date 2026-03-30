@@ -22,7 +22,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
 
-  const fetchProfile = useCallback(async (userId: string) => {
+  const fetchProfile = useCallback(async (userId: string, email?: string) => {
     try {
       const { data, error } = await supabase
         .from('clients')
@@ -34,7 +34,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error('AuthContext: Erro ao buscar perfil:', error);
         return;
       }
-      setProfile(data);
+      
+      if (data) {
+        setProfile(data);
+      } else if (userId && email) {
+        // AUTO-CURA: Se o usuário existe no Auth mas não no banco (falha no signup), criamos agora.
+        console.warn('AuthContext: Perfil não encontrado. Criando perfil padrão...');
+        const baseName = email.split('@')[0];
+        const { data: newProfile, error: createError } = await supabase
+          .from('clients')
+          .insert([{
+            user_id: userId,
+            username: `${baseName}_${Math.floor(Math.random() * 1000)}`, // Garante unicidade
+            name: baseName,
+            email: email,
+            expiration_date: '',
+            admin_id: localStorage.getItem('referralId') || null
+          }])
+          .select()
+          .single();
+        
+        if (!createError && newProfile) {
+          setProfile(newProfile);
+        }
+      }
     } catch (err) {
       console.error('AuthContext: Erro fatal ao buscar perfil:', err);
     }
@@ -74,15 +97,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Inicialização da sessão
     const initSession = async () => {
       try {
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        const { data: { session: initialSession }, error: sessionError } = await supabase.auth.getSession();
         
+        if (sessionError) throw sessionError;
+
         if (mounted) {
           setSession(initialSession);
           setUser(initialSession?.user ?? null);
           
           if (initialSession?.user) {
+            // Executa em paralelo para ser mais rápido
             await Promise.all([
-              fetchProfile(initialSession.user.id),
+              fetchProfile(initialSession.user.id, initialSession.user.email),
               checkAdminStatus(initialSession.user.id)
             ]);
           }
@@ -102,12 +128,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (mounted) {
         setSession(newSession);
-        setUser(newSession?.user ?? null);
+        const newUser = newSession?.user ?? null;
+        setUser(newUser);
         
-        if (newSession?.user) {
+        if (newUser) {
           await Promise.all([
-            fetchProfile(newSession.user.id),
-            checkAdminStatus(newSession.user.id)
+            fetchProfile(newUser.id, newUser.email),
+            checkAdminStatus(newUser.id)
           ]);
         } else {
           setProfile(null);

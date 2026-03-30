@@ -247,9 +247,19 @@ async function processApprovedPayment(externalRef: string, providerName: string)
       const exp = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
       if (exp > baseDate) baseDate = exp;
     }
-    // Lógica simplificada de meses
+    // Lógica robusta de adição de meses
+    const currentDay = baseDate.getDate();
     baseDate.setMonth(baseDate.getMonth() + 1);
-    const newExp = `${String(baseDate.getDate()).padStart(2,'0')}/${String(baseDate.getMonth()+1).padStart(2,'0')}/${baseDate.getFullYear()}`;
+    // Se o dia mudou (ex: 31 de jan -> 3 de mar), ajusta para o último dia do mês correto
+    if (baseDate.getDate() !== currentDay) {
+      baseDate.setDate(0);
+    }
+    
+    const day = String(baseDate.getDate()).padStart(2, '0');
+    const month = String(baseDate.getMonth() + 1).padStart(2, '0');
+    const year = baseDate.getFullYear();
+    const newExp = `${day}/${month}/${year}`;
+    
     await supabase.from('clients').update({ expiration_date: newExp }).eq('email', userEmail);
     await notifyUser(client.user_id, client.email, client.username, { title: 'Pagamento Aprovado! 🎉', body: `Plano "${plan.name}" ativado. Novo vencimento: ${newExp}`, url: '/invoices' }, client.admin_id);
   }
