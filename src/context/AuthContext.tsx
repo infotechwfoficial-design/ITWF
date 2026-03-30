@@ -223,8 +223,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setIsAdmin(isRoleAdmin || prefersAdmin);
             await fetchProfile(newUser);
           } else {
-            // Atualização fantasma em background
-            fetchProfile(newUser).catch(console.error);
+            // Evita duplo fetch na inicialização da página
+            if (_event !== 'INITIAL_SESSION') {
+              // Atualização fantasma em background
+              fetchProfile(newUser).catch(console.error);
+            }
           }
         } else {
           setProfile(null);
