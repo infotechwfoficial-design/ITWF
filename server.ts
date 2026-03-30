@@ -451,6 +451,33 @@ async function startServer() {
     }
   });
 
+  // ROTA PARA DELETAR USUÁRIO COMPLETAMENTE (Incluindo tabela auth.users)
+  app.delete('/api/users/:userId', async (req, res) => {
+    try {
+      const { userId } = req.params;
+      
+      if (!userId || userId === 'undefined') {
+        return res.status(400).json({ error: 'ID de usuário inválido.' });
+      }
+
+      // 1. Usar a conta de serviço admin para deletar o usuário do Identity
+      const { error: authError } = await supabase.auth.admin.deleteUser(userId);
+      
+      if (authError) {
+        console.error('[API Delete User] Erro no Supabase Auth:', authError.message);
+        return res.status(500).json({ error: 'Erro ao deletar usuário no sistema de autenticação.' });
+      }
+
+      // A exclusão da tabela `clients` e outras tabelas dependentes já está sendo
+      // feita pelo Frontend no Admin.tsx (performClientCleanup), ou via ON DELETE CASCADE.
+      
+      res.json({ success: true, message: 'Usuário deletado com sucesso do sistema.' });
+    } catch (err: any) {
+      console.error('[API Delete User]', err);
+      res.status(500).json({ error: 'Erro catastrófico ao excluir usuário' });
+    }
+  });
+
   app.get('/api/notifications', async (req, res) => {
     try {
       const { data, error } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
