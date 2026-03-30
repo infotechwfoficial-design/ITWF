@@ -172,11 +172,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (mounted) {
           setSession(initialSession || null);
-          setUser(initialSession?.user ?? null);
-          lastUserId.current = initialSession?.user?.id ?? null;
+          const currentUser = initialSession?.user ?? null;
+          setUser(currentUser);
+          lastUserId.current = currentUser?.id ?? null;
           
-          if (initialSession?.user) {
-            await Promise.race([fetchProfile(initialSession.user), timeoutPromise]);
+          if (currentUser) {
+            // Define o isAdmin imediatamente baseado no JWT para que o App.tsx rode o roteador sem erros
+            const isRoleAdmin = currentUser.app_metadata?.role === 'admin';
+            const prefersAdmin = localStorage.getItem('isAdminAuthenticated') === 'true';
+            setIsAdmin(isRoleAdmin || prefersAdmin);
+            
+            // Busca o perfil de forma desvinculada (assíncrona pura) 
+            // para DESTRAVAR o "Carregando" instantaneamente!
+            fetchProfile(currentUser).catch(console.error);
           }
           setLoading(false);
         }
@@ -204,16 +212,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         setSession(newSession);
-        setUser(newSession?.user ?? null);
+        const newUser = newSession?.user ?? null;
+        setUser(newUser);
         
-        if (newSession?.user) {
+        if (newUser) {
           if (isUserDifferent) {
-            // Se houve troca de contas real, congela UI, e busca sincrono 
-            await fetchProfile(newSession.user);
+            // Bloqueio apenas se for uma pessoa DIFERENTE logando
+            const isRoleAdmin = newUser.app_metadata?.role === 'admin';
+            const prefersAdmin = localStorage.getItem('isAdminAuthenticated') === 'true';
+            setIsAdmin(isRoleAdmin || prefersAdmin);
+            await fetchProfile(newUser);
           } else {
-            // Se é o MESMO usuário (apenas Refreshing de Token do celular após voltar no WhatsApp),
-            // Fazemos update de dados livre pelas cortinas de fundo SEM aguardar as promises para a UI não travar!
-            fetchProfile(newSession.user).catch(console.error);
+            // Atualização fantasma em background
+            fetchProfile(newUser).catch(console.error);
           }
         } else {
           setProfile(null);
