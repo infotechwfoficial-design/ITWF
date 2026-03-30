@@ -13,13 +13,16 @@ import {
   LogOut,
   Smartphone,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  X,
+  Smartphone as PhoneIcon
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import Toast from '../components/Toast';
 import { supabase } from '../utils/supabase';
 import { subscribeUserToPush, unsubscribeFromPush } from '../utils/push';
+import { useAuth } from '../context/AuthContext';
 
 interface ToastState {
   message: string;
@@ -28,7 +31,10 @@ interface ToastState {
 
 export default function Settings() {
   const navigate = useNavigate();
+  const { profile: contextProfile, refreshProfile, signOut } = useAuth();
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -48,9 +54,24 @@ export default function Settings() {
     setToast({ message, type });
   }, []);
 
+  // Sync with AuthContext
+  useEffect(() => {
+    if (contextProfile) {
+      setProfile(contextProfile);
+      setFormData({
+        name: contextProfile.name || '',
+        email: contextProfile.email || '',
+        phone: '',
+        language: 'Português (Brasil)'
+      });
+      setLoading(false);
+    } else {
+      setLoading(false);
+    }
+  }, [contextProfile]);
+
   useEffect(() => {
     checkPushStatus();
-    fetchProfile();
   }, []);
 
   const checkPushStatus = async () => {
@@ -91,45 +112,27 @@ export default function Settings() {
     }
   };
 
-  const fetchProfile = async () => {
-    const timeout = setTimeout(() => {
-      setLoading(false);
-      console.warn('Settings: Timeout de 8s no carregamento do perfil.');
-    }, 8000);
-
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profile) return;
+    
+    setSaving(true);
     try {
-      setLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (!session) {
-        navigate('/');
-        return;
-      }
-
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('clients')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .maybeSingle();
+        .update({
+          name: formData.name
+        })
+        .eq('user_id', profile.user_id);
 
-      if (error) {
-        console.error('Settings: Erro ao buscar dados:', error);
-      }
-
-      if (data) {
-        setProfile(data);
-        setFormData({
-          name: data.name || '',
-          email: data.email || '',
-          phone: '',
-          language: 'Português (Brasil)'
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching profile:', error);
+      if (error) throw error;
+      
+      await refreshProfile();
+      showToast('Perfil atualizado com sucesso!', 'success');
+    } catch (err: any) {
+      showToast('Erro ao atualizar perfil: ' + err.message, 'error');
     } finally {
-      setLoading(false);
-      clearTimeout(timeout);
+      setSaving(false);
     }
   };
 
@@ -137,7 +140,7 @@ export default function Settings() {
     const file = e.target.files?.[0];
     if (!file || !profile) return;
 
-    if (file.size > 2 * 1024 * 1024) { // Limite de 2MB
+    if (file.size > 2 * 1024 * 1024) {
       showToast('A imagem selecionada é muito grande. O limite máximo é 2MB.', 'error');
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
@@ -145,16 +148,13 @@ export default function Settings() {
 
     try {
       setUploading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
       const fileExt = file.name.split('.').pop();
-      const fileName = `${session.user.id}-${Math.random()}.${fileExt}`;
-      const filePath = `${session.user.id}/${fileName}`;
+      const fileName = `${profile.user_id}-${Date.now()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, file, { upsert: true });
+        .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
@@ -165,46 +165,16 @@ export default function Settings() {
       const { error: updateError } = await supabase
         .from('clients')
         .update({ avatar_url: publicUrl })
-        .eq('user_id', session.user.id);
+        .eq('user_id', profile.user_id);
 
       if (updateError) throw updateError;
 
-      setProfile({ ...profile, avatar_url: publicUrl });
+      await refreshProfile();
       showToast('Foto de perfil atualizada com sucesso!', 'success');
     } catch (error: any) {
       showToast('Erro ao fazer upload: ' + error.message, 'error');
     } finally {
       setUploading(false);
-    }
-  };
-
-  const handleSaveProfile = async () => {
-    if (saving) return;
-    try {
-      setSaving(true);
-      const { data: { session } } = await supabase.auth.getSession();
-
-      if (!session) {
-        navigate('/');
-        return;
-      }
-
-      const { error } = await supabase
-        .from('clients')
-        .update({
-          name: formData.name
-        })
-        .eq('user_id', session.user.id);
-
-      if (error) throw error;
-      showToast('Configurações salvas com sucesso!', 'success');
-
-      // Refresh profile data
-      await fetchProfile();
-    } catch (error: any) {
-      showToast('Erro ao salvar: ' + error.message, 'error');
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -220,13 +190,16 @@ export default function Settings() {
 
   return (
     <Layout>
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
-      )}
+      <AnimatePresence>
+        {toast && (
+          <Toast
+            message={toast.message}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
+        )}
+      </AnimatePresence>
+
       <div className="max-w-4xl mx-auto flex flex-col gap-8">
         <header>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Configurações do Perfil</h1>
@@ -234,7 +207,6 @@ export default function Settings() {
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Profile Sidebar */}
           <div className="lg:col-span-1 space-y-6">
             <div className="bg-slate-50 dark:bg-slate-900/40 border border-black/5 dark:border-white/10 rounded-2xl p-6 flex flex-col items-center text-center shadow-sm">
               <div className="relative group">
@@ -244,7 +216,6 @@ export default function Settings() {
                       src={profile.avatar_url}
                       alt="Avatar"
                       className="w-full h-full object-cover"
-                      referrerPolicy="no-referrer"
                     />
                   ) : (
                     <User size={48} className="text-slate-400" />
@@ -321,13 +292,7 @@ export default function Settings() {
                 <ChevronRight size={16} className={`transition-transform ${activeTab === 'notifications' ? 'translate-x-1' : ''}`} />
               </button>
               <button
-                onClick={async () => {
-                  await supabase.auth.signOut();
-                  localStorage.removeItem('isAdminAuthenticated');
-                  localStorage.removeItem('adminRole');
-                  localStorage.removeItem('currentUser');
-                  navigate('/');
-                }}
+                onClick={signOut}
                 className="w-full flex items-center justify-between px-5 py-4 text-rose-500 hover:bg-rose-500/10 transition-colors font-bold text-sm border-t border-black/5 dark:border-white/5"
               >
                 <div className="flex items-center gap-3">
@@ -339,7 +304,6 @@ export default function Settings() {
             </nav>
           </div>
 
-          {/* Form Area */}
           <div className="lg:col-span-2 relative overflow-hidden min-h-[500px]">
             <AnimatePresence mode="wait">
               {activeTab === 'profile' && (
@@ -351,7 +315,7 @@ export default function Settings() {
                   transition={{ duration: 0.2 }}
                   className="bg-white/40 dark:bg-slate-900/40 border border-black/5 dark:border-white/10 rounded-[2.5rem] p-8 space-y-8 shadow-sm backdrop-blur-md"
                 >
-                  <div className="space-y-6">
+                  <form onSubmit={handleSaveProfile} className="space-y-6">
                     <h3 className="text-xl font-bold text-slate-900 dark:text-white border-b border-black/5 dark:border-white/5 pb-4">Informações Básicas</h3>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -385,25 +349,33 @@ export default function Settings() {
                         </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex justify-end gap-4 pt-6 border-t border-black/5 dark:border-white/5">
-                    <button
-                      onClick={() => fetchProfile()}
-                      disabled={saving}
-                      className="px-6 py-2.5 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-all font-medium disabled:opacity-50"
-                    >
-                      Descartar
-                    </button>
-                    <button
-                      onClick={handleSaveProfile}
-                      disabled={saving}
-                      className="px-8 py-2.5 rounded-2xl bg-primary hover:bg-primary/90 text-white font-bold shadow-lg shadow-primary/20 flex items-center gap-2 transition-all disabled:opacity-50"
-                    >
-                      {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-                      {saving ? 'Salvando...' : 'Salvar Alterações'}
-                    </button>
-                  </div>
+                    <div className="flex justify-end gap-4 pt-6 border-t border-black/5 dark:border-white/5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData({
+                            name: contextProfile?.name || '',
+                            email: contextProfile?.email || '',
+                            phone: '',
+                            language: 'Português (Brasil)'
+                          });
+                        }}
+                        disabled={saving}
+                        className="px-6 py-2.5 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5 transition-all font-medium disabled:opacity-50"
+                      >
+                        Descartar
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={saving}
+                        className="px-8 py-2.5 rounded-2xl bg-primary hover:bg-primary/90 text-white font-bold shadow-lg shadow-primary/20 flex items-center gap-2 transition-all disabled:opacity-50"
+                      >
+                        {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                        {saving ? 'Salvando...' : 'Salvar Alterações'}
+                      </button>
+                    </div>
+                  </form>
                 </motion.div>
               )}
 

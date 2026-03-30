@@ -8,7 +8,7 @@ interface LoginProps {
   onLogin: () => void;
 }
 
-export default function Login({ onLogin }: LoginProps) {
+export default function Login() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -45,7 +45,6 @@ export default function Login({ onLogin }: LoginProps) {
         if (data.user) {
           // If needed, we can set local state, but App.tsx will eventually listen to Auth State
           localStorage.setItem('currentUser', data.user.email || ''); // Keeping fallback for the Dashboard requests for now
-          onLogin();
           navigate('/dashboard');
         }
       } else {
