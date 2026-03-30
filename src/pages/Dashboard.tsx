@@ -391,7 +391,7 @@ export default function Dashboard() {
                   <Wallet size={18} />
                 </div>
                 <div>
-                  <p className="text-[9px] font-black text-slate-400 uppercase leading-none mb-1">Saldo</p>
+                  <p className="text-[9px] font-black text-slate-400 uppercase leading-none mb-1">Valor do Plano</p>
                   <p className="text-sm font-black text-slate-900 dark:text-white">{formatCurrency(client?.balance || 0)}</p>
                 </div>
               </div>
