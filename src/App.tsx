@@ -107,12 +107,16 @@ export default function App() {
     checkSession();
 
     // Timeout de segurança: se o App ficar preso em "null" (Carregando Experiência) por mais de 10s, 
-    // forçamos uma decisão para não travar o usuário.
+    // forçamos uma decisão para não travar o usuário. Usamos functional state updater para evitar stale closures.
     const safetyTimer = setTimeout(() => {
-      if (isAuthenticated === null) {
-        console.warn('App: timeout de segurança atingido. Forçando redirecionamento.');
-        setIsAuthenticated(false);
-      }
+      setIsAuthenticated(prev => {
+        if (prev === null) {
+          console.warn('App: timeout de segurança atingido. Forçando redirecionamento.');
+          return false;
+        }
+        return prev;
+      });
+      setIsAdmin(prev => (prev === null ? false : prev));
     }, 10000);
 
     return () => clearTimeout(safetyTimer);
