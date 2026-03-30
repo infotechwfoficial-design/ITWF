@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../utils/supabase';
 import { Client, Admin } from '../types';
@@ -21,6 +21,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profile, setProfile] = useState<Client | Admin | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
+  
+  // Usamos ref para rastrear o ID de usuário atual e evitar problemas com "closures" obsoletas.
+  const lastUserId = useRef<string | null>(null);
 
   const fetchProfile = useCallback(async (user: User) => {
     try {
@@ -145,6 +148,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setSession(null);
     setProfile(null);
     setIsAdmin(false);
+    lastUserId.current = null;
   };
 
   useEffect(() => {
@@ -153,48 +157,71 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Inicialização da sessão
     const initSession = async () => {
       try {
-        const { data: { session: initialSession }, error: sessionError } = await supabase.auth.getSession();
+        // Criamos um timeout na inicialização da Promise para que o PWA/Mobile 
+        // nunca trave infinitamente na tela de "Carregando" caso a rede do OS fale ao acordar
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout fetching session')), 15000)
+        );
+        const sessionPromise = supabase.auth.getSession();
+        
+        const result = await Promise.race([sessionPromise, timeoutPromise]) as any;
+        const initialSession = result?.data?.session;
+        const sessionError = result?.error;
         
         if (sessionError) throw sessionError;
 
         if (mounted) {
-          setSession(initialSession);
+          setSession(initialSession || null);
           setUser(initialSession?.user ?? null);
+          lastUserId.current = initialSession?.user?.id ?? null;
           
           if (initialSession?.user) {
-            await fetchProfile(initialSession.user);
+            await Promise.race([fetchProfile(initialSession.user), timeoutPromise]);
           }
           setLoading(false);
         }
       } catch (err) {
         console.error('AuthContext: Erro na inicialização:', err);
+        // Em caso de catch (como travamento na volta de 2º plano), liberamos a UI assim mesmo e tentamos continuar
         if (mounted) setLoading(false);
       }
     };
 
     initSession();
 
-    // Listener de mudanças na auth
+    // Listener de mudanças na auth (acionado frequentemente quando retorna do WhatsApp/etc)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       console.log('AuthContext: Auth event ->', _event);
       
       if (mounted) {
-        // Se houve mudança no usuário, ligar o loading para que as rotas aguardem o fetchProfile
-        if (newSession?.user?.id !== session?.user?.id) {
+        const newUserId = newSession?.user?.id ?? null;
+        const isUserDifferent = newUserId !== lastUserId.current;
+
+        // Se o usuário mudou de fato, chamamos o bloqueio pesado
+        if (isUserDifferent) {
           setLoading(true);
+          lastUserId.current = newUserId;
         }
 
         setSession(newSession);
-        const newUser = newSession?.user ?? null;
-        setUser(newUser);
+        setUser(newSession?.user ?? null);
         
-        if (newUser) {
-          await fetchProfile(newUser);
+        if (newSession?.user) {
+          if (isUserDifferent) {
+            // Se houve troca de contas real, congela UI, e busca sincrono 
+            await fetchProfile(newSession.user);
+          } else {
+            // Se é o MESMO usuário (apenas Refreshing de Token do celular após voltar no WhatsApp),
+            // Fazemos update de dados livre pelas cortinas de fundo SEM aguardar as promises para a UI não travar!
+            fetchProfile(newSession.user).catch(console.error);
+          }
         } else {
           setProfile(null);
           setIsAdmin(false);
+          lastUserId.current = null;
         }
         
+        // Garante liberação
         setLoading(false);
       }
     });
