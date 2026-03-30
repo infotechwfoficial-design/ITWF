@@ -279,6 +279,7 @@ export default function Admin() {
   const [activeTab, setActiveTab] = useState<'clients' | 'notifications' | 'requests' | 'plans' | 'payments' | 'resellers' | 'settings'>('clients');
   const [toast, setToast] = useState<ToastState | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(false);
   
   // O currentAdmin agora vem do contexto
   const currentAdmin = isAuthAdmin ? (profile as AdminProfile) : null;
@@ -549,18 +550,40 @@ export default function Admin() {
   };
 
   useEffect(() => {
-    if (isAuthAdmin && currentAdmin) {
-      fetchClients();
-      fetchNotifications();
-      fetchRequests();
-      fetchPlans();
-      fetchAdminSettings();
-      if (currentAdmin.role === 'master') {
-        fetchResellers();
-        fetchPaymentSettings();
+    let mounted = true;
+
+    const loadAdminData = async () => {
+      if (!isAuthAdmin || !currentAdmin) return;
+      
+      try {
+        setIsLoadingData(true);
+        // Otimização: Buscamos sequencialmente ou em blocos menores para evitar "Rate Limit" e travamento (Timeouts)
+        // se a internet ou o plano free do Supabase estrangular as requisições.
+        await fetchClients();
+        await fetchNotifications();
+        await fetchRequests();
+        await fetchPlans();
+        await fetchAdminSettings();
+        await fetchPushStats();
+
+        if (currentAdmin.role === 'master') {
+          await fetchResellers();
+          await fetchPaymentSettings();
+        }
+      } catch (err) {
+        console.error('Erro geral ao carregar dados do admin:', err);
+      } finally {
+        if (mounted) {
+          setIsLoadingData(false);
+        }
       }
-      fetchPushStats();
-    }
+    };
+
+    loadAdminData();
+
+    return () => {
+      mounted = false;
+    };
   }, [isAuthAdmin, currentAdmin]);
 
   const fetchPaymentSettings = async () => {
@@ -1119,13 +1142,21 @@ export default function Admin() {
     >
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       
-      {activeTab === 'clients' && (
-        <div className="space-y-6">
-          {/* Referral Link Section for Resellers */}
-          {currentAdmin && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
+      {isLoadingData ? (
+        <div className="flex-1 flex flex-col items-center justify-center min-h-[60vh]">
+          <Loader2 size={48} className="animate-spin text-primary mb-4" />
+          <p className="font-bold text-slate-500 animate-pulse">Sincronizando banco de dados...</p>
+          <p className="text-xs text-slate-400 mt-2">Isso pode levar alguns segundos.</p>
+        </div>
+      ) : (
+        <>
+          {activeTab === 'clients' && (
+            <div className="space-y-6">
+              {/* Referral Link Section for Resellers */}
+              {currentAdmin && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
               className="bg-primary/5 border border-primary/20 rounded-3xl p-6 flex flex-col md:flex-row items-center justify-between gap-6"
             >
               <div className="flex items-center gap-4">
@@ -2345,6 +2376,8 @@ export default function Admin() {
             </div>
           </motion.div>
         </div>
+      )}
+        </>
       )}
 
       {/* Confirm Modal Reutilizável */}
