@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
   ShieldCheck, 
@@ -18,11 +18,39 @@ import {
   User as UserIcon,
   Plus
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { supabase } from '../utils/supabase';
 
 export default function SaaS() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [reseller, setReseller] = useState<{ name: string; support: string } | null>(null);
+
+  // Busca informações do revendedor se houver ?ref=ID na URL
+  useEffect(() => {
+    const fetchReseller = async () => {
+      const refId = searchParams.get('ref');
+      if (refId) {
+        const { data } = await supabase
+          .from('admins')
+          .select('name, support_number')
+          .eq('id', refId)
+          .maybeSingle();
+        
+        if (data) {
+          setReseller({
+            name: data.name,
+            support: data.support_number || '5584996764125' // Fallback para o oficial
+          });
+        }
+      }
+    };
+    fetchReseller();
+  }, [searchParams]);
+
+  const supportNumber = reseller?.support || '5584996764125';
+  const agencyName = reseller?.name ? `${reseller.name} InfoTech` : 'ITWF SAAS';
 
   const plans = [
     {
@@ -165,8 +193,8 @@ export default function SaaS() {
           >
             <button 
               onClick={() => {
-                const msg = encodeURIComponent("Olá! Vim pela Landing Page e quero saber mais sobre como ser um revendedor ITWF.");
-                window.open(`https://wa.me/5584996764125?text=${msg}`, '_blank');
+                const msg = encodeURIComponent(`Olá! Vim pela Landing Page de ${reseller?.name || 'Indicação'} e quero saber mais sobre como ser um revendedor.`);
+                window.open(`https://wa.me/${supportNumber}?text=${msg}`, '_blank');
               }}
               className="w-full md:w-auto bg-primary text-white px-10 py-5 rounded-2xl text-lg font-black shadow-2xl shadow-primary/40 flex items-center justify-center gap-2 group transition-all hover:translate-y-[-2px]"
             >
@@ -175,8 +203,8 @@ export default function SaaS() {
             </button>
             <button 
               onClick={() => {
-                const msg = encodeURIComponent("Olá! Gostaria de ver uma demonstração do painel administrativo ITWF.");
-                window.open(`https://wa.me/5584996764125?text=${msg}`, '_blank');
+                const msg = encodeURIComponent(`Olá! Gostaria de ver uma demonstração do painel administrativo.`);
+                window.open(`https://wa.me/${supportNumber}?text=${msg}`, '_blank');
               }}
               className="w-full md:w-auto px-10 py-5 rounded-2xl text-lg font-bold border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center gap-2 transition-all"
             >
@@ -282,8 +310,8 @@ export default function SaaS() {
 
                 <button 
                   onClick={() => {
-                    const msg = encodeURIComponent(`Olá! Gostaria de saber mais sobre o Plano ${p.name} do ITWF SaaS.`);
-                    window.open(`https://wa.me/5584996764125?text=${msg}`, '_blank');
+                    const msg = encodeURIComponent(`Olá! Gostaria de saber mais sobre o Plano ${p.name} do sistema sob a supervisão de ${reseller?.name || 'suporte'}.`);
+                    window.open(`https://wa.me/${supportNumber}?text=${msg}`, '_blank');
                   }}
                   className={`w-full py-4 rounded-2xl font-black transition-all ${p.popular ? 'bg-primary text-white shadow-lg shadow-primary/30 hover:scale-105' : 'bg-slate-100 dark:bg-slate-800 hover:bg-primary hover:text-white dark:hover:bg-primary'}`}
                 >

@@ -17,11 +17,24 @@ export default function Plans() {
   const [isAnnual, setIsAnnual] = useState(false);
 
   useEffect(() => {
-    const apiUrl = import.meta.env.VITE_API_URL || '';
-    fetch(`${apiUrl}/api/plans`)
-      .then(res => res.json())
-      .then(data => setPlans(data))
-      .catch(err => console.error(err));
+    const fetchPlans = async () => {
+      try {
+        const apiUrl = import.meta.env.VITE_API_URL || '';
+        const res = await fetch(`${apiUrl}/api/plans`);
+        
+        const contentType = res.headers.get('content-type');
+        if (res.ok && contentType && contentType.includes('application/json')) {
+          const data = await res.json();
+          setPlans(data);
+        } else {
+          console.error(`[Plans] Erro ao carregar planos: ${res.status}`);
+        }
+      } catch (err) {
+        console.error('[Plans] Falha na rede:', err);
+      }
+    };
+    
+    fetchPlans();
   }, []);
 
   return (

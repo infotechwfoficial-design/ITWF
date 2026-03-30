@@ -59,13 +59,18 @@ async function getAdminLogo(adminId: string | null): Promise<string> {
   if (!adminId) return defaultLogo;
   if (adminLogoCache.has(adminId)) return adminLogoCache.get(adminId)!;
   try {
-    const { data: adminAuth } = await supabase.from('admins').select('user_id').eq('id', adminId).maybeSingle();
-    const userId = adminAuth?.user_id || adminId;
-    const { data: adminProfile } = await supabase.from('clients').select('push_logo_url').eq('user_id', userId).maybeSingle();
+    // Busca o logo diretamente na tabela admins usando o ID (PK)
+    const { data: adminProfile } = await supabase
+      .from('admins')
+      .select('push_logo_url')
+      .eq('id', adminId)
+      .maybeSingle();
+
     const logo = adminProfile?.push_logo_url || defaultLogo;
     adminLogoCache.set(adminId, logo);
     return logo;
   } catch (e) {
+    console.error('[server] Erro ao buscar logo do admin:', e);
     return defaultLogo;
   }
 }
@@ -247,9 +252,17 @@ async function processApprovedPayment(externalRef: string, providerName: string)
       const exp = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
       if (exp > baseDate) baseDate = exp;
     }
-    // Lógica robusta de adição de meses
+    // Lógica robusta de adição de meses baseada na duração do plano
     const currentDay = baseDate.getDate();
-    baseDate.setMonth(baseDate.getMonth() + 1);
+    let monthsToAdd = 1;
+    
+    const duration = plan.duration?.toLowerCase() || '';
+    if (duration.includes('trimestral')) monthsToAdd = 3;
+    else if (duration.includes('anual')) monthsToAdd = 12;
+    else if (duration.includes('semestral')) monthsToAdd = 6;
+
+    baseDate.setMonth(baseDate.getMonth() + monthsToAdd);
+    
     // Se o dia mudou (ex: 31 de jan -> 3 de mar), ajusta para o último dia do mês correto
     if (baseDate.getDate() !== currentDay) {
       baseDate.setDate(0);
@@ -269,30 +282,86 @@ async function processApprovedPayment(externalRef: string, providerName: string)
 
 async function startServer() {
   const app = express();
-  app.use(cors({ origin: ['https://itwf.vercel.app', 'http://localhost:5173', 'http://localhost:3000'], credentials: true }));
+  
+  // CORS Dinâmico: Aceita Vercel oficial, subdomínios Vercel (previews) e localhost
+  app.use(cors({ 
+    origin: (origin, callback) => {
+      const allowedOrigins = [
+        'https://itwf.vercel.app', 
+        'http://localhost:5173', 
+        'http://localhost:3000'
+      ];
+      if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    }, 
+    credentials: true 
+  }));
+  
   app.use(express.json({ verify: (req: any, res, buf) => { if (req.originalUrl.startsWith('/api/webhooks/stripe')) req.rawBody = buf; } }));
 
   // Routes
   app.get('/api/plans', async (req, res) => {
-    const { data } = await supabase.from('plans').select('*').order('id', { ascending: true });
-    res.json(data);
+    try {
+      const { data, error } = await supabase.from('plans').select('*').order('id', { ascending: true });
+      if (error) throw error;
+      res.json(data || []);
+    } catch (err: any) {
+      console.error('[Plans API Error]', err);
+      res.status(500).json({ error: 'Erro ao carregar planos' });
+    }
   });
 
   app.post('/api/chat', async (req, res) => {
-    const { history, message } = req.body;
-    const model = ai.getGenerativeModel({ model: 'gemini-flash-latest' });
-    const result = await model.generateContent(message);
-    res.json({ reply: result.response.text() });
+    try {
+      const { history, message } = req.body;
+      const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      
+      // Inicia chat com histórico para manter contexto
+      const chat = model.startChat({ 
+        history: (history || []).map((m: any) => ({
+          role: m.role || 'user',
+          parts: [{ text: m.parts?.[0]?.text || '' }]
+        }))
+      });
+
+      const result = await chat.sendMessage(message || '');
+      res.json({ reply: result.response.text() });
+    } catch (err: any) {
+      console.error('[Chat API Error]', err);
+      res.status(500).json({ error: 'Desculpe, tive um problema ao processar sua mensagem.' });
+    }
   });
 
   app.post('/api/send-push', async (req, res) => {
-    const { title, message, email, username, adminId } = req.body;
-    const { data: subs } = await supabase.from('push_subscriptions').select('subscription_json, admin_id').or(`username.eq.${username},email.eq.${email}`);
-    if (subs) {
-      const promises = subs.map(s => sendPushNotification(s.subscription_json, { title, body: message, url: '/dashboard' }, s.admin_id));
-      await Promise.allSettled(promises);
+    try {
+      const { title, message, email, username, adminId } = req.body;
+      
+      // Constrói query de busca de inscrições de forma flexível
+      let orFilter = [];
+      if (username) orFilter.push(`username.eq.${username}`);
+      if (email) orFilter.push(`email.eq.${email}`);
+      
+      if (orFilter.length === 0) {
+        return res.status(400).json({ error: 'Identificador (email ou username) não fornecido' });
+      }
+
+      const { data: subs } = await supabase
+        .from('push_subscriptions')
+        .select('subscription_json, admin_id')
+        .or(orFilter.join(','));
+
+      if (subs && subs.length > 0) {
+        const promises = subs.map(s => sendPushNotification(s.subscription_json, { title, body: message, url: '/dashboard' }, s.admin_id || adminId));
+        await Promise.allSettled(promises);
+      }
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error('[Send Push API Error]', err);
+      res.status(500).json({ error: 'Erro ao enviar notificação' });
     }
-    res.json({ success: true });
   });
 
   app.post('/api/send-sports-push', async (req, res) => {
@@ -319,43 +388,98 @@ async function startServer() {
   });
 
   app.post('/api/subscribe', async (req, res) => {
-    const { email, username, subscription, adminId } = req.body;
-    await supabase.from('push_subscriptions').upsert([{ email, username, admin_id: adminId || null, subscription_json: JSON.stringify(subscription) }], { onConflict: 'subscription_json' });
-    res.status(201).json({ success: true });
+    try {
+      const { email, username, subscription, adminId } = req.body;
+      if (!subscription) return res.status(400).json({ error: 'Assinatura PWA não fornecida' });
+      
+      await supabase.from('push_subscriptions').upsert([{ 
+        email, 
+        username, 
+        admin_id: adminId || null, 
+        subscription_json: JSON.stringify(subscription) 
+      }], { onConflict: 'subscription_json' });
+      
+      res.status(201).json({ success: true });
+    } catch (err: any) {
+      console.error('[Subscribe API Error]', err);
+      res.status(500).json({ error: 'Erro ao registrar assinatura de notificações' });
+    }
   });
 
   app.post('/api/unsubscribe', async (req, res) => {
-    const { email, subscription_json } = req.body;
-    if (subscription_json) {
-      await supabase.from('push_subscriptions').delete().eq('subscription_json', subscription_json);
-    } else if (email) {
-      await supabase.from('push_subscriptions').delete().eq('email', email);
+    try {
+      const { email, subscription_json } = req.body;
+      if (subscription_json) {
+        await supabase.from('push_subscriptions').delete().eq('subscription_json', subscription_json);
+      } else if (email) {
+        await supabase.from('push_subscriptions').delete().eq('email', email);
+      }
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error('[Unsubscribe API Error]', err);
+      res.status(500).json({ error: 'Erro ao remover assinatura' });
     }
-    res.json({ success: true });
   });
 
   app.post('/api/register-fcm', async (req, res) => {
-    const { email, token, device_type } = req.body;
-    const { data: client } = await supabase.from('clients').select('user_id').eq('email', email).maybeSingle();
-    await supabase.from('fcm_tokens').upsert([{ user_id: client?.user_id, email, token, device_type }], { onConflict: 'token' });
-    res.status(201).json({ success: true });
+    try {
+      const { email, token, device_type } = req.body;
+      if (!token) return res.status(400).json({ error: 'Token FCM não fornecido' });
+
+      const { data: client } = await supabase.from('clients').select('user_id').eq('email', email).maybeSingle();
+      await supabase.from('fcm_tokens').upsert([{ 
+        user_id: client?.user_id, 
+        email, 
+        token, 
+        device_type 
+      }], { onConflict: 'token' });
+      
+      res.status(201).json({ success: true });
+    } catch (err: any) {
+      console.error('[FCM API Error]', err);
+      res.status(500).json({ error: 'Erro ao registrar token mobile' });
+    }
   });
 
   app.get('/api/admin/run-vencimentos', async (req, res) => {
-    await runVencimentosCheck();
-    res.json({ success: true });
+    try {
+      await runVencimentosCheck();
+      res.json({ success: true });
+    } catch (err: any) {
+      console.error('[Admin Cron Error]', err);
+      res.status(500).json({ error: 'Erro ao executar verificação de vencimentos' });
+    }
   });
 
   // Webhooks
   app.post('/api/webhooks/mercadopago', async (req, res) => {
-    const { data } = req.body;
-    if (data?.id) {
-      const { data: setting } = await supabase.from('payment_settings').select('*').eq('provider', 'mercadopago').single();
-      const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${data.id}`, { headers: { Authorization: `Bearer ${setting?.credentials?.token}` } });
-      const mpData = await mpResponse.json();
-      if (mpData.status === 'approved') await processApprovedPayment(mpData.external_reference, 'Mercado Pago');
+    try {
+      const { data, type } = req.body;
+      
+      // Processa apenas notificações de pagamento aprovado
+      if (type === 'payment' || data?.id) {
+        const paymentId = data?.id || req.body.id;
+        const { data: setting } = await supabase.from('payment_settings').select('*').eq('provider', 'mercadopago').single();
+        
+        if (setting?.credentials?.token) {
+          const mpResponse = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, { 
+            headers: { Authorization: `Bearer ${setting.credentials.token}` } 
+          });
+          
+          if (mpResponse.ok) {
+            const mpData = await mpResponse.json();
+            if (mpData.status === 'approved') {
+              await processApprovedPayment(mpData.external_reference, 'Mercado Pago');
+            }
+          }
+        }
+      }
+      res.sendStatus(200);
+    } catch (err: any) {
+      console.error('[MP Webhook Error]', err);
+      // Sempre retornamos 200 para o MP não ficar tentando reenviar em caso de erro interno
+      res.sendStatus(200);
     }
-    res.sendStatus(200);
   });
 
   // Keep-alive e Crons

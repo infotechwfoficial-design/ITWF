@@ -40,7 +40,7 @@ import {
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { Client, Notification as NotificationType } from '../types';
+import { Client, Notification as NotificationType, isClient } from '../types';
 import { subscribeUserToPush } from '../utils/push';
 import { supabase } from '../utils/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -133,6 +133,12 @@ export default function Dashboard() {
   // Sicroniza o perfil do contexto com o estado local do Dashboard
   useEffect(() => {
     if (contextProfile) {
+      if (!isClient(contextProfile)) {
+        // Segurança extra: Se for Admin tentando acessar Dashboard, manda pro lugar certo
+        navigate('/admin');
+        return;
+      }
+
       setClient(contextProfile);
       setNewName(contextProfile.name || '');
       setLoading(false);
@@ -156,7 +162,7 @@ export default function Dashboard() {
       // Se não houver perfil após o loading do contexto, liberamos a tela (será mostrada como visitante)
       setLoading(false);
     }
-  }, [contextProfile]);
+  }, [contextProfile, navigate]);
 
   // Carrega dados secundários e realtime
   useEffect(() => {

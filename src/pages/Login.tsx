@@ -103,7 +103,14 @@ export default function Login() {
               message: `O usuário ${email} acabou de se cadastrar no sistema.`,
               email: 'info.tech.wf.oficial@gmail.com'
             })
-          }).catch(console.error);
+          })
+          .then(async (res) => {
+            if (!res.ok) {
+              const text = await res.text().catch(() => '');
+              console.warn('[Push Notification] Erro ao notificar admin:', res.status, text);
+            }
+          })
+          .catch(err => console.error('[Push Notification] Falha na rede:', err));
         }
 
         setSuccessMsg('Conta criada com sucesso! Você já pode fazer login.');

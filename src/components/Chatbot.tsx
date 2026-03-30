@@ -60,9 +60,9 @@ export function Chatbot() {
                 })
             });
 
-            const data = await response.json();
+            const data = await response.json().catch(() => ({ error: 'Formato de resposta inválido' }));
 
-            if (!response.ok) throw new Error(data.error);
+            if (!response.ok) throw new Error(data.error || `Erro de rede (${response.status})`);
 
             setMessages((prev) => [
                 ...prev,

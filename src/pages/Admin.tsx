@@ -36,8 +36,9 @@ import {
   Loader2
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { Client, Notification, Plan } from '../types';
+import type { Client, Notification, Plan, Admin as AdminProfile } from '../types';
 import { supabase } from '../utils/supabase';
+import { useAuth } from '../context/AuthContext';
 import Toast from '../components/Toast';
 import ConfirmModal from '../components/ConfirmModal';
 
@@ -269,6 +270,8 @@ const PlanCard = React.memo(({ plan, onEdit, onDelete }: {
 
 export default function Admin() {
   const navigate = useNavigate();
+  const { profile, isAdmin: isAuthAdmin, loading: authLoading, signOut: authSignOut } = useAuth();
+  
   const [clients, setClients] = useState<Client[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
@@ -276,7 +279,9 @@ export default function Admin() {
   const [activeTab, setActiveTab] = useState<'clients' | 'notifications' | 'requests' | 'plans' | 'payments' | 'resellers' | 'settings'>('clients');
   const [toast, setToast] = useState<ToastState | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [currentAdmin, setCurrentAdmin] = useState<{ id: string; role: string } | null>(null);
+  
+  // O currentAdmin agora vem do contexto
+  const currentAdmin = isAuthAdmin ? (profile as AdminProfile) : null;
   const [resellers, setResellers] = useState<any[]>([]);
   const [isResellerModalOpen, setIsResellerModalOpen] = useState(false);
   const [pushSubscribersCount, setPushSubscribersCount] = useState<number | null>(null);
@@ -376,37 +381,10 @@ export default function Admin() {
   }, []);
 
   useEffect(() => {
-    const checkUser = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-
-        if (user) {
-          // BUSCA SEGURA: Buscar o role diretamente do banco de dados, ignorando o localStorage
-          const { data: adminData } = await supabase
-            .from('admins')
-            .select('role')
-            .eq('user_id', user.id)
-            .single();
-
-          if (adminData) {
-            setCurrentAdmin({ id: user.id, role: adminData.role });
-            // Opcionalmente atualizamos o localStorage apenas para fins de UI não crítica (ex: mostrar Sidebar)
-            localStorage.setItem('adminRole', adminData.role);
-          } else {
-            // Se o cara está logado mas não é admin (removido da tabela), expulsa
-            await supabase.auth.signOut();
-            navigate('/admin/login');
-          }
-        } else {
-          navigate('/admin/login');
-        }
-      } catch (err) {
-        console.error('Erro na verificação de admin:', err);
-        navigate('/admin/login');
-      }
-    };
-    checkUser();
-  }, [navigate]);
+    if (!authLoading && !isAuthAdmin) {
+      navigate('/admin/login');
+    }
+  }, [isAuthAdmin, authLoading, navigate]);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'warning') => {
     setToast({ message, type });
@@ -467,9 +445,9 @@ export default function Admin() {
     try {
       if (!currentAdmin?.id) return;
       const { data, error } = await supabase
-        .from('clients')
+        .from('admins')
         .select('support_number, push_logo_url')
-        .eq('user_id', currentAdmin.id)
+        .eq('user_id', currentAdmin.user_id)
         .maybeSingle();
       
       if (error) throw error;
@@ -493,9 +471,9 @@ export default function Admin() {
     setSavingSettings(true);
     try {
       const { error } = await supabase
-        .from('clients')
+        .from('admins')
         .update({ push_logo_url: adminPushLogoLink })
-        .eq('user_id', currentAdmin.id);
+        .eq('user_id', currentAdmin.user_id);
       if (error) throw error;
       setAdminPushLogoUrl(adminPushLogoLink);
       showToast('Link da logo salvo!', 'success');
@@ -534,9 +512,9 @@ export default function Admin() {
       if (!publicData?.publicUrl) throw new Error('Falha ao gerar URL pública da logo');
 
       const { error: updateError } = await supabase
-        .from('clients')
+        .from('admins')
         .update({ push_logo_url: publicData.publicUrl })
-        .eq('user_id', currentAdmin.id);
+        .eq('user_id', currentAdmin.user_id);
 
       if (updateError) throw updateError;
 
@@ -557,9 +535,9 @@ export default function Admin() {
     setSavingSettings(true);
     try {
       const { error } = await supabase
-        .from('clients')
+        .from('admins')
         .update({ support_number: adminSupportNumber })
-        .eq('user_id', currentAdmin.id);
+        .eq('user_id', currentAdmin.user_id);
       if (error) throw error;
       showToast('Configurações salvas com sucesso!', 'success');
     } catch (e: any) {
@@ -571,7 +549,7 @@ export default function Admin() {
   };
 
   useEffect(() => {
-    if (currentAdmin) {
+    if (isAuthAdmin && currentAdmin) {
       fetchClients();
       fetchNotifications();
       fetchRequests();
@@ -583,7 +561,7 @@ export default function Admin() {
       }
       fetchPushStats();
     }
-  }, [currentAdmin]);
+  }, [isAuthAdmin, currentAdmin]);
 
   const fetchPaymentSettings = async () => {
     const { data } = await supabase.from('payment_settings').select('*').order('provider');
@@ -647,7 +625,7 @@ export default function Admin() {
     if (!currentAdmin) return;
     try {
       const apiUrl = import.meta.env.VITE_API_URL || '';
-      const res = await fetch(`${apiUrl}/api/push-stats?adminId=${currentAdmin.id}`);
+      const res = await fetch(`${apiUrl}/api/push-stats?adminId=${currentAdmin.user_id}`);
       const data = await res.json();
       setPushSubscribersCount(data.count || 0);
     } catch (err) {
@@ -662,10 +640,10 @@ export default function Admin() {
     
     if (currentAdmin.role === 'master') {
       // Master vê seus clientes diretos (sem vinculação) e também os que indicou
-      query = query.or(`admin_id.is.null,admin_id.eq.${currentAdmin.id}`);
+      query = query.or(`admin_id.is.null,admin_id.eq.${currentAdmin.user_id}`);
     } else {
       // Revendedores veem apenas os seus próprios clientes
-      query = query.eq('admin_id', currentAdmin.id);
+      query = query.eq('admin_id', currentAdmin.user_id);
     }
     
     const { data } = await query.order('created_at', { ascending: false });
@@ -686,9 +664,9 @@ export default function Admin() {
     
     if (currentAdmin.role === 'master') {
       // Master vê pedidos de seus clientes diretos (sem admin_id ou indicados por ele)
-      query = query.or(`admin_id.is.null,admin_id.eq.${currentAdmin.id}`);
+      query = query.or(`admin_id.is.null,admin_id.eq.${currentAdmin.user_id}`);
     } else {
-      query = query.eq('admin_id', currentAdmin.id);
+      query = query.eq('admin_id', currentAdmin.user_id);
     }
 
     const { data } = await query.order('created_at', { ascending: false });
@@ -729,7 +707,14 @@ export default function Admin() {
           })
         });
 
-        const authData = await authRes.json();
+        let authData;
+        const contentType = authRes.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          authData = await authRes.json();
+        } else {
+          throw new Error(`Erro do servidor (Status ${authRes.status}). Verifique se o backend está online.`);
+        }
+
         if (!authRes.ok) throw new Error(authData.error || 'Erro ao criar conta de acesso');
 
         // 2. Inserir na tabela clients com o user_id retornado
@@ -743,7 +728,7 @@ export default function Admin() {
             expiration_date: clientForm.expiration_date,
             balance: clientForm.balance,
             renewal_link: clientForm.renewal_link,
-            admin_id: currentAdmin?.id
+            admin_id: currentAdmin?.user_id
           }]);
 
         if (error) throw error;
@@ -780,11 +765,15 @@ export default function Admin() {
         body: JSON.stringify({
           title: notifForm.title,
           message: notifForm.message,
-          adminId: currentAdmin?.id
+          adminId: currentAdmin?.user_id
         })
       });
 
-      const pushData = await resPush.json();
+      let pushData = { count: 0 };
+      const pushContentType = resPush.headers.get('content-type');
+      if (pushContentType && pushContentType.includes('application/json')) {
+        pushData = await resPush.json();
+      }
       
       setIsNotifModalOpen(false);
       setNotifForm({ title: '', message: '', type: 'info' });
@@ -817,12 +806,19 @@ export default function Admin() {
           title: 'Aviso de Vencimento',
           message: directPushMessage,
           username: directPushClient.username,
-          adminId: currentAdmin?.id
+          adminId: currentAdmin?.user_id
         })
       });
       
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Falha ao enviar push');
+      let data;
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        throw new Error(`Erro de comunicação com o servidor (${res.status}).`);
+      }
+
+      if (!res.ok) throw new Error(data?.error || 'Falha ao enviar push');
       
       showToast('Notificação enviada!', 'success');
       setIsDirectPushModalOpen(false);
@@ -892,7 +888,7 @@ export default function Admin() {
             message: `O status do seu pedido "${title}" mudou para: ${status}`,
             email: clientData.email,
             username: clientData.username,
-            adminId: currentAdmin?.id
+            adminId: currentAdmin?.user_id
           })
         }).catch(err => console.error('Erro ao disparar push API:', err));
 
@@ -931,8 +927,15 @@ export default function Admin() {
         headers: { 'Content-Type': 'application/json' }
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Erro ao enviar agenda');
+      let data;
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        throw new Error(`Erro do servidor (${res.status}). O serviço pode estar temporariamente indisponível.`);
+      }
+
+      if (!res.ok) throw new Error(data?.error || 'Erro ao enviar agenda');
 
       showToast('Agenda esportiva enviada com sucesso!', 'success');
     } catch (err: any) {
@@ -1090,7 +1093,7 @@ export default function Admin() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('isAdminAuthenticated');
+    authSignOut();
     navigate('/admin/login');
   };
 

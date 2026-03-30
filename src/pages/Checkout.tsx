@@ -66,12 +66,18 @@ export default function Checkout() {
         })
       });
 
-      const data = await response.json();
-
-      if (data.init_point) {
-        window.location.href = data.init_point;
+      const contentType = response.headers.get('content-type');
+      if (response.ok && contentType && contentType.includes('application/json')) {
+        const data = await response.json();
+        if (data.init_point) {
+          window.location.href = data.init_point;
+        } else {
+          alert(data.error || 'Erro ao gerar o link de pagamento. Verifique as configurações no admin.');
+        }
       } else {
-        alert(data.error || 'Erro ao gerar o link de pagamento. Verifique as configurações no admin.');
+        const errorText = await response.text().catch(() => '');
+        console.error('[Checkout] Erro na API:', errorText);
+        alert(`Erro no servidor (${response.status}). Tente novamente em instantes.`);
       }
     } catch (err) {
       console.error(err);

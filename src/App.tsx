@@ -87,8 +87,14 @@ function AppContent() {
           <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
             <Suspense fallback={<LoadingFallback />}>
               <Routes>
-                <Route path="/" element={!user ? <Login /> : <Navigate to="/dashboard" replace />} />
-                <Route path="/admin-login" element={!user ? <AdminLogin /> : <Navigate to="/admin" replace />} />
+                <Route path="/" element={
+                  !user ? <Login /> : 
+                  isAdmin ? <Navigate to="/admin" replace /> : <Navigate to="/dashboard" replace />
+                } />
+                <Route path="/admin-login" element={
+                  !user ? <AdminLogin /> : 
+                  isAdmin ? <Navigate to="/admin" replace /> : <Navigate to="/dashboard" replace />
+                } />
                 <Route path="/dashboard" element={user ? <Dashboard /> : <Navigate to="/" replace />} />
                 <Route path="/plans" element={user ? <Plans /> : <Navigate to="/" replace />} />
                 <Route path="/sports" element={user ? <Sports /> : <Navigate to="/" replace />} />

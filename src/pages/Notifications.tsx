@@ -18,14 +18,26 @@ export default function Notifications() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const apiUrl = import.meta.env.VITE_API_URL || '';
-    fetch(`${apiUrl}/api/notifications`)
-      .then(res => res.json())
-      .then(data => {
-        setNotifications(data);
+    const fetchNotifications = async () => {
+      try {
+        const apiUrl = import.meta.env.VITE_API_URL || '';
+        const res = await fetch(`${apiUrl}/api/notifications`);
+        
+        const contentType = res.headers.get('content-type');
+        if (res.ok && contentType && contentType.includes('application/json')) {
+          const data = await res.json();
+          setNotifications(data);
+        } else {
+          console.error(`[Notifications] Erro ao carregar: ${res.status}`);
+        }
+      } catch (err) {
+        console.error('[Notifications] Erro de rede:', err);
+      } finally {
         setLoading(false);
-      })
-      .catch(() => setLoading(false));
+      }
+    };
+    
+    fetchNotifications();
   }, []);
 
   if (loading) {
