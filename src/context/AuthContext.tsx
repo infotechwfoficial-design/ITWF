@@ -224,21 +224,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const prefersAdmin = localStorage.getItem('isAdminAuthenticated') === 'true';
             setIsAdmin(isRoleAdmin || prefersAdmin);
             await fetchProfile(newUser);
+            setLoading(false); // Libera somente após carregar perfil
           } else {
-            // Evita duplo fetch na inicialização da página
+            // Evita duplo fetch na inicialização da página (deixa o initSession cuidar disso)
             if (_event !== 'INITIAL_SESSION') {
-              // Atualização fantasma em background
+              // Atualização fantasma em background para eventos de token refresh, etc.
               fetchProfile(newUser).catch(console.error);
             }
           }
         } else {
+          // Se deslogou, limpa tudo e libera a tela
           setProfile(null);
           setIsAdmin(false);
           lastUserId.current = null;
+          setLoading(false);
         }
-        
-        // Garante liberação
-        setLoading(false);
       }
     });
 
