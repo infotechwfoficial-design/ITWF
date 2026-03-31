@@ -190,16 +190,58 @@ async function runVencimentosCheck() {
 async function fetchSportsAgenda(): Promise<string> {
   try {
     const now = new Date();
-    const dateStr = now.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
     const fullDateText = now.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
-    const prompt = `Liste os 5 jogos de futebol mais importantes de HOJE (${fullDateText}). Formato: [EMOJI] TIME A x TIME B - Horário (Brasília). Retorne apenas a agenda diretamente.`;
-    const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash', tools: [{ googleSearchRetrieval: {} }] as any });
+    const prompt = `Hoje é ${fullDateText}. Primeiro, verifique a data atual. Em seguida, realize uma busca em tempo real nos principais portais de esporte do Brasil (GE, UOL Esporte, TNT Sports) e liste os 5 jogos de futebol mais importantes de HOJE, com foco total no Brasileirão Séries A e B. Além de times e horários, informe OBRIGATORIAMENTE onde assistir (Canais de TV ou Streaming). Formato: [EMOJI] TIME A x TIME B - Horário (Brasília) - [📺 Onde assistir]. Se não houver jogos importantes hoje, informe 'Sem jogos de destaque hoje'. Responda apenas com a lista diretamente.`;
+    
+    const model = ai.getGenerativeModel({ model: 'gemini-flash-latest', tools: [{ googleSearchRetrieval: {} }] as any });
     const result = await model.generateContent(prompt);
     return result.response.text()?.trim() || '';
   } catch (err) {
     console.error('[IA Agenda Error]', err);
     return '';
+  }
+}
+
+async function runSportsAgendaPush() {
+  const brDate = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+  const todayISO = new Date().toISOString().split('T')[0];
+  console.log(`[Sports Auto-Push] Iniciando verificação para ${brDate}`);
+
+  try {
+    // Busca agenda do dia (se já gerada)
+    let { data: dbAgenda } = await supabase
+      .from('notifications')
+      .select('message')
+      .eq('title', '⚽ Agenda Esportiva')
+      .gte('created_at', todayISO)
+      .maybeSingle();
+
+    let message = dbAgenda?.message || '';
+
+    if (!message) {
+      message = await fetchSportsAgenda();
+      if (message && message !== 'Sem jogos de destaque hoje') {
+        await supabase.from('notifications').insert([{ title: '⚽ Agenda Esportiva', message, type: 'info' }]);
+      }
+    }
+
+    if (message && message !== 'Sem jogos de destaque hoje') {
+      const { data: subs } = await supabase.from('push_subscriptions').select('subscription_json, admin_id');
+      if (subs && subs.length > 0) {
+        const promises = subs.map(s => sendPushNotification(s.subscription_json, { 
+          title: '⚽ Agenda Esportiva do Dia', 
+          body: message.substring(0, 500), // Evita payload muito grande
+          url: '/notifications' 
+        }, s.admin_id));
+        await Promise.allSettled(promises);
+        console.log(`[Sports Auto-Push] Agenda enviada para ${subs.length} inscritos.`);
+      }
+    } else {
+      console.log('[Sports Auto-Push] Nenhuma agenda relevante encontrada para hoje.');
+    }
+  } catch (err) {
+    console.error('[Sports Auto-Push Error]', err);
   }
 }
 
@@ -317,7 +359,7 @@ async function startServer() {
   app.post('/api/chat', async (req, res) => {
     try {
       const { history, message } = req.body;
-      const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = ai.getGenerativeModel({ model: 'gemini-flash-latest' });
       
       // Inicia chat com histórico para manter contexto
       const chat = model.startChat({ 
@@ -330,8 +372,14 @@ async function startServer() {
       const result = await chat.sendMessage(message || '');
       res.json({ reply: result.response.text() });
     } catch (err: any) {
-      console.error('[Chat API Error]', err);
-      res.status(500).json({ error: 'Desculpe, tive um problema ao processar sua mensagem.' });
+      console.error('[Chat API Error Detail]', {
+        message: err.message,
+        status: err.status,
+        code: err.code,
+        reason: err.reason,
+        stack: err.stack
+      });
+      res.status(500).json({ error: 'Desculpe, tive um problema ao processar sua mensagem.', detail: err.message });
     }
   });
 
@@ -366,26 +414,13 @@ async function startServer() {
   });
 
   app.post('/api/send-sports-push', async (req, res) => {
-    const today = new Date().toLocaleDateString('pt-BR');
-    let message = '';
-    
-    // Check persistency in DB
-    const { data: dbAgenda } = await supabase.from('notifications').select('message').eq('title', '⚽ Agenda Esportiva').gte('created_at', new Date().toISOString().split('T')[0]).maybeSingle();
-    message = dbAgenda?.message || '';
-
-    if (!message) {
-      message = await fetchSportsAgenda();
-      if (message) await supabase.from('notifications').insert([{ title: '⚽ Agenda Esportiva', message, type: 'info' }]);
+    try {
+      await runSportsAgendaPush();
+      res.json({ success: true, message: 'Processamento da agenda iniciado...' });
+    } catch (err: any) {
+      console.error('[Manual Sports Push Error]', err);
+      res.status(500).json({ error: 'Erro ao processar agenda esportiva' });
     }
-
-    if (message) {
-      const { data: subs } = await supabase.from('push_subscriptions').select('subscription_json, admin_id');
-      if (subs) {
-        subs.forEach(s => sendPushNotification(s.subscription_json, { title: '⚽ Agenda Esportiva do Dia', body: message, url: '/notifications' }, s.admin_id));
-      }
-      return res.json({ success: true, message: 'Enviando agenda...' });
-    }
-    res.status(500).json({ error: 'Erro ao gerar agenda' });
   });
 
   app.post('/api/subscribe', async (req, res) => {
@@ -554,6 +589,7 @@ async function startServer() {
   setInterval(() => { fetch(`${RENDER_URL}/api/plans`).catch(() => {}); }, 5 * 60 * 1000);
 
   cron.schedule('0 11,17,23 * * *', runVencimentosCheck);
+  cron.schedule('0 7,9 * * *', runSportsAgendaPush);
   cron.schedule('0 3 * * *', () => notifiedToday.clear());
   
   if (process.env.SPORTMONKS_API_TOKEN) setInterval(checkLiveGoals, 60000);

@@ -68,11 +68,15 @@ export function Chatbot() {
                 ...prev,
                 { role: 'model', parts: [{ text: data.reply || 'Desculpe, não entendi.' }] }
             ]);
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
+            const errorMessage = error.message?.includes('401') 
+                ? 'Sua chave de API parece inválida ou expirou.' 
+                : 'Desculpe, estou passando por instabilidades técnicas no momento. Por favor, tente novamente em instantes ou contate o suporte no WhatsApp: (84) 99676-4125.';
+            
             setMessages((prev) => [
                 ...prev,
-                { role: 'model', parts: [{ text: 'Desculpe, estou passando por instabilidades. Por favor, contate o suporte oficial no WhatsApp: (84) 99676-4125.' }] }
+                { role: 'model', parts: [{ text: errorMessage }] }
             ]);
         } finally {
             setIsLoading(false);
