@@ -164,8 +164,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         );
         const sessionPromise = supabase.auth.getSession();
         
+        console.log('AuthContext: Iniciando busca de sessão...');
         const result = await Promise.race([sessionPromise, timeoutPromise]) as any;
         const initialSession = result?.data?.session;
+        console.log('AuthContext: Sessão inicial:', initialSession ? 'Sim' : 'Não');
         const sessionError = result?.error;
         
         if (sessionError) throw sessionError;
@@ -181,10 +183,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const prefersAdmin = localStorage.getItem('isAdminAuthenticated') === 'true';
             setIsAdmin(isRoleAdmin || prefersAdmin);
             
-            // Na primeira carga (F5), aguardamos o perfil carregar 
-            // para evitar que o Dashboard mostre "Visitante" indevidamente.
-            await fetchProfile(currentUser).catch(console.error);
+            console.log('AuthContext: Iniciando fetchProfile para:', currentUser.email);
+            await fetchProfile(currentUser).catch(err => console.error('AuthContext: Erro fetchProfile:', err));
+          } else {
+            console.log('AuthContext: Nenhum usuário na sessão inicial');
           }
+          console.log('AuthContext: Finalizando loading inicial');
           setLoading(false);
         }
       } catch (err) {

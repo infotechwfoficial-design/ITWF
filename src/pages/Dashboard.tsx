@@ -108,7 +108,7 @@ const RequestCard = React.memo(({ req }: { req: any }) => (
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { profile: contextProfile, signOut, refreshProfile } = useAuth();
+  const { profile: contextProfile, signOut, refreshProfile, loading: authLoading } = useAuth();
   
   const [client, setClient] = useState<Client | null>(null);
   const [requests, setRequests] = useState<any[]>([]);
@@ -130,8 +130,11 @@ export default function Dashboard() {
     setToastConfig({ message, type });
   }, []);
 
-  // Sicroniza o perfil do contexto com o estado local do Dashboard
+  // Sincroniza o perfil do contexto com o estado local do Dashboard
   useEffect(() => {
+    // Se o AuthContext ainda está carregando, mantemos o Dashboard em loading
+    if (authLoading) return;
+
     if (contextProfile) {
       if (!isClient(contextProfile)) {
         // Segurança extra: Se for Admin tentando acessar Dashboard, manda pro lugar certo
@@ -159,10 +162,10 @@ export default function Dashboard() {
         if (isStandalone && !pwaTutorialSeen) setShowWelcomeModal(true);
       }
     } else {
-      // Se não houver perfil após o loading do contexto, liberamos a tela (será mostrada como visitante)
+      // Se authLoading terminou e não houver perfil, liberamos a tela (será mostrada como visitante)
       setLoading(false);
     }
-  }, [contextProfile, navigate]);
+  }, [contextProfile, authLoading, navigate]);
 
   // Carrega dados secundários e realtime
   useEffect(() => {
