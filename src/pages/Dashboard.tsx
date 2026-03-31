@@ -396,12 +396,18 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <Link 
-                to="/plans" 
-                className="px-6 py-3 bg-primary text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
+              <button 
+                onClick={() => {
+                  if (client?.renewal_link && client.renewal_link.trim() !== '') {
+                    window.open(client.renewal_link, '_blank');
+                  } else {
+                    navigate('/plans');
+                  }
+                }}
+                className="px-6 py-3 bg-primary text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all text-center"
               >
                 Renovar
-              </Link>
+              </button>
             </div>
           </div>
         </section>
