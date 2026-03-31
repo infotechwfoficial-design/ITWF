@@ -171,38 +171,49 @@ export default function Dashboard() {
   useEffect(() => {
     if (!contextProfile) return;
 
+    let isMounted = true;
     let channel: any;
 
     const fetchSecondaryData = async () => {
+      if (!isMounted) return;
       setLoadingExtras(true);
       try {
-        // Pedidos
-        const { data: reqs } = await supabase
-          .from('requests')
-          .select('*')
-          .eq('user_id', contextProfile.user_id)
-          .order('created_at', { ascending: false })
-          .limit(6);
-        if (reqs) setRequests(reqs);
+        const [reqsRes, notifsRes, agendaRes] = await Promise.allSettled([
+          // Pedidos
+          supabase
+            .from('requests')
+            .select('*')
+            .eq('user_id', contextProfile.user_id)
+            .order('created_at', { ascending: false })
+            .limit(6),
+          // Notificações
+          supabase
+            .from('notifications')
+            .select('*')
+            .or(`client_id.eq.${contextProfile.id},is_global.eq.true`)
+            .order('created_at', { ascending: false })
+            .limit(10),
+          // Agenda
+          supabase
+            .from('notifications')
+            .select('message')
+            .eq('title', '⚽ Agenda Esportiva')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        ]);
 
-        // Notificações
-        const { data: notifs } = await supabase
-          .from('notifications')
-          .select('*')
-          .or(`client_id.eq.${contextProfile.id},is_global.eq.true`)
-          .order('created_at', { ascending: false })
-          .limit(10);
-        if (notifs) setNotifications(notifs);
+        if (!isMounted) return;
 
-        // Agenda Esportiva
-        const { data: agenda } = await supabase
-          .from('notifications')
-          .select('message')
-          .eq('title', '⚽ Agenda Esportiva')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (agenda) setSportsAgenda(agenda.message);
+        if (reqsRes.status === 'fulfilled' && reqsRes.value.data) {
+          setRequests(reqsRes.value.data);
+        }
+        if (notifsRes.status === 'fulfilled' && notifsRes.value.data) {
+          setNotifications(notifsRes.value.data);
+        }
+        if (agendaRes.status === 'fulfilled' && agendaRes.value.data) {
+          setSportsAgenda(agendaRes.value.data.message);
+        }
 
         // Realtime Subscription
         channel = supabase
@@ -211,6 +222,7 @@ export default function Dashboard() {
             'postgres_changes',
             { event: '*', schema: 'public', table: 'notifications' },
             (payload) => {
+              if (!isMounted) return;
               const newNotif = payload.new as any;
               if (newNotif.client_id === contextProfile.id || newNotif.is_global) {
                 if (payload.eventType === 'INSERT') {
@@ -224,13 +236,14 @@ export default function Dashboard() {
       } catch (err) {
         console.error('Dashboard: Erro ao carregar extras:', err);
       } finally {
-        setLoadingExtras(false);
+        if (isMounted) setLoadingExtras(false);
       }
     };
 
     fetchSecondaryData();
 
     return () => {
+      isMounted = false;
       if (channel) supabase.removeChannel(channel);
     };
   }, [contextProfile]);

@@ -42,45 +42,50 @@ export default function RequestContent() {
   const [loadingTrending, setLoadingTrending] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
     const fetchUserData = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
 
-        if (user) {
-          const [clientRes, favRes] = await Promise.all([
+        if (user && mounted) {
+          const [clientRes, favRes] = await Promise.allSettled([
             supabase.from('clients').select('*').eq('user_id', user.id).single(),
             supabase.from('favorites').select('content_id').eq('user_id', user.id)
           ]);
 
-          if (clientRes.data) {
-            const clientData = clientRes.data;
-            setClient(clientData);
-            
-            if (clientData.admin_id) {
-              const { data: adminData } = await supabase
-                .from('clients')
-                .select('support_number')
-                .eq('user_id', clientData.admin_id)
-                .maybeSingle();
-                
-              if (adminData?.support_number) {
-                setSupportNumber(adminData.support_number);
+          if (mounted) {
+            if (clientRes.status === 'fulfilled' && clientRes.value.data) {
+              const clientData = clientRes.value.data;
+              setClient(clientData);
+              
+              if (clientData.admin_id) {
+                const { data: adminData } = await supabase
+                  .from('clients')
+                  .select('support_number')
+                  .eq('user_id', clientData.admin_id)
+                  .maybeSingle();
+                  
+                if (mounted && adminData?.support_number) {
+                  setSupportNumber(adminData.support_number);
+                }
               }
             }
-          }
 
-          if (favRes.data) {
-            setFavorites(favRes.data.map((f: any) => f.content_id));
+            if (favRes.status === 'fulfilled' && favRes.value.data) {
+              setFavorites(favRes.value.data.map((f: any) => f.content_id));
+            }
           }
         }
       } catch (err) {
-        console.error('Error fetching user data for requests:', err);
+        if (mounted) console.error('Error fetching user data for requests:', err);
       }
     };
     fetchUserData();
+    return () => { mounted = false; };
   }, []);
 
   useEffect(() => {
+    let mounted = true;
     const fetchTrending = async () => {
       setLoadingTrending(true);
       try {
@@ -96,18 +101,20 @@ export default function RequestContent() {
         const filtered = (data.results || []).filter((m: any) => 
           (m.media_type === 'movie' || m.media_type === 'tv') && m.poster_path
         );
-        setTrendingMedia(filtered.slice(0, 15));
+        if (mounted) setTrendingMedia(filtered.slice(0, 15));
       } catch (err) {
-        console.error('Error fetching trending media:', err);
+        if (mounted) console.error('Error fetching trending media:', err);
       } finally {
-        setLoadingTrending(false);
+        if (mounted) setLoadingTrending(false);
       }
     };
     fetchTrending();
+    return () => { mounted = false; };
   }, []);
 
   // Debounced search for live results
   useEffect(() => {
+    let mounted = true;
     const timer = setTimeout(async () => {
       if (query.trim().length > 2) {
         setIsSearching(true);
@@ -120,20 +127,27 @@ export default function RequestContent() {
           const filteredResults = (data.results || []).filter((m: any) =>
             (m.media_type === 'movie' || m.media_type === 'tv') && m.poster_path
           );
-          setLiveResults(filteredResults.slice(0, 5));
-          setShowLiveResults(true);
+          if (mounted) {
+            setLiveResults(filteredResults.slice(0, 5));
+            setShowLiveResults(true);
+          }
         } catch (err) {
-          console.error('Live search error:', err);
+          if (mounted) console.error('Live search error:', err);
         } finally {
-          setIsSearching(false);
+          if (mounted) setIsSearching(false);
         }
       } else {
-        setLiveResults([]);
-        setShowLiveResults(false);
+        if (mounted) {
+          setLiveResults([]);
+          setShowLiveResults(false);
+        }
       }
     }, 500);
 
-    return () => clearTimeout(timer);
+    return () => {
+      mounted = false;
+      clearTimeout(timer);
+    };
   }, [query]);
 
   const [isSearching, setIsSearching] = useState(false);

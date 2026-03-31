@@ -154,91 +154,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     let mounted = true;
 
-    // Inicialização da sessão
-    const initSession = async () => {
-      try {
-        // Criamos um timeout na inicialização da Promise para que o PWA/Mobile 
-        // nunca trave infinitamente na tela de "Carregando" caso a rede do OS fale ao acordar
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Timeout fetching session')), 15000)
-        );
-        const sessionPromise = supabase.auth.getSession();
-        
-        console.log('AuthContext: Iniciando busca de sessão...');
-        const result = await Promise.race([sessionPromise, timeoutPromise]) as any;
-        const initialSession = result?.data?.session;
-        console.log('AuthContext: Sessão inicial:', initialSession ? 'Sim' : 'Não');
-        const sessionError = result?.error;
-        
-        if (sessionError) throw sessionError;
-
-        if (mounted) {
-          setSession(initialSession || null);
-          const currentUser = initialSession?.user ?? null;
-          setUser(currentUser);
-          lastUserId.current = currentUser?.id ?? null;
-          
-          if (currentUser) {
-            const isRoleAdmin = currentUser.app_metadata?.role === 'admin';
-            const prefersAdmin = localStorage.getItem('isAdminAuthenticated') === 'true';
-            setIsAdmin(isRoleAdmin || prefersAdmin);
-            
-            console.log('AuthContext: Iniciando fetchProfile para:', currentUser.email);
-            await fetchProfile(currentUser).catch(err => console.error('AuthContext: Erro fetchProfile:', err));
-          } else {
-            console.log('AuthContext: Nenhum usuário na sessão inicial');
-          }
-          console.log('AuthContext: Finalizando loading inicial');
-          setLoading(false);
-        }
-      } catch (err) {
-        console.error('AuthContext: Erro na inicialização:', err);
-        if (mounted) setLoading(false);
-      }
-    };
-
-    initSession();
-
-    // Listener de mudanças na auth (acionado frequentemente quando retorna do WhatsApp/etc)
+    // Em Supabase v2, o listener capta também a `INITIAL_SESSION` durante a renderização inicial,
+    // eliminando a necessidade de chamar `getSession` manualmente em paralelo.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
-      console.log('AuthContext: Auth event ->', _event);
+      console.log(`AuthContext: Evento -> ${_event}`);
       
-      if (mounted) {
-        const newUserId = newSession?.user?.id ?? null;
-        const isUserDifferent = newUserId !== lastUserId.current;
+      if (!mounted) return;
 
-        // Se o usuário mudou de fato, chamamos o bloqueio pesado
+      const newUser = newSession?.user ?? null;
+      setSession(newSession);
+      setUser(newUser);
+      
+      if (newUser) {
+        const isUserDifferent = newUser.id !== lastUserId.current;
+
         if (isUserDifferent) {
+          // Novo usuário, bloqueia totalmente a interface (loading = true começa nativo do state).
           setLoading(true);
-          lastUserId.current = newUserId;
-        }
+          lastUserId.current = newUser.id;
 
-        setSession(newSession);
-        const newUser = newSession?.user ?? null;
-        setUser(newUser);
-        
-        if (newUser) {
-          if (isUserDifferent) {
-            // Bloqueio apenas se for uma pessoa DIFERENTE logando
-            const isRoleAdmin = newUser.app_metadata?.role === 'admin';
-            const prefersAdmin = localStorage.getItem('isAdminAuthenticated') === 'true';
-            setIsAdmin(isRoleAdmin || prefersAdmin);
+          try {
             await fetchProfile(newUser);
-            setLoading(false); // Libera somente após carregar perfil
-          } else {
-            // Evita duplo fetch na inicialização da página (deixa o initSession cuidar disso)
-            if (_event !== 'INITIAL_SESSION') {
-              // Atualização fantasma em background para eventos de token refresh, etc.
-              fetchProfile(newUser).catch(console.error);
-            }
+          } catch (err) {
+            console.error('AuthContext: Falha total ao buscar profile no evento de Auth:', err);
+          } finally {
+            if (mounted) setLoading(false);
           }
         } else {
-          // Se deslogou, limpa tudo e libera a tela
-          setProfile(null);
-          setIsAdmin(false);
-          lastUserId.current = null;
-          setLoading(false);
+          // Usuário reconectado / Token renovado
+          if (_event !== 'INITIAL_SESSION') {
+            fetchProfile(newUser).catch(console.error);
+          } else {
+             // Caso a renderização do React Strict Mode dispare INITIAL_SESSION novamente para o MESMO user já carregado.
+             if (mounted) setLoading(false);
+          }
         }
+      } else {
+        // Usuário não logado
+        setProfile(null);
+        setIsAdmin(false);
+        lastUserId.current = null;
+        if (mounted) setLoading(false);
       }
     });
 

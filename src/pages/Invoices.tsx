@@ -23,26 +23,30 @@ export default function Invoices() {
   const [client, setClient] = useState<any>(null);
 
   useEffect(() => {
+    let mounted = true;
     const fetchData = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
 
-        if (user) {
-          const [clientRes, invoicesRes] = await Promise.all([
+        if (user && mounted) {
+          const [clientRes, invoicesRes] = await Promise.allSettled([
             supabase.from('clients').select('*').eq('user_id', user.id).single(),
             supabase.from('invoices').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
           ]);
 
-          if (clientRes.data) setClient(clientRes.data);
-          if (invoicesRes.data) setInvoices(invoicesRes.data);
+          if (mounted) {
+            if (clientRes.status === 'fulfilled' && clientRes.value.data) setClient(clientRes.value.data);
+            if (invoicesRes.status === 'fulfilled' && invoicesRes.value.data) setInvoices(invoicesRes.value.data);
+          }
         }
       } catch (err) {
-        console.error('Error fetching invoices:', err);
+        if (mounted) console.error('Error fetching invoices:', err);
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     };
     fetchData();
+    return () => { mounted = false; };
   }, []);
 
   return (

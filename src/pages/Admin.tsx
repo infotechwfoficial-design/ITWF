@@ -330,6 +330,14 @@ export default function Admin() {
   });
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
 
   // Notification Form State (Restaurados)
   const [isNotifModalOpen, setIsNotifModalOpen] = useState(false);
@@ -557,18 +565,21 @@ export default function Admin() {
       
       try {
         setIsLoadingData(true);
-        // Otimização: Buscamos sequencialmente ou em blocos menores para evitar "Rate Limit" e travamento (Timeouts)
-        // se a internet ou o plano free do Supabase estrangular as requisições.
-        await fetchClients();
-        await fetchNotifications();
-        await fetchRequests();
-        await fetchPlans();
-        await fetchAdminSettings();
-        await fetchPushStats();
+        // Otimização: Buscamos em paralelo com allSettled para evitar lentidão e garantir carregamento rápido
+        await Promise.allSettled([
+          fetchClients(),
+          fetchNotifications(),
+          fetchRequests(),
+          fetchPlans(),
+          fetchAdminSettings(),
+          fetchPushStats()
+        ]);
 
         if (currentAdmin.role === 'master') {
-          await fetchResellers();
-          await fetchPaymentSettings();
+          await Promise.allSettled([
+            fetchResellers(),
+            fetchPaymentSettings()
+          ]);
         }
       } catch (err) {
         console.error('Erro geral ao carregar dados do admin:', err);
@@ -1237,9 +1248,9 @@ export default function Admin() {
                 </thead>
                 <tbody className="divide-y divide-black/5 dark:divide-white/5">
                   {clients.filter(c => 
-                    (c.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
-                    (c.username?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
-                    (c.email?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+                    (c.name?.toLowerCase() || '').includes(debouncedSearchTerm.toLowerCase()) || 
+                    (c.username?.toLowerCase() || '').includes(debouncedSearchTerm.toLowerCase()) || 
+                    (c.email?.toLowerCase() || '').includes(debouncedSearchTerm.toLowerCase())
                   ).map((client) => (
                     <ClientRow
                       key={client.id}
@@ -1258,9 +1269,9 @@ export default function Admin() {
             {/* Mobile Cards */}
             <div className="md:hidden divide-y divide-black/5 dark:divide-white/5">
               {clients.filter(c => 
-                (c.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
-                (c.username?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
-                (c.email?.toLowerCase() || '').includes(searchTerm.toLowerCase())
+                (c.name?.toLowerCase() || '').includes(debouncedSearchTerm.toLowerCase()) || 
+                (c.username?.toLowerCase() || '').includes(debouncedSearchTerm.toLowerCase()) || 
+                (c.email?.toLowerCase() || '').includes(debouncedSearchTerm.toLowerCase())
               ).map((client, idx) => (
                 <ClientCard
                   key={client.id}
@@ -1385,8 +1396,8 @@ export default function Admin() {
                 <tbody className="divide-y divide-black/5 dark:divide-white/5">
                   {requests.filter(req => {
                     const reqClient = clients.find(c => c.user_id === req.user_id);
-                    const matchTitle = (req.content_title?.toLowerCase() || '').includes(searchTerm.toLowerCase());
-                    const matchUser = (reqClient?.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || (reqClient?.username?.toLowerCase() || '').includes(searchTerm.toLowerCase());
+                    const matchTitle = (req.content_title?.toLowerCase() || '').includes(debouncedSearchTerm.toLowerCase());
+                    const matchUser = (reqClient?.name?.toLowerCase() || '').includes(debouncedSearchTerm.toLowerCase()) || (reqClient?.username?.toLowerCase() || '').includes(debouncedSearchTerm.toLowerCase());
                     return matchTitle || matchUser;
                   }).map((req) => {
                     const reqClient = clients.find(c => c.user_id === req.user_id);
@@ -1437,8 +1448,8 @@ export default function Admin() {
             <div className="md:hidden divide-y divide-black/5 dark:divide-white/5">
               {requests.filter(req => {
                 const reqClient = clients.find(c => c.user_id === req.user_id);
-                const matchTitle = (req.content_title?.toLowerCase() || '').includes(searchTerm.toLowerCase());
-                const matchUser = (reqClient?.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || (reqClient?.username?.toLowerCase() || '').includes(searchTerm.toLowerCase());
+                const matchTitle = (req.content_title?.toLowerCase() || '').includes(debouncedSearchTerm.toLowerCase());
+                const matchUser = (reqClient?.name?.toLowerCase() || '').includes(debouncedSearchTerm.toLowerCase()) || (reqClient?.username?.toLowerCase() || '').includes(debouncedSearchTerm.toLowerCase());
                 return matchTitle || matchUser;
               }).map((request, idx) => {
                 const reqClient = clients.find(c => c.user_id === request.user_id);
