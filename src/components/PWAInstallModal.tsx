@@ -35,7 +35,14 @@ export default function PWAInstallModal({ deferredPrompt, onClose }: PWAInstallM
         try {
             const { data: { session } } = await supabase.auth.getSession();
             if (session?.user?.email) {
-                await subscribeUserToPush(session.user.email);
+                // Busca o username e admin_id para um registro completo
+                const { data: client } = await supabase
+                    .from('clients')
+                    .select('username, admin_id')
+                    .eq('email', session.user.email)
+                    .maybeSingle();
+
+                await subscribeUserToPush(session.user.email, client?.username, client?.admin_id);
             }
             setStep(3);
             setTimeout(onClose, 2000);

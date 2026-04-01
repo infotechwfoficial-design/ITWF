@@ -428,10 +428,22 @@ async function startServer() {
       const { email, username, subscription, adminId } = req.body;
       if (!subscription) return res.status(400).json({ error: 'Assinatura PWA não fornecida' });
       
+      let finalUsername = username;
+      let finalAdminId = adminId;
+
+      // Se o username ou adminId estiverem faltando, tenta buscar na tabela de clients
+      if (!finalUsername || !finalAdminId) {
+        const { data: client } = await supabase.from('clients').select('username, admin_id').eq('email', email).maybeSingle();
+        if (client) {
+          if (!finalUsername) finalUsername = client.username;
+          if (!finalAdminId) finalAdminId = client.admin_id;
+        }
+      }
+
       await supabase.from('push_subscriptions').upsert([{ 
         email, 
-        username, 
-        admin_id: adminId || null, 
+        username: finalUsername || null, 
+        admin_id: finalAdminId || null, 
         subscription_json: JSON.stringify(subscription) 
       }], { onConflict: 'subscription_json' });
       

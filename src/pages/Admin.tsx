@@ -853,6 +853,7 @@ export default function Admin() {
           title: 'Aviso de Vencimento',
           message: directPushMessage,
           username: directPushClient.username,
+          email: directPushClient.email,
           adminId: currentAdmin?.user_id
         })
       });
