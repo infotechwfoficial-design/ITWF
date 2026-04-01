@@ -25,12 +25,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Usamos ref para rastrear o ID de usuário atual e evitar problemas com "closures" obsoletas.
   const lastUserId = useRef<string | null>(null);
 
+  // Sistema de Log de Diagnóstico para o PWA
+  const addAuthLog = useCallback((message: string) => {
+    const timestamp = new Date().toISOString();
+    const logEntry = `[${timestamp}] ${message}`;
+    console.log(`AuthDiag: ${message}`);
+    
+    try {
+      const existingLogs = JSON.parse(localStorage.getItem('itwf_auth_logs') || '[]');
+      const updatedLogs = [logEntry, ...existingLogs].slice(0, 50); // Mantém apenas os últimos 50 logs
+      localStorage.setItem('itwf_auth_logs', JSON.stringify(updatedLogs));
+    } catch (e) {
+      console.warn('Erro ao salvar logs de diagnóstico:', e);
+    }
+  }, []);
+
   const fetchProfile = useCallback(async (user: User) => {
+    addAuthLog(`Iniciando busca de perfil para user_id: ${user.id}`);
     try {
       const isRoleAdmin = user.app_metadata?.role === 'admin';
       const prefersAdmin = localStorage.getItem('isAdminAuthenticated') === 'true';
 
-      // Define secure admin access straight from the JWT
+      addAuthLog(`Configurações: isRoleAdmin=${isRoleAdmin}, prefersAdmin=${prefersAdmin}`);
       setIsAdmin(isRoleAdmin || prefersAdmin); 
 
       if (prefersAdmin || isRoleAdmin) {
@@ -46,11 +62,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         if (adminData && prefersAdmin) {
+          addAuthLog('Perfil de Admin encontrado e carregado.');
           setProfile(adminData);
           return;
         }
       }
 
+      addAuthLog('Buscando na tabela de clientes...');
       // 2. Tenta buscar na tabela de clientes
       const { data: clientData, error: clientError } = await supabase
         .from('clients')
@@ -94,19 +112,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // 3. Se não achou cliente e é admin via JWT (mas não tinha preferência de login ainda), carrega o perfil admin padrão
       if (isRoleAdmin) {
-        const { data: adminFallback, error: adminFallbackError } = await supabase
+        const { data: adminFallback } = await supabase
           .from('admins')
           .select('*')
           .eq('user_id', user.id)
           .maybeSingle();
 
         if (adminFallback) {
-          setProfile(adminFallback);
+          addAuthLog('Perfil de Admin encontrado via Fallback.');
+          setProfile(adminFallback as Admin);
           localStorage.setItem('isAdminAuthenticated', 'true');
           return;
         }
       }
 
+      addAuthLog('Perfil não encontrado em nenhuma tabela.');
       // 4. AUTO-CURA (Apenas para Clientes): Se não encontrou em nenhum lugar e é um novo usuário
       if (user.id && user.email) {
         console.warn('AuthContext: Perfil não encontrado. Criando perfil de cliente padrão...');
@@ -125,16 +145,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .single();
         
         if (!createError && newProfile) {
-          setProfile(newProfile);
+          addAuthLog('Perfil de Auto-Cura (Cliente) criado com sucesso.');
+          setProfile(newProfile as Client);
           if (!isRoleAdmin) {
             setIsAdmin(false);
           }
+        } else if (createError) {
+          addAuthLog(`Erro na Auto-Cura: ${createError.message}`);
         }
       }
-    } catch (err) {
+    } catch (err: any) {
+      addAuthLog(`Erro fatal no fetchProfile: ${err.message}`);
       console.error('AuthContext: Erro fatal ao sincronizar perfil:', err);
     }
-  }, []);
+  }, [addAuthLog]);
 
   const refreshProfile = async () => {
     if (user) {
@@ -153,13 +177,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     let mounted = true;
+    addAuthLog('AuthProvider iniciado/montado.');
 
     // Em Supabase v2, o listener capta também a `INITIAL_SESSION` durante a renderização inicial,
     // eliminando a necessidade de chamar `getSession` manualmente em paralelo.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
-      console.log(`AuthContext: Evento -> ${_event}`);
+      addAuthLog(`Evento Auth recebido: ${_event}`);
       
-      if (!mounted) return;
+      if (!mounted) {
+        addAuthLog('Evento ignorado: Componente desmontado.');
+        return;
+      }
 
       const newUser = newSession?.user ?? null;
       setSession(newSession);
@@ -167,42 +195,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (newUser) {
         const isUserDifferent = newUser.id !== lastUserId.current;
+        addAuthLog(`Usuário logado: ${newUser.email} (Diferente do anterior: ${isUserDifferent})`);
 
         if (isUserDifferent) {
-          // Novo usuário, bloqueia totalmente a interface (loading = true começa nativo do state).
           setLoading(true);
           lastUserId.current = newUser.id;
 
           try {
             await fetchProfile(newUser);
-          } catch (err) {
+          } catch (err: any) {
+            addAuthLog(`Erro no try do listener: ${err.message}`);
             console.error('AuthContext: Falha total ao buscar profile no evento de Auth:', err);
           } finally {
-            if (mounted) setLoading(false);
+            if (mounted) {
+              setLoading(false);
+              addAuthLog('Carregamento finalizado (Loading=false).');
+            }
           }
         } else {
           // Usuário reconectado / Token renovado
           if (_event !== 'INITIAL_SESSION') {
-            fetchProfile(newUser).catch(console.error);
+            addAuthLog('Usuário repetido, atualizando perfil silenciosamente...');
+            fetchProfile(newUser).catch(err => addAuthLog(`Erro silencioso: ${err.message}`));
           } else {
-             // Caso a renderização do React Strict Mode dispare INITIAL_SESSION novamente para o MESMO user já carregado.
-             if (mounted) setLoading(false);
+             if (mounted) {
+               setLoading(false);
+               addAuthLog('Carregamento finalizado - Sessão Inicial Repetida.');
+             }
           }
         }
       } else {
-        // Usuário não logado
+        addAuthLog('Nenhum usuário logado detectado.');
         setProfile(null);
         setIsAdmin(false);
         lastUserId.current = null;
-        if (mounted) setLoading(false);
+        if (mounted) {
+          setLoading(false);
+          addAuthLog('Carregamento finalizado - Visitante.');
+        }
       }
     });
 
     return () => {
       mounted = false;
+      addAuthLog('AuthProvider desmontado.');
       subscription.unsubscribe();
     };
-  }, [fetchProfile]);
+  }, [fetchProfile, addAuthLog]);
 
   return (
     <AuthContext.Provider value={{ user, session, profile, loading, isAdmin, refreshProfile, signOut }}>
