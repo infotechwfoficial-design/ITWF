@@ -35,7 +35,7 @@ export default function SaaS() {
         const { data } = await supabase
           .from('admins')
           .select('name, support_number')
-          .eq('id', refId)
+          .eq('user_id', refId)
           .maybeSingle();
         
         if (data) {
