@@ -179,8 +179,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let mounted = true;
     addAuthLog('AuthProvider iniciado/montado.');
 
-    // Em Supabase v2, o listener capta também a `INITIAL_SESSION` durante a renderização inicial,
-    // eliminando a necessidade de chamar `getSession` manualmente em paralelo.
+    // KICKSTART: Chute inicial de 3 segundos para garantir que o PWA nunca trave
+    const kickstartSession = async () => {
+      addAuthLog('Executando Kickstart de sessão manual...');
+      try {
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        if (mounted && initialSession) {
+          addAuthLog(`Kickstart: Sessão encontrada para ${initialSession.user.email}`);
+          setUser(initialSession.user);
+          setSession(initialSession);
+          await fetchProfile(initialSession.user);
+        } else {
+          addAuthLog('Kickstart: Nenhuma sessão imediata encontrada.');
+        }
+      } catch (err: any) {
+        addAuthLog(`Erro no Kickstart: ${err.message}`);
+      } finally {
+        // O timer de 3s é o soberano para destravar o loading
+      }
+    };
+
+    // FAIL-SAFE: O soberano sistema de 3 segundos que funcionava perfeitamente
+    const loadingTimer = setTimeout(() => {
+      if (mounted) {
+        setLoading(false);
+        addAuthLog('Sessão Destravada pelo Timer de 3 segundos (Fail-Safe).');
+      }
+    }, 3000);
+
+    kickstartSession();
+
+    // Listener para eventos em tempo real (Login, Logout, Expiração de Token)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       addAuthLog(`Evento Auth recebido: ${_event}`);
       
@@ -190,6 +219,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       const newUser = newSession?.user ?? null;
+      
+      // Se for INITIAL_SESSION, o Kickstart já pode ter lidado com isso,
+      // mas o listener é o canal oficial de sincronização do Supabase.
       setSession(newSession);
       setUser(newUser);
       
@@ -198,46 +230,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         addAuthLog(`Usuário logado: ${newUser.email} (Diferente do anterior: ${isUserDifferent})`);
 
         if (isUserDifferent) {
-          setLoading(true);
           lastUserId.current = newUser.id;
-
           try {
             await fetchProfile(newUser);
           } catch (err: any) {
-            addAuthLog(`Erro no try do listener: ${err.message}`);
-            console.error('AuthContext: Falha total ao buscar profile no evento de Auth:', err);
+            addAuthLog(`Erro no listener fetchProfile: ${err.message}`);
           } finally {
             if (mounted) {
               setLoading(false);
-              addAuthLog('Carregamento finalizado (Loading=false).');
+              addAuthLog('Carregamento finalizado via Listener.');
             }
           }
         } else {
-          // Usuário reconectado / Token renovado
           if (_event !== 'INITIAL_SESSION') {
-            addAuthLog('Usuário repetido, atualizando perfil silenciosamente...');
             fetchProfile(newUser).catch(err => addAuthLog(`Erro silencioso: ${err.message}`));
           } else {
              if (mounted) {
                setLoading(false);
-               addAuthLog('Carregamento finalizado - Sessão Inicial Repetida.');
+               addAuthLog('Carregamento finalizado - Sessão Inicial Confirmada.');
              }
           }
         }
       } else {
-        addAuthLog('Nenhum usuário logado detectado.');
+        addAuthLog('Nenhum usuário logado detectado pelo listener.');
         setProfile(null);
         setIsAdmin(false);
         lastUserId.current = null;
         if (mounted) {
           setLoading(false);
-          addAuthLog('Carregamento finalizado - Visitante.');
+          addAuthLog('Carregamento finalizado - Modo Visitante.');
         }
       }
     });
 
     return () => {
       mounted = false;
+      clearTimeout(loadingTimer);
       addAuthLog('AuthProvider desmontado.');
       subscription.unsubscribe();
     };
