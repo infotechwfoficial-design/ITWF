@@ -73,7 +73,11 @@ function getDaysRemaining(expirationDate: string): number {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const diff = expDate.getTime() - today.getTime();
-    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+    
+    // Se a data é hoje e já passou do horário ou se é anterior a hoje,
+    // retornamos 0 ou negativo para o status lidar, mas a interface mostrará 0.
+    return days;
   } catch (e) {
     console.error('Erro ao calcular dias restantes:', e);
     return 0;
@@ -81,7 +85,7 @@ function getDaysRemaining(expirationDate: string): number {
 }
 
 function getSubscriptionStatus(daysRemaining: number) {
-  if (daysRemaining < 0) return { label: 'Vencida', color: 'text-rose-500', dot: 'bg-rose-500', shadow: 'shadow-[0_0_10px_rgba(239,68,68,0.6)]' };
+  if (daysRemaining <= 0) return { label: 'Vencida', color: 'text-rose-500', dot: 'bg-rose-500', shadow: 'shadow-[0_0_10px_rgba(239,68,68,0.6)]' };
   if (daysRemaining <= 3) return { label: 'Crítica', color: 'text-orange-500', dot: 'bg-orange-500', shadow: 'shadow-[0_0_10px_rgba(249,115,22,0.6)]' };
   if (daysRemaining <= 7) return { label: 'Expirando', color: 'text-yellow-500', dot: 'bg-yellow-400', shadow: 'shadow-[0_0_10px_rgba(234,179,8,0.6)]' };
   return { label: 'Ativa', color: 'text-green-500', dot: 'bg-green-500', shadow: 'shadow-[0_0_10px_rgba(34,197,94,0.6)]' };
@@ -207,10 +211,14 @@ export default function Dashboard() {
       const hasSupabaseSession = localStorage.getItem(`sb-${projectRef}-auth-token`) !== null;
       
       if (hasSupabaseSession) {
-         // Damos uma pequena margem de 2.0s para o refreshProfile ou a auto-cura agirem em produção
+         // Damos uma margem maior de 4.0s para o refreshProfile ou a auto-cura agirem em produção
+         // Isso evita que o usuário veja "Visitante" momentaneamente durante a sincronização inicial
          const timer = setTimeout(() => {
-           if (!contextProfile) setLoading(false);
-         }, 2500);
+           if (!contextProfile) {
+             setLoading(false);
+             console.log('Dashboard: Tempo esgotado aguardando perfil, assumindo Visitante.');
+           }
+         }, 4000);
          return () => clearTimeout(timer);
       } else {
         setLoading(false);
@@ -453,8 +461,10 @@ export default function Dashboard() {
                   <Timer size={18} />
                 </div>
                 <div>
-                  <p className="text-[9px] font-black text-slate-400 uppercase leading-none mb-1">Expira em</p>
-                  <p className={`text-sm font-black ${status.color}`}>{daysRemaining} dias</p>
+                  <p className="text-[9px] font-black text-slate-400 uppercase leading-none mb-1">Status de Assinatura</p>
+                  <p className={`text-sm font-black ${status.color}`}>
+                    {daysRemaining <= 0 ? 'Vencida' : `${daysRemaining} dias`}
+                  </p>
                 </div>
               </div>
 

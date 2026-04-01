@@ -209,23 +209,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     // FAIL-SAFE: O soberano sistema de 3 segundos que funcionava perfeitamente
-    // REDUZIDO para 1.5s APENAS se não houver sessão imediata. 
-    // Se houver sessão, deixamos o fetchProfile ditar o tempo.
+    // AUMENTADO para 5s para garantir que bancos de dados lentos não resultem em "Visitante"
     const loadingTimer = setTimeout(() => {
-      if (mounted && !lastUserId.current) {
+      if (mounted && (!lastUserId.current || !profile)) {
         setLoading(false);
-        addAuthLog('Sessão Destravada pelo Timer (Modo Visitante/Sem Sessão).');
+        addAuthLog('Sessão Destravada pelo Timer (Modo Visitante/Profile Pendente).');
       }
-    }, 3000); // Reduzido de 4s para 3s
+    }, 5000); 
 
 
-    // Proteção Extra: Se após 8 segundos nada aconteceu (raríssimo), damos um último empurrão
+    // Proteção Extra: Se após 10 segundos nada aconteceu (raríssimo), damos um último empurrão
     const emergencyTimer = setTimeout(() => {
       if (mounted && loading) {
         setLoading(false);
-        addAuthLog('TRIGGER DE EMERGÊNCIA: Destravando após 5 segundos.');
+        addAuthLog('TRIGGER DE EMERGÊNCIA: Destravando após 10 segundos.');
       }
-    }, 5000); // Reduzido de 8s para 5s
+    }, 10000); 
 
     kickstartSession();
 
@@ -266,18 +265,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               addAuthLog('Carregamento finalizado via Listener.');
             }
           }
+        } else if (!profile) {
+          // Se for o mesmo usuário mas o perfil ainda estiver nulo, tentamos buscar novamente
+          addAuthLog('Mesmo usuário detectado sem perfil carregado. Re-sincronizando...');
+          fetchProfile(newUser).finally(() => {
+            if (mounted) setLoading(false);
+          });
         } else {
-          // Se for o mesmo usuário, o Kickstart ou uma rodada anterior já pode estar lidando com isso.
-          // Mas garantimos que o loading saia de cena se o perfil já existir ou após um reforço.
-          if (_event !== 'INITIAL_SESSION') {
-            fetchProfile(newUser).catch(err => addAuthLog(`Erro silencioso: ${err.message}`));
-          }
-          
-          if (mounted && loading) {
-             // Caso o Kickstart tenha falhado ou demorado, o listener dá o veredito final
-             setLoading(false); 
-             addAuthLog('Carregamento finalizado - Sessão Confirmada (Atrasada).');
-          }
+          // Se for o mesmo usuário e já tiver perfil, apenas removemos o loading
+          addAuthLog('Usuário e perfil já confirmados.');
+          if (mounted) setLoading(false);
         }
       } else {
         addAuthLog('Nenhum usuário logado detectado pelo listener.');
