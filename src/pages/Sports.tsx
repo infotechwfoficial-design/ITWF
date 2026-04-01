@@ -51,11 +51,12 @@ const Sports = () => {
         </header>
 
         {/* Categories / Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Categories / Stats Grid - Agora ocupando largura total */}
+        <div className="w-full">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="md:col-span-2 rounded-[2.5rem] bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-black/5 dark:border-white/5 p-1 overflow-hidden shadow-xl flex flex-col"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="rounded-[2.5rem] bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-black/5 dark:border-white/5 p-1 overflow-hidden shadow-xl flex flex-col"
           >
             {/* TABS HEADERS */}
             <div className="flex p-2 gap-2 bg-black/5 dark:bg-white/5 rounded-t-[2.4rem] border-b border-black/5 dark:border-white/5 overflow-x-auto no-scrollbar">
@@ -95,7 +96,7 @@ const Sports = () => {
             </div>
 
             {/* CONTENT CONTAINER */}
-            <div className="w-full h-[450px] md:h-[800px] overflow-hidden bg-white/5 bg-slate-50 dark:bg-slate-950/20">
+            <div className="w-full h-[600px] md:h-[800px] overflow-hidden bg-white/5 bg-slate-50 dark:bg-slate-950/20">
               {activeTab === 'fixtures' ? (
                 <iframe 
                   key="fixtures"
@@ -162,57 +163,9 @@ const Sports = () => {
               )}
             </div>
           </motion.div>
-
-          {/* Sidebar / Info */}
-          <div className="flex flex-col gap-6">
-             <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.1 }}
-              className="rounded-3xl bg-amber-500/10 border border-amber-500/20 p-6 flex flex-col gap-4"
-            >
-              <div className="size-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center">
-                <Zap size={24} />
-              </div>
-              <div>
-                <h4 className="font-bold text-lg text-slate-900 dark:text-white">Agenda Exclusiva</h4>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Confira horários e canais de transmissão gerados pela nossa IA em tempo real.</p>
-              </div>
-            </motion.div>
-
-             <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.1 }}
-              className="rounded-3xl bg-primary/10 border border-primary/20 p-6 flex flex-col gap-4"
-            >
-              <div className="size-12 rounded-2xl bg-primary text-white flex items-center justify-center">
-                <Calendar size={24} />
-              </div>
-              <div>
-                <h4 className="font-bold text-lg text-slate-900 dark:text-white">Rodadas e Jogos</h4>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Use o seletor ao lado para navegar entre as rodadas do seu campeonato favorito.</p>
-              </div>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2 }}
-              className="rounded-3xl bg-slate-50 dark:bg-slate-900/40 border border-black/5 dark:border-white/5 p-6 flex flex-col gap-4 shadow-sm"
-            >
-              <div className="size-12 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
-                <Table size={24} />
-              </div>
-              <div>
-                <h4 className="font-bold text-lg text-slate-900 dark:text-white">TABELA</h4>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Acompanhe a subida do seu time na tabela em tempo real.</p>
-              </div>
-            </motion.div>
-            
-            <div className="mt-auto p-6 rounded-3xl bg-black/5 dark:bg-white/5 italic text-[10px] text-slate-400 text-center">
-              Dados da agenda gerados por IA. Rodadas e Tabela fornecidos por api-futebol.com.br
-            </div>
+          
+          <div className="mt-6 p-6 rounded-3xl bg-black/5 dark:bg-white/5 italic text-[10px] text-slate-400 text-center">
+            Dados da agenda gerados por IA. Rodadas e Tabela fornecidos por api-futebol.com.br
           </div>
         </div>
       </div>

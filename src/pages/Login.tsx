@@ -70,10 +70,14 @@ export default function Login() {
             admin_id: finalAdminId
           }]);
 
-          // Fallback para unique_violation (mesmo baseName existente em provedores diferentes)
+          // Caso o trigger do Supabase já tenha criado o perfil (Erro 409/23505), ignoramos silenciosamente
           if (clientInsert.error && clientInsert.error.code === '23505') {
+            console.log('[SignUp] Perfil já criado via trigger ou tentativa anterior. Prosseguindo.');
+          } else if (clientInsert.error) {
+            console.error('Inserção na tabela clients falhou:', clientInsert.error);
+            // Fallback para nome de usuário duplicado (adicionando sufixo)
             const fallbackSufix = Math.floor(Math.random() * 10000);
-            clientInsert = await supabase.from('clients').insert([{
+            const retryInsert = await supabase.from('clients').insert([{
               user_id: data.user.id,
               username: `${baseName}_${fallbackSufix}`,
               name: baseName,
@@ -81,13 +85,10 @@ export default function Login() {
               expiration_date: '',
               admin_id: finalAdminId
             }]);
-          }
 
-          if (clientInsert.error) {
-            console.error('Inserção na tabela clients falhou:', clientInsert.error);
-            // Em vez de crashar a conta inteira, prossegue para não deixar o usuário num "limbo"
-            // O Dashboard lidará com a falta do cliente se extremamente necessário.
-            throw new Error(`Erro ao finalizar seu perfil: ${clientInsert.error.message}`);
+            if (retryInsert.error && retryInsert.error.code !== '23505') {
+              throw new Error(`Erro ao finalizar seu perfil: ${retryInsert.error.message}`);
+            }
           }
           
           // Limpa o referral cache

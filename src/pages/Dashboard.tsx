@@ -108,7 +108,7 @@ const RequestCard = React.memo(({ req }: { req: any }) => (
     </div>
     <div className="flex items-center justify-between pt-4 border-t border-black/5 dark:border-white/5">
       <div className="flex items-center gap-2 text-slate-400">
-        <Clock size={14} />
+        < Clock size={14} />
         <span className="text-[10px] font-medium">
           {new Date(req.created_at).toLocaleDateString()}
         </span>
@@ -124,6 +124,23 @@ const RequestCard = React.memo(({ req }: { req: any }) => (
     </div>
   </motion.div>
 ));
+
+const DashboardSkeleton = () => (
+  <Layout>
+    <div className="flex flex-col gap-6 max-w-7xl mx-auto animate-pulse">
+      <div className="h-32 bg-slate-200 dark:bg-slate-800 rounded-[2rem]" />
+      <div className="h-10 bg-slate-200 dark:bg-slate-800 rounded-2xl w-full" />
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="lg:col-span-1 h-64 bg-slate-200 dark:bg-slate-800 rounded-[2rem]" />
+        <div className="lg:col-span-3 h-64 bg-slate-200 dark:bg-slate-800 rounded-[2rem]" />
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="h-24 bg-slate-200 dark:bg-slate-800 rounded-[2rem]" />
+        <div className="h-24 bg-slate-200 dark:bg-slate-800 rounded-[2rem]" />
+      </div>
+    </div>
+  </Layout>
+);
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -152,7 +169,10 @@ export default function Dashboard() {
   // Sincroniza o perfil do contexto com o estado local do Dashboard
   useEffect(() => {
     // Se o AuthContext ainda está carregando, mantemos o Dashboard em loading
-    if (authLoading) return;
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
 
     if (contextProfile) {
       if (!isClient(contextProfile)) {
@@ -180,9 +200,21 @@ export default function Dashboard() {
         const pwaTutorialSeen = localStorage.getItem('pwa_tutorial_seen') === 'true';
         if (isStandalone && !pwaTutorialSeen) setShowWelcomeModal(true);
       }
-    } else {
-      // Se authLoading terminou e não houver perfil, liberamos a tela (será mostrada como visitante)
-      setLoading(false);
+      // Caso crítico: authLoading terminou mas não temos perfil.
+      // Se ainda houver uma sessão do Supabase ativa, forçamos um refresh e esperamos.
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+      const projectRef = supabaseUrl.split('.')[0].replace('https://', '');
+      const hasSupabaseSession = localStorage.getItem(`sb-${projectRef}-auth-token`) !== null;
+      
+      if (hasSupabaseSession) {
+         // Damos uma pequena margem de 2.0s para o refreshProfile ou a auto-cura agirem em produção
+         const timer = setTimeout(() => {
+           if (!contextProfile) setLoading(false);
+         }, 2500);
+         return () => clearTimeout(timer);
+      } else {
+        setLoading(false);
+      }
     }
   }, [contextProfile, authLoading, navigate]);
 
@@ -195,8 +227,18 @@ export default function Dashboard() {
 
     const fetchSecondaryData = async () => {
       if (!isMounted) return;
+      
+      // Validação de segurança: Só busca se tivermos ID de profile válido
+      if (!contextProfile?.id) {
+        return;
+      }
+
       setLoadingExtras(true);
       try {
+        const notifFilter = contextProfile?.id 
+          ? `client_id.eq.${contextProfile.id},is_global.eq.true`
+          : `is_global.eq.true`;
+
         const [reqsRes, notifsRes, agendaRes] = await Promise.allSettled([
           // Pedidos
           supabase
@@ -205,11 +247,11 @@ export default function Dashboard() {
             .eq('user_id', contextProfile.user_id)
             .order('created_at', { ascending: false })
             .limit(6),
-          // Notificações
+          // Notificações (Filtro dinâmico para evitar erro 400/null)
           supabase
             .from('notifications')
             .select('*')
-            .or(`client_id.eq.${contextProfile.id},is_global.eq.true`)
+            .or(notifFilter)
             .order('created_at', { ascending: false })
             .limit(10),
           // Agenda
@@ -352,12 +394,7 @@ export default function Dashboard() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 gap-6">
-        <RefreshCw className="animate-spin text-primary" size={48} />
-        <p className="text-slate-500 font-medium animate-pulse">Sincronizando seu painel...</p>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   const daysRemaining = client ? getDaysRemaining(client.expiration_date) : 0;

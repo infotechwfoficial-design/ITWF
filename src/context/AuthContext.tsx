@@ -134,7 +134,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       addAuthLog('Perfil não encontrado em nenhuma tabela.');
       // 4. AUTO-CURA (Apenas para Clientes): Se não encontrou em nenhum lugar e é um novo usuário
       if (user.id && user.email) {
-        console.warn('AuthContext: Perfil não encontrado. Criando perfil de cliente padrão...');
+        addAuthLog('Iniciando Auto-Cura para novo usuário...');
         const baseName = user.email.split('@')[0];
         const { data: newProfile, error: createError } = await supabase
           .from('clients')
@@ -157,11 +157,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         } else if (createError) {
           addAuthLog(`Erro na Auto-Cura: ${createError.message}`);
+          console.error('AuthContext: Falha na auto-cura:', createError);
         }
       }
     } catch (err: any) {
       addAuthLog(`Erro fatal no fetchProfile: ${err.message}`);
       console.error('AuthContext: Erro fatal ao sincronizar perfil:', err);
+    } finally {
+      // Garantimos que o loading local do Dashboard (se houver) ou do App saiba que a tentativa terminou
+      addAuthLog('Finalizada tentativa de busca de perfil.');
     }
   }, [addAuthLog]);
 
@@ -205,20 +209,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     // FAIL-SAFE: O soberano sistema de 3 segundos que funcionava perfeitamente
+    // REDUZIDO para 1.5s APENAS se não houver sessão imediata. 
+    // Se houver sessão, deixamos o fetchProfile ditar o tempo.
     const loadingTimer = setTimeout(() => {
-      if (mounted) {
+      if (mounted && !lastUserId.current) {
         setLoading(false);
-        addAuthLog('Sessão Destravada pelo Timer de 3 segundos (Fail-Safe).');
+        addAuthLog('Sessão Destravada pelo Timer (Modo Visitante/Sem Sessão).');
       }
-    }, 3000);
+    }, 3000); // Reduzido de 4s para 3s
+
 
     // Proteção Extra: Se após 8 segundos nada aconteceu (raríssimo), damos um último empurrão
     const emergencyTimer = setTimeout(() => {
       if (mounted && loading) {
         setLoading(false);
-        addAuthLog('TRIGGER DE EMERGÊNCIA: Destravando após 8 segundos.');
+        addAuthLog('TRIGGER DE EMERGÊNCIA: Destravando após 5 segundos.');
       }
-    }, 8000);
+    }, 5000); // Reduzido de 8s para 5s
 
     kickstartSession();
 
@@ -260,13 +267,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
           }
         } else {
+          // Se for o mesmo usuário, o Kickstart ou uma rodada anterior já pode estar lidando com isso.
+          // Mas garantimos que o loading saia de cena se o perfil já existir ou após um reforço.
           if (_event !== 'INITIAL_SESSION') {
             fetchProfile(newUser).catch(err => addAuthLog(`Erro silencioso: ${err.message}`));
-          } else {
-             if (mounted) {
-               setLoading(false);
-               addAuthLog('Carregamento finalizado - Sessão Inicial Confirmada.');
-             }
+          }
+          
+          if (mounted && loading) {
+             // Caso o Kickstart tenha falhado ou demorado, o listener dá o veredito final
+             setLoading(false); 
+             addAuthLog('Carregamento finalizado - Sessão Confirmada (Atrasada).');
           }
         }
       } else {
