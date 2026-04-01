@@ -64,7 +64,7 @@ const ClientRow = React.memo(({ client, onView, onDirectPush, onEdit, onCopy, on
     <td className="px-6 py-4 font-mono text-sm text-primary">{client.username}</td>
     <td className="px-6 py-4 font-bold">{client.name}</td>
     <td className="px-6 py-4 text-slate-500">{client.expiration_date}</td>
-    <td className="px-6 py-4 font-black">R$ {Number(client.balance || 0).toFixed(2)}</td>
+    <td className="px-6 py-4 font-black">R$ {(Number(client.balance) || 0).toFixed(2)}</td>
     <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
       <div className="flex justify-end gap-2">
         <button onClick={() => onDirectPush(client)} className="p-2 text-slate-400 hover:text-amber-500 transition-colors" title="Enviar Notificação Push">
@@ -118,7 +118,7 @@ const ClientCard = React.memo(({ client, idx, onView, onDirectPush, onEdit, onCo
     <div className="flex items-center justify-between mt-4">
       <div className="flex items-center gap-2">
          <span className="text-xs font-bold text-slate-400">Saldo:</span>
-         <span className="text-sm font-black text-slate-900 dark:text-white">R$ {Number(client.balance || 0).toFixed(2)}</span>
+         <span className="text-sm font-black text-slate-900 dark:text-white">R$ {(Number(client.balance) || 0).toFixed(2)}</span>
       </div>
       <div className="flex gap-2">
         <button onClick={(e) => { e.stopPropagation(); onDirectPush(client); }} className="p-2 bg-amber-500/10 rounded-xl text-amber-500"><Bell size={16} /></button>
@@ -307,7 +307,12 @@ export default function Admin() {
   // Plan Form State
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
-  const [planForm, setPlanForm] = useState({
+  const [planForm, setPlanForm] = useState<{
+    name: string;
+    price: number | string;
+    duration: string;
+    features: string;
+  }>({
     name: '',
     price: 0,
     duration: '',
@@ -319,7 +324,15 @@ export default function Admin() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [viewingClient, setViewingClient] = useState<Client | null>(null);
-  const [clientForm, setClientForm] = useState({
+  const [clientForm, setClientForm] = useState<{
+    username: string;
+    name: string;
+    email: string;
+    expiration_date: string;
+    balance: number | string;
+    renewal_link: string;
+    password: string;
+  }>({
     username: '',
     name: '',
     email: '',
@@ -722,7 +735,7 @@ export default function Admin() {
             name: clientForm.name,
             email: clientForm.email,
             expiration_date: clientForm.expiration_date,
-            balance: clientForm.balance,
+            balance: Number(clientForm.balance) || 0,
             renewal_link: clientForm.renewal_link
           })
           .eq('id', editingClient.id);
@@ -760,7 +773,7 @@ export default function Admin() {
             name: clientForm.name,
             email: clientForm.email,
             expiration_date: clientForm.expiration_date,
-            balance: clientForm.balance,
+            balance: Number(clientForm.balance) || 0,
             renewal_link: clientForm.renewal_link,
             admin_id: currentAdmin?.user_id
           }]);
@@ -1016,7 +1029,11 @@ export default function Admin() {
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...planForm, features: featuresArray })
+        body: JSON.stringify({ 
+          ...planForm, 
+          price: Number(planForm.price) || 0, 
+          features: featuresArray 
+        })
       });
 
       if (!res.ok) throw new Error('Erro ao salvar plano');
@@ -1776,8 +1793,11 @@ export default function Admin() {
                         required
                         type="number"
                         step="0.01"
-                        value={clientForm.balance}
-                        onChange={e => setClientForm({ ...clientForm, balance: parseFloat(e.target.value) })}
+                        value={clientForm.balance as any}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setClientForm({ ...clientForm, balance: val === '' ? '' : parseFloat(val) });
+                        }}
                         className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-800 border border-black/5 dark:border-white/10 rounded-xl outline-none focus:ring-2 focus:ring-primary font-bold"
                         placeholder="0.00"
                       />
@@ -2080,8 +2100,11 @@ export default function Admin() {
                       step="0.01"
                       required
                       className="w-full bg-slate-50 dark:bg-slate-800 border border-black/5 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                      value={planForm.price}
-                      onChange={(e) => setPlanForm({ ...planForm, price: parseFloat(e.target.value) })}
+                      value={planForm.price as any}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setPlanForm({ ...planForm, price: val === '' ? '' : parseFloat(val) });
+                      }}
                       placeholder="29.90"
                     />
                   </div>

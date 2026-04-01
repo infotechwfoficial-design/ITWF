@@ -51,14 +51,33 @@ import { formatCurrency } from '../utils/format';
 // Calcula dias restantes a partir de uma data no formato DD/MM/AAAA
 function getDaysRemaining(expirationDate: string): number {
   if (!expirationDate) return 0;
-  const parts = expirationDate.split('/');
-  if (parts.length !== 3) return 0;
-  const [day, month, year] = parts;
-  const expDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const diff = expDate.getTime() - today.getTime();
-  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+  try {
+    const parts = expirationDate.split('/');
+    if (parts.length !== 3) return 0;
+    
+    const [dayStr, monthStr, yearStr] = parts;
+    const day = parseInt(dayStr);
+    const month = parseInt(monthStr);
+    const year = parseInt(yearStr);
+
+    if (isNaN(day) || isNaN(month) || isNaN(year)) {
+      console.warn('Dashboard: Data de expiração inválida detectada:', expirationDate);
+      return 0;
+    }
+
+    const expDate = new Date(year, month - 1, day);
+    
+    // Verifica se a data gerada é válida
+    if (isNaN(expDate.getTime())) return 0;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diff = expDate.getTime() - today.getTime();
+    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+  } catch (e) {
+    console.error('Erro ao calcular dias restantes:', e);
+    return 0;
+  }
 }
 
 function getSubscriptionStatus(daysRemaining: number) {

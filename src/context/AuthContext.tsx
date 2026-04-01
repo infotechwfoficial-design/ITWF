@@ -50,7 +50,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsAdmin(isRoleAdmin || prefersAdmin); 
 
       if (prefersAdmin || isRoleAdmin) {
-        // 1. Tenta buscar na tabela de admins primeiro se houver preferência ou se for admin por JWT e preferir admin
+        // 1. Tenta buscar na tabela de admins primeiro if houver preferência ou se for admin por JWT e preferir admin
+        addAuthLog('Buscando na tabela de admins...');
         const { data: adminData, error: adminError } = await supabase
           .from('admins')
           .select('*')
@@ -58,6 +59,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .maybeSingle();
 
         if (adminError) {
+          addAuthLog(`Erro ao buscar admin: ${adminError.message}`);
           console.error('AuthContext: Erro ao buscar perfil de admin:', adminError);
         }
 
@@ -77,6 +79,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .maybeSingle();
 
       if (clientError) {
+        addAuthLog(`Erro ao buscar cliente: ${clientError.message}`);
         console.error('AuthContext: Erro ao buscar perfil de cliente:', clientError);
       }
       
@@ -98,9 +101,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             } as Client);
           } else {
             setProfile(clientData);
+            addAuthLog('Perfil de Cliente carregado (sem branding admin).');
           }
         } else {
           setProfile(clientData);
+          addAuthLog('Perfil de Cliente carregado (sem admin_id).');
         }
 
         // Se encontrou como cliente, mas tem flag de admin perdida e não é admin real no JWT, vamos remover
@@ -207,10 +212,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }, 3000);
 
+    // Proteção Extra: Se após 8 segundos nada aconteceu (raríssimo), damos um último empurrão
+    const emergencyTimer = setTimeout(() => {
+      if (mounted && loading) {
+        setLoading(false);
+        addAuthLog('TRIGGER DE EMERGÊNCIA: Destravando após 8 segundos.');
+      }
+    }, 8000);
+
     kickstartSession();
 
     // Listener para eventos em tempo real (Login, Logout, Expiração de Token)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+      // Pequeno atraso para o INITIAL_SESSION não atropelar o Kickstart se ambos vierem juntos
+      if (_event === 'INITIAL_SESSION') {
+        await new Promise(r => setTimeout(r, 100));
+      }
+      
       addAuthLog(`Evento Auth recebido: ${_event}`);
       
       if (!mounted) {
