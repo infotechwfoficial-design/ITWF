@@ -204,8 +204,9 @@ export default function Dashboard() {
         const pwaTutorialSeen = localStorage.getItem('pwa_tutorial_seen') === 'true';
         if (isStandalone && !pwaTutorialSeen) setShowWelcomeModal(true);
       }
+    } else {
       // Caso crítico: authLoading terminou mas não temos perfil.
-      // Se ainda houver uma sessão do Supabase ativa, forçamos um refresh e esperamos.
+      // Se ainda houver uma sessão do Supabase ativa, forçamos o timeout de segurança para aguardar.
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
       const projectRef = supabaseUrl.split('.')[0].replace('https://', '');
       const hasSupabaseSession = localStorage.getItem(`sb-${projectRef}-auth-token`) !== null;
@@ -221,6 +222,7 @@ export default function Dashboard() {
          }, 4000);
          return () => clearTimeout(timer);
       } else {
+        // Se realmente não tiver sessão nem perfil, libera o loading imediatamente para o modo visitante
         setLoading(false);
       }
     }
