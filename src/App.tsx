@@ -27,6 +27,7 @@ import UpdatePassword from './pages/UpdatePassword';
 import Terms from './pages/Terms';
 import Maintenance from './pages/Maintenance';
 import SaaS from './pages/SaaS';
+import DebugPage from './pages/DebugPage';
 
 const LoadingFallback = () => (
   <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 gap-6">
@@ -112,6 +113,7 @@ function AppContent() {
                 <Route path="/terms" element={<Terms />} />
                 <Route path="/maintenance" element={<Maintenance />} />
                 <Route path="/saas" element={<SaaS />} />
+                <Route path="/debug" element={<DebugPage />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Suspense>
