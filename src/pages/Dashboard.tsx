@@ -205,26 +205,8 @@ export default function Dashboard() {
         if (isStandalone && !pwaTutorialSeen) setShowWelcomeModal(true);
       }
     } else {
-      // Caso crítico: authLoading terminou mas não temos perfil.
-      // Se ainda houver uma sessão do Supabase ativa, forçamos o timeout de segurança para aguardar.
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-      const projectRef = supabaseUrl.split('.')[0].replace('https://', '');
-      const hasSupabaseSession = localStorage.getItem(`sb-${projectRef}-auth-token`) !== null;
-      
-      if (hasSupabaseSession) {
-         // Damos uma margem maior de 4.0s para o refreshProfile ou a auto-cura agirem em produção
-         // Isso evita que o usuário veja "Visitante" momentaneamente durante a sincronização inicial
-         const timer = setTimeout(() => {
-           if (!contextProfile) {
-             setLoading(false);
-             console.log('Dashboard: Tempo esgotado aguardando perfil, assumindo Visitante.');
-           }
-         }, 4000);
-         return () => clearTimeout(timer);
-      } else {
-        // Se realmente não tiver sessão nem perfil, libera o loading imediatamente para o modo visitante
-        setLoading(false);
-      }
+      // Se realmente não tiver sessão nem perfil, libera o loading imediatamente para o modo visitante
+      setLoading(false);
     }
   }, [contextProfile, authLoading, navigate]);
 

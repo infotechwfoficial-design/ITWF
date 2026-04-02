@@ -188,111 +188,85 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let mounted = true;
     addAuthLog('AuthProvider iniciado/montado.');
 
-    // KICKSTART: Chute inicial de 3 segundos para garantir que o PWA nunca trave
-    const kickstartSession = async () => {
-      addAuthLog('Executando Kickstart de sessão manual...');
+    // Inicialização Atômica: Um único fluxo para checar sessão + perfil
+    const initializeAuth = async () => {
       try {
+        addAuthLog('Iniciando verificação de sessão inicial...');
         const { data: { session: initialSession } } = await supabase.auth.getSession();
-        if (mounted && initialSession) {
-          addAuthLog(`Kickstart: Sessão encontrada para ${initialSession.user.email}`);
-          setUser(initialSession.user);
+        
+        if (!mounted) return;
+
+        if (initialSession) {
+          addAuthLog(`Sessão encontrada: ${initialSession.user.email}. Buscando perfil...`);
           setSession(initialSession);
+          setUser(initialSession.user);
+          lastUserId.current = initialSession.user.id;
+          
+          // Esperamos o perfil carregar ANTES de liberar o loading
           await fetchProfile(initialSession.user);
         } else {
-          addAuthLog('Kickstart: Nenhuma sessão imediata encontrada.');
+          addAuthLog('Nenhuma sessão inicial encontrada.');
         }
       } catch (err: any) {
-        addAuthLog(`Erro no Kickstart: ${err.message}`);
+        addAuthLog(`Erro na inicialização: ${err.message}`);
       } finally {
-        // O timer de 3s é o soberano para destravar o loading
+        if (mounted) {
+          setLoading(false);
+          addAuthLog('Carregamento inicial finalizado.');
+        }
       }
     };
 
-    // FAIL-SAFE: O soberano sistema de 3 segundos que funcionava perfeitamente
-    // AUMENTADO para 5s para garantir que bancos de dados lentos não resultem em "Visitante"
-    const loadingTimer = setTimeout(() => {
-      if (mounted && (!lastUserId.current || !profile)) {
-        setLoading(false);
-        addAuthLog('Sessão Destravada pelo Timer (Modo Visitante/Profile Pendente).');
-      }
-    }, 5000); 
-
-
-    // Proteção Extra: Se após 10 segundos nada aconteceu (raríssimo), damos um último empurrão
-    const emergencyTimer = setTimeout(() => {
+    // FAIL-SAFE DE SEGURANÇA (Apenas para casos extremos de rede travada)
+    const safetyTimeout = setTimeout(() => {
       if (mounted && loading) {
         setLoading(false);
-        addAuthLog('TRIGGER DE EMERGÊNCIA: Destravando após 10 segundos.');
+        addAuthLog('Safety Timeout: Carregamento forçado após 10s.');
       }
-    }, 10000); 
+    }, 10000);
 
-    kickstartSession();
+    initializeAuth();
 
     // Listener para eventos em tempo real (Login, Logout, Expiração de Token)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
-      // Pequeno atraso para o INITIAL_SESSION não atropelar o Kickstart se ambos vierem juntos
-      if (_event === 'INITIAL_SESSION') {
-        await new Promise(r => setTimeout(r, 100));
-      }
-      
       addAuthLog(`Evento Auth recebido: ${_event}`);
       
-      if (!mounted) {
-        addAuthLog('Evento ignorado: Componente desmontado.');
-        return;
-      }
+      if (!mounted) return;
 
       const newUser = newSession?.user ?? null;
-      
-      // Se for INITIAL_SESSION, o Kickstart já pode ter lidado com isso,
-      // mas o listener é o canal oficial de sincronização do Supabase.
       setSession(newSession);
       setUser(newUser);
       
       if (newUser) {
         const isUserDifferent = newUser.id !== lastUserId.current;
-        addAuthLog(`Usuário logado: ${newUser.email} (Diferente do anterior: ${isUserDifferent})`);
-
-        if (isUserDifferent) {
+        if (isUserDifferent || !profile) {
           lastUserId.current = newUser.id;
+          addAuthLog(`Sincronizando perfil para o evento ${_event}...`);
           try {
             await fetchProfile(newUser);
-          } catch (err: any) {
-            addAuthLog(`Erro no listener fetchProfile: ${err.message}`);
           } finally {
-            if (mounted) {
-              setLoading(false);
-              addAuthLog('Carregamento finalizado via Listener.');
-            }
-          }
-        } else if (!profile) {
-          // Se for o mesmo usuário mas o perfil ainda estiver nulo, tentamos buscar novamente
-          addAuthLog('Mesmo usuário detectado sem perfil carregado. Re-sincronizando...');
-          fetchProfile(newUser).finally(() => {
             if (mounted) setLoading(false);
-          });
+          }
         } else {
-          // Se for o mesmo usuário e já tiver perfil, apenas removemos o loading
-          addAuthLog('Usuário e perfil já confirmados.');
           if (mounted) setLoading(false);
         }
       } else {
-        addAuthLog('Nenhum usuário logado detectado pelo listener.');
-        setProfile(null);
-        setIsAdmin(false);
-        lastUserId.current = null;
-        if (mounted) {
-          setLoading(false);
-          addAuthLog('Carregamento finalizado - Modo Visitante.');
+        // Logout ou Sessão Expirada
+        if (lastUserId.current !== null) {
+          addAuthLog('Limpando dados de perfil (Logout detectado).');
+          setProfile(null);
+          setIsAdmin(false);
+          lastUserId.current = null;
         }
+        if (mounted) setLoading(false);
       }
     });
 
     return () => {
       mounted = false;
-      clearTimeout(loadingTimer);
-      addAuthLog('AuthProvider desmontado.');
+      clearTimeout(safetyTimeout);
       subscription.unsubscribe();
+      addAuthLog('AuthProvider desmontado.');
     };
   }, [fetchProfile, addAuthLog]);
 
