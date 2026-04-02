@@ -147,34 +147,27 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose, clientName
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 size-32 md:size-64 bg-primary/20 rounded-full blur-[60px] md:blur-[100px]"></div>
               
               <div className="w-full max-w-[400px] mx-auto z-10 transition-transform hover:scale-[1.02] duration-500">
-                <div className="relative w-full shadow-[0_30px_60px_rgba(0,0,0,0.6)] overflow-hidden rounded-[2rem] border-2 md:border-4 border-slate-900 dark:border-slate-800 bg-black">
-                  <video 
-                    src="/tutorial.mp4" 
-                    autoPlay 
-                    playsInline 
-                    controls 
-                    controlsList="nodownload"
-                    onEnded={() => setIsVideoFinished(true)}
-                    onError={() => setIsVideoFinished(true)}
-                    className="w-full h-auto aspect-[9/16] object-contain"
-                  />
+                <div className="relative w-full shadow-[0_30px_60px_rgba(0,0,0,0.6)] overflow-hidden rounded-[2rem] border-2 md:border-4 border-slate-900 dark:border-slate-800 bg-black aspect-[9/16]">
+                  {isOpen && (
+                    <iframe
+                      src="https://www.youtube-nocookie.com/embed/MbwzRQr5-iA?autoplay=1&mute=0&rel=0&modestbranding=1"
+                      title="Tutorial ITWF"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen
+                      className="absolute inset-0 w-full h-full border-0"
+                      onLoad={() => setIsVideoFinished(true)} // Liberamos o acesso após o carregamento do player
+                    />
+                  )}
                   
                   {isVideoFinished && (
-                    <div className="absolute inset-0 z-20 bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-500">
-                      <Sparkles size={48} className="text-primary mb-4 animate-pulse" />
-                      <h3 className="text-white font-black uppercase text-xl md:text-2xl mb-6 leading-tight">Você está<br/>Pronto!</h3>
-                      <button
-                        onClick={onClose}
-                        className="bg-primary hover:bg-primary/90 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-sm shadow-[0_15px_40px_-5px_rgba(var(--primary-rgb),0.6)] transition-all active:scale-[0.97] flex items-center gap-3 animate-pulse-subtle w-full justify-center"
-                      >
-                        Acessar Painel <PlayCircle size={20} />
-                      </button>
+                    <div className="absolute bottom-6 left-6 right-6 z-10 pointer-events-none">
+                       {/* Overlay sutil para indicar que o tutorial está pronto */}
                     </div>
                   )}
                 </div>
                 <div className="mt-4 text-center">
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                    TUTORIAL ITWF RENOVAÇÕES
+                    TUTORIAL ITWF RENOVAÇÕES (VIA YOUTUBE)
                   </p>
                 </div>
               </div>
