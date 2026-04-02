@@ -353,7 +353,33 @@ export default function Dashboard() {
     return <DashboardSkeleton />;
   }
 
-  const daysRemaining = client ? getDaysRemaining(client.expiration_date) : 0;
+  // Se após o carregamento não houver cliente, algo falhou na sincronização ou auto-cura
+  if (!client) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 p-6 text-center gap-6">
+        <div className="size-20 bg-rose-500/10 text-rose-500 rounded-3xl flex items-center justify-center">
+          <AlertTriangle size={32} />
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-xl font-black text-slate-900 dark:text-white uppercase">Conta não Localizada</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xs mx-auto">
+            Não conseguimos vincular sua sessão a um perfil ativo. Tente entrar novamente ou contate o suporte.
+          </p>
+        </div>
+        <button 
+          onClick={() => {
+            supabase.auth.signOut();
+            navigate('/');
+          }}
+          className="px-8 py-3 bg-primary text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-primary/20"
+        >
+          Voltar ao Login
+        </button>
+      </div>
+    );
+  }
+
+  const daysRemaining = getDaysRemaining(client.expiration_date);
   const status = getSubscriptionStatus(daysRemaining);
 
   return (
@@ -389,7 +415,7 @@ export default function Dashboard() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <h1 className="text-xl font-black text-slate-900 dark:text-white uppercase truncate">
-                    {client?.name || 'Visitante'}
+                    {client.name}
                   </h1>
                   <button onClick={() => setIsEditingName(true)} className="text-slate-400 hover:text-primary transition-colors">
                     <Edit3 size={14} />
@@ -397,7 +423,7 @@ export default function Dashboard() {
                 </div>
                 <p className="text-[10px] font-bold text-slate-500 flex items-center gap-1 uppercase tracking-tight">
                   <Cloud size={12} className="text-primary" />
-                  @{client?.username || 'itwf.user'}
+                  @{client.username}
                 </p>
               </div>
             </div>

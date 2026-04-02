@@ -79,9 +79,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           localStorage.removeItem('isAdminAuthenticated');
         }
       } else {
-        // Se não achou perfil, marcamos como null
-        // A criação (Auto-Cura) agora será responsabilidade das páginas de Login/Signup
-        setProfile(null);
+        // Se não achou perfil e não é admin, tenta a auto-cura (Auto-Healing)
+        if (!isRoleAdmin && !prefersAdmin) {
+          console.log('AuthContext: Perfil não encontrado. Iniciando Auto-Cura para:', user.email);
+          const baseName = user.email?.split('@')[0] || 'usuario';
+          const cleanUsername = baseName.toLowerCase().replace(/[^a-z0-9]/g, '');
+          
+          const { data: newProfile, error: insertError } = await supabase
+            .from('clients')
+            .insert([{
+              user_id: user.id,
+              username: cleanUsername,
+              name: baseName,
+              email: user.email,
+              expiration_date: '',
+              balance: 0
+            }])
+            .select()
+            .maybeSingle();
+
+          if (insertError) {
+             // Se falhar por nome duplicado, tenta com sufixo aleatório
+             const fallbackUsername = `${cleanUsername}${Math.floor(Math.random() * 1000)}`;
+             const { data: retryProfile, error: retryError } = await supabase
+               .from('clients')
+               .insert([{
+                 user_id: user.id,
+                 username: fallbackUsername,
+                 name: baseName,
+                 email: user.email,
+                 expiration_date: '',
+                 balance: 0
+               }])
+               .select()
+               .maybeSingle();
+             
+             if (retryProfile) {
+               setProfile(retryProfile);
+             } else {
+               console.error('AuthContext: Falha crítica na Auto-Cura:', retryError);
+               setProfile(null);
+             }
+          } else if (newProfile) {
+            console.log('AuthContext: Auto-Cura realizada com sucesso.');
+            setProfile(newProfile);
+          }
+        } else {
+          setProfile(null);
+        }
       }
     } catch (err) {
       console.error('AuthContext: Erro ao carregar perfil:', err);
