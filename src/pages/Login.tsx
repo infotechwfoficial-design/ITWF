@@ -48,7 +48,7 @@ export default function Login() {
           navigate('/dashboard');
         }
       } else {
-        // Sign Up
+        // Sign Up (Lógica Estável do Backup)
         const { data, error } = await supabase.auth.signUp({
           email,
           password
@@ -61,7 +61,8 @@ export default function Login() {
           const baseName = email.split('@')[0];
           const finalAdminId = referralId || localStorage.getItem('referralId') || null;
 
-          let clientInsert = await supabase.from('clients').insert([{
+          // Inserção direta e simples do backup (com tratamento básico de erro)
+          const { error: insertError } = await supabase.from('clients').insert([{
             user_id: data.user.id,
             username: baseName,
             name: baseName,
@@ -70,31 +71,23 @@ export default function Login() {
             admin_id: finalAdminId
           }]);
 
-          // Caso o trigger do Supabase já tenha criado o perfil (Erro 409/23505), ignoramos silenciosamente
-          if (clientInsert.error && clientInsert.error.code === '23505') {
-            console.log('[SignUp] Perfil já criado via trigger ou tentativa anterior. Prosseguindo.');
-          } else if (clientInsert.error) {
-            console.error('Inserção na tabela clients falhou:', clientInsert.error);
-            // Fallback para nome de usuário duplicado (adicionando sufixo)
-            const fallbackSufix = Math.floor(Math.random() * 10000);
-            const retryInsert = await supabase.from('clients').insert([{
-              user_id: data.user.id,
-              username: `${baseName}_${fallbackSufix}`,
-              name: baseName,
-              email: email,
-              expiration_date: '',
-              admin_id: finalAdminId
-            }]);
-
-            if (retryInsert.error && retryInsert.error.code !== '23505') {
-              throw new Error(`Erro ao finalizar seu perfil: ${retryInsert.error.message}`);
-            }
+          if (insertError) {
+             // Caso o username base já exista, adicionamos um sufixo (fallback mínimo)
+             const fallbackSufix = Math.floor(Math.random() * 1000);
+             await supabase.from('clients').insert([{
+               user_id: data.user.id,
+               username: `${baseName}_${fallbackSufix}`,
+               name: baseName,
+               email: email,
+               expiration_date: '',
+               admin_id: finalAdminId
+             }]);
           }
           
           // Limpa o referral cache
           localStorage.removeItem('referralId');
 
-          // Notificar Administrador sobre novo cadastro
+          // Notificar Administrador
           const apiUrl = import.meta.env.VITE_API_URL || '';
           fetch(`${apiUrl}/api/send-push`, {
             method: 'POST',
@@ -104,14 +97,7 @@ export default function Login() {
               message: `O usuário ${email} acabou de se cadastrar no sistema.`,
               email: 'info.tech.wf.oficial@gmail.com'
             })
-          })
-          .then(async (res) => {
-            if (!res.ok) {
-              const text = await res.text().catch(() => '');
-              console.warn('[Push Notification] Erro ao notificar admin:', res.status, text);
-            }
-          })
-          .catch(err => console.error('[Push Notification] Falha na rede:', err));
+          }).catch(err => console.error('[Push Notification] Falha na rede:', err));
         }
 
         setSuccessMsg('Conta criada com sucesso! Você já pode fazer login.');
@@ -233,7 +219,7 @@ export default function Login() {
           <div className="w-full border-t border-black/5 dark:border-white/10 my-4" />
 
           <Link 
-            to="/revenda"
+            to="/saas"
             className="w-full group p-4 border border-primary/20 bg-primary/5 rounded-2xl flex items-center justify-between transition-all hover:bg-primary/10 mb-2"
           >
             <div className="flex flex-col items-start">

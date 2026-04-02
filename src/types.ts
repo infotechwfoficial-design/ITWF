@@ -11,6 +11,8 @@ export interface Client {
   renewal_link: string;
   avatar_url?: string;
   onboarding_completed?: boolean;
+  push_logo_url?: string;
+  admin_name?: string;
 }
 
 export interface Notification {

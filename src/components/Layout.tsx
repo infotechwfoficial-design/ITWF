@@ -3,6 +3,8 @@ import Sidebar, { NavItem } from './Sidebar';
 import MobileHeader from './MobileHeader';
 import BottomNav from './BottomNav';
 import { Chatbot } from './Chatbot';
+import { useAuth } from '../context/AuthContext';
+import { isClient } from '../types';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -27,12 +29,24 @@ export default function Layout({
   activeTab,
   showNotifications = true
 }: LayoutProps) {
+  const { profile } = useAuth();
+  const customLogo = isClient(profile) ? profile.push_logo_url : undefined;
+  // Se o título não for passado, tenta usar o nome que injetamos no perfil via AuthContext ou ITWF
+  const systemTitle = mobileHeaderTitle || (isClient(profile) && (profile as any).admin_name) || "ITWF";
+
   return (
     <div className="flex flex-col md:flex-row h-screen bg-white dark:bg-background-dark text-slate-900 dark:text-slate-100 font-sans overflow-hidden transition-colors duration-300">
-      <Sidebar items={sidebarItems} title={mobileHeaderTitle} activeId={activeTab} onLogout={onLogout} />
+      <Sidebar 
+        items={sidebarItems} 
+        title={systemTitle} 
+        logoUrl={customLogo}
+        activeId={activeTab} 
+        onLogout={onLogout} 
+      />
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
         <MobileHeader 
-          title={mobileHeaderTitle} 
+          title={systemTitle} 
+          logoUrl={customLogo}
           showBackButton={mobileHeaderShowBack}
           onBack={mobileHeaderOnBack}
           onLogout={onLogout}

@@ -19,13 +19,12 @@ import {
   LogOut,
   ChevronRight,
   Settings as SettingsIcon,
-  CreditCard,
-  LayoutDashboard,
-  HelpCircle,
   Plus,
+  LayoutDashboard,
+  Trophy,
   ArrowRight,
   Star,
-  TrendingUp,
+  HelpCircle,
   Calendar,
   Menu,
   Sparkles,
@@ -148,14 +147,15 @@ const DashboardSkeleton = () => (
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { profile: contextProfile, signOut, refreshProfile, loading: authLoading } = useAuth();
+  const { profile: contextProfile, loading: authLoading, refreshProfile } = useAuth();
   
-  const [client, setClient] = useState<Client | null>(null);
   const [requests, setRequests] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<NotificationType[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingExtras, setLoadingExtras] = useState(false);
+  const [loadingExtras, setLoadingExtras] = useState(true);
   const [sportsAgenda, setSportsAgenda] = useState<string | null>(null);
+  
+  // O perfil do contexto já é o nosso 'client'
+  const client = isClient(contextProfile) ? contextProfile : null;
   
   // Quick Edit States
   const [isEditingName, setIsEditingName] = useState(false);
@@ -170,134 +170,101 @@ export default function Dashboard() {
     setToastConfig({ message, type });
   }, []);
 
-  // Sincroniza o perfil do contexto com o estado local do Dashboard
+  // Busca dados secundários (Pedidos, Notificações, Agenda)
+  const fetchDashboardData = useCallback(async (profile: Client) => {
+    setLoadingExtras(true);
+    try {
+      const notifFilter = profile.id 
+        ? `client_id.eq.${profile.id},is_global.eq.true`
+        : `is_global.eq.true`;
+
+      const [reqsRes, notifsRes, agendaRes] = await Promise.allSettled([
+        // Pedidos
+        supabase
+          .from('requests')
+          .select('*')
+          .eq('user_id', profile.user_id)
+          .order('created_at', { ascending: false })
+          .limit(6),
+        // Notificações
+        supabase
+          .from('notifications')
+          .select('*')
+          .or(notifFilter)
+          .order('created_at', { ascending: false })
+          .limit(10),
+        // Agenda
+        supabase
+          .from('notifications')
+          .select('message')
+          .eq('title', '⚽ Agenda Esportiva')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      ]);
+
+      if (reqsRes.status === 'fulfilled' && reqsRes.value.data) setRequests(reqsRes.value.data);
+      if (notifsRes.status === 'fulfilled' && notifsRes.value.data) setNotifications(notifsRes.value.data);
+      if (agendaRes.status === 'fulfilled' && agendaRes.value.data) setSportsAgenda(agendaRes.value.data.message);
+
+    } catch (err) {
+      console.error('Dashboard: Erro ao carregar dados:', err);
+    } finally {
+      setLoadingExtras(false);
+    }
+  }, []);
+
+  // Efeito principal de Sincronização e Onboarding
   useEffect(() => {
-    // Se o AuthContext ainda está carregando, mantemos o Dashboard em loading
-    if (authLoading) {
-      setLoading(true);
+    if (authLoading) return;
+
+    if (!contextProfile) {
+      // Se após o loading do Auth não houver perfil, redireciona ou mantém como visitante
       return;
     }
 
-    if (contextProfile) {
-      if (!isClient(contextProfile)) {
-        // Segurança extra: Se for Admin tentando acessar Dashboard, manda pro lugar certo
-        navigate('/admin');
-        return;
-      }
-
-      setClient(contextProfile);
-      setNewName(contextProfile.name || '');
-      setLoading(false);
-      
-      // Notificações Push - Checagem inicial
-      if ('Notification' in window && Notification.permission === 'default') {
-        setShowPushBanner(true);
-      } else if ('Notification' in window && Notification.permission === 'granted') {
-        subscribeUserToPush(contextProfile.email, contextProfile.username, contextProfile.admin_id);
-      }
-
-      // Onboarding
-      if (!contextProfile.onboarding_completed) {
-        setShowWelcomeModal(true);
-      } else {
-        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
-        const pwaTutorialSeen = localStorage.getItem('pwa_tutorial_seen') === 'true';
-        if (isStandalone && !pwaTutorialSeen) setShowWelcomeModal(true);
-      }
-    } else {
-      // Se realmente não tiver sessão nem perfil, libera o loading imediatamente para o modo visitante
-      setLoading(false);
+    if (!isClient(contextProfile)) {
+      navigate('/admin');
+      return;
     }
-  }, [contextProfile, authLoading, navigate]);
 
-  // Carrega dados secundários e realtime
+    setNewName(contextProfile.name || '');
+    fetchDashboardData(contextProfile);
+
+    // Push Notifications
+    if ('Notification' in window && Notification.permission === 'default') {
+      setShowPushBanner(true);
+    } else if ('Notification' in window && Notification.permission === 'granted') {
+      subscribeUserToPush(contextProfile.email, contextProfile.username, contextProfile.admin_id);
+    }
+
+    // Onboarding
+    if (!contextProfile.onboarding_completed) {
+      setShowWelcomeModal(true);
+    }
+
+  }, [contextProfile, authLoading, navigate, fetchDashboardData]);
+
+  // Realtime para notificações apenas
   useEffect(() => {
-    if (!contextProfile) return;
+    if (!contextProfile?.id) return;
 
-    let isMounted = true;
-    let channel: any;
-
-    const fetchSecondaryData = async () => {
-      if (!isMounted) return;
-      
-      // Validação de segurança: Só busca se tivermos ID de profile válido
-      if (!contextProfile?.id) {
-        return;
-      }
-
-      setLoadingExtras(true);
-      try {
-        const notifFilter = contextProfile?.id 
-          ? `client_id.eq.${contextProfile.id},is_global.eq.true`
-          : `is_global.eq.true`;
-
-        const [reqsRes, notifsRes, agendaRes] = await Promise.allSettled([
-          // Pedidos
-          supabase
-            .from('requests')
-            .select('*')
-            .eq('user_id', contextProfile.user_id)
-            .order('created_at', { ascending: false })
-            .limit(6),
-          // Notificações (Filtro dinâmico para evitar erro 400/null)
-          supabase
-            .from('notifications')
-            .select('*')
-            .or(notifFilter)
-            .order('created_at', { ascending: false })
-            .limit(10),
-          // Agenda
-          supabase
-            .from('notifications')
-            .select('message')
-            .eq('title', '⚽ Agenda Esportiva')
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle()
-        ]);
-
-        if (!isMounted) return;
-
-        if (reqsRes.status === 'fulfilled' && reqsRes.value.data) {
-          setRequests(reqsRes.value.data);
+    const channel = supabase
+      .channel(`notifs_${contextProfile.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notifications' },
+        (payload) => {
+          const newNotif = payload.new as any;
+          if (newNotif.client_id === contextProfile.id || newNotif.is_global) {
+            setNotifications(prev => [newNotif as NotificationType, ...prev].slice(0, 10));
+          }
         }
-        if (notifsRes.status === 'fulfilled' && notifsRes.value.data) {
-          setNotifications(notifsRes.value.data);
-        }
-        if (agendaRes.status === 'fulfilled' && agendaRes.value.data) {
-          setSportsAgenda(agendaRes.value.data.message);
-        }
-
-        // Realtime Subscription
-        channel = supabase
-          .channel(`dashboard_realtime_${contextProfile.user_id}`)
-          .on(
-            'postgres_changes',
-            { event: '*', schema: 'public', table: 'notifications' },
-            (payload) => {
-              if (!isMounted) return;
-              const newNotif = payload.new as any;
-              if (newNotif.client_id === contextProfile.id || newNotif.is_global) {
-                if (payload.eventType === 'INSERT') {
-                   setNotifications(prev => [newNotif as NotificationType, ...prev].slice(0, 10));
-                }
-              }
-            }
-          )
-          .subscribe();
-
-      } catch (err) {
-        console.error('Dashboard: Erro ao carregar extras:', err);
-      } finally {
-        if (isMounted) setLoadingExtras(false);
-      }
-    };
-
-    fetchSecondaryData();
+      )
+      .subscribe();
 
     return () => {
-      isMounted = false;
-      if (channel) supabase.removeChannel(channel);
+      supabase.removeChannel(channel);
     };
   }, [contextProfile]);
 
@@ -311,7 +278,6 @@ export default function Dashboard() {
 
       if (error) throw error;
       await refreshProfile();
-      setClient({ ...client, name: newName.trim() });
       setIsEditingName(false);
       showToast('Nome atualizado com sucesso!', 'success');
     } catch (err: any) {
@@ -346,7 +312,6 @@ export default function Dashboard() {
 
       if (updateError) throw updateError;
       await refreshProfile();
-      setClient({ ...client, avatar_url: publicUrl });
       showToast('Foto de perfil atualizada!', 'success');
     } catch (err: any) {
       showToast('Erro ao subir foto: ' + err.message, 'error');
@@ -379,13 +344,12 @@ export default function Dashboard() {
         .eq('user_id', client.user_id);
       
       await refreshProfile();
-      setClient({ ...client, onboarding_completed: true });
     } catch (err) {
       console.warn('Erro ao salvar status de onboarding:', err);
     }
   };
 
-  if (loading) {
+  if (authLoading) {
     return <DashboardSkeleton />;
   }
 
@@ -527,9 +491,14 @@ export default function Dashboard() {
                   <p className="text-[11px] font-bold leading-relaxed whitespace-pre-wrap">{sportsAgenda}</p>
                 </div>
               ) : (
-                <div className="text-center py-8 space-y-2">
-                  <AlertTriangle className="mx-auto text-white/50" size={24} />
-                  <p className="text-[10px] font-black uppercase">Sem Jogos no Momento</p>
+                <div className="text-center py-12 px-4 space-y-4 bg-white/5 rounded-3xl border border-white/10 animate-pulse-slow">
+                  <div className="size-12 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-2">
+                    <Trophy className="text-white/40" size={20} />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-white">Agenda Livre</p>
+                    <p className="text-[9px] text-white/50 font-medium leading-tight">Não há grandes jogos programados para as próximas horas. Aproveite para organizar seus outros conteúdos!</p>
+                  </div>
                 </div>
               )}
             </section>
