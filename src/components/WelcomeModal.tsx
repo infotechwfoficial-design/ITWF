@@ -149,13 +149,13 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose, clientName
               <div className="w-full max-w-[400px] mx-auto z-10 transition-transform hover:scale-[1.02] duration-500">
                 <div className="relative w-full shadow-[0_30px_60px_rgba(0,0,0,0.6)] overflow-hidden rounded-[2rem] border-2 md:border-4 border-slate-900 dark:border-slate-800 bg-black aspect-[9/16]">
                   {isOpen && (
-                    <iframe
-                      src="https://www.youtube-nocookie.com/embed/MbwzRQr5-iA?autoplay=1&mute=0&rel=0&modestbranding=1"
-                      title="Tutorial ITWF"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                      allowFullScreen
-                      className="absolute inset-0 w-full h-full border-0"
-                      onLoad={() => setIsVideoFinished(true)} // Liberamos o acesso após o carregamento do player
+                    <video
+                      src="/tutorial.mp4"
+                      className="absolute inset-0 w-full h-full border-0 object-cover"
+                      controls
+                      autoPlay
+                      playsInline
+                      onEnded={() => setIsVideoFinished(true)}
                     />
                   )}
                   
