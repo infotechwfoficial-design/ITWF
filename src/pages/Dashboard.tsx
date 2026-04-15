@@ -239,7 +239,8 @@ export default function Dashboard() {
     }
 
     // Onboarding
-    if (!contextProfile.onboarding_completed) {
+    const hasSeenTutorialLocal = localStorage.getItem('pwa_tutorial_seen') === 'true';
+    if (!contextProfile.onboarding_completed && !hasSeenTutorialLocal) {
       setShowWelcomeModal(true);
     }
 
