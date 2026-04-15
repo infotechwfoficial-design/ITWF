@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
       VitePWA({
         registerType: 'prompt',
-        includeAssets: ['logo.png'],
+        includeAssets: ['logo.png', 'pwa-192x192.png', 'pwa-512x512.png', 'apple-touch-icon.png', 'badge.png'],
         manifest: {
           name: "ITWF Sistema de Renovação",
           short_name: 'Painel ITWF',
@@ -22,13 +22,13 @@ export default defineConfig(({ mode }) => {
           display: "standalone",
           icons: [
             {
-              src: 'logo.png',
+              src: 'pwa-192x192.png',
               sizes: '192x192',
               type: 'image/png',
               purpose: 'any maskable'
             },
             {
-              src: 'logo.png',
+              src: 'pwa-512x512.png',
               sizes: '512x512',
               type: 'image/png',
               purpose: 'any maskable'
