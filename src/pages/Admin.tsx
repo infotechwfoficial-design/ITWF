@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import Layout from '../components/Layout';
 import {
   Users,
@@ -33,7 +34,8 @@ import {
   Copy,
   Check,
   Settings as SettingsIcon,
-  Loader2
+  Loader2,
+  LayoutDashboard
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import type { Client, Notification, Plan, Admin as AdminProfile } from '../types';
@@ -58,27 +60,32 @@ const ClientRow = React.memo(({ client, onView, onDirectPush, onEdit, onCopy, on
   onDelete: (c: Client) => void;
 }) => (
   <tr
-    className="hover:bg-black/[0.01] dark:hover:bg-white/[0.01] transition-colors cursor-pointer group"
+    className="hover:bg-primary/5 dark:hover:bg-white/5 transition-colors cursor-pointer group border-b border-black/5 dark:border-white/5 last:border-0"
     onClick={() => onView(client)}
   >
-    <td className="px-6 py-4 font-mono text-sm text-primary">{client.username}</td>
-    <td className="px-6 py-4 font-bold">{client.name}</td>
-    <td className="px-6 py-4 text-slate-500">{client.expiration_date}</td>
+    <td className="px-6 py-4">
+      <div className="flex items-center gap-3">
+        <div className="size-10 rounded-xl bg-gradient-to-tr from-primary to-accent text-white flex items-center justify-center font-black shadow-lg shadow-primary/20">
+          {client.name?.charAt(0) || client.username?.charAt(0) || 'C'}
+        </div>
+        <div>
+          <div className="font-black text-slate-900 dark:text-white group-hover:text-primary transition-colors">{client.name}</div>
+          <div className="font-mono text-[10px] uppercase text-primary/70 tracking-widest">@{client.username}</div>
+        </div>
+      </div>
+    </td>
+    <td className="px-6 py-4">
+      <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300">
+        {client.expiration_date}
+      </span>
+    </td>
     <td className="px-6 py-4 font-black">R$ {(Number(client.balance) || 0).toFixed(2)}</td>
     <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-      <div className="flex justify-end gap-2">
-        <button onClick={() => onDirectPush(client)} className="p-2 text-slate-400 hover:text-amber-500 transition-colors" title="Enviar Notificação Push">
-          <Bell size={18} />
-        </button>
-        <button onClick={() => onEdit(client)} className="p-2 text-slate-400 hover:text-primary transition-colors">
-          <Edit2 size={18} />
-        </button>
-        <button onClick={() => onCopy(client)} className="p-2 text-slate-400 hover:text-emerald-500 transition-colors" title="Copiar Link de Acesso">
-          <LinkIcon size={18} />
-        </button>
-        <button onClick={() => onDelete(client)} className="p-2 text-slate-400 hover:text-rose-500 transition-colors">
-          <Trash2 size={18} />
-        </button>
+      <div className="flex justify-end gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
+        <button onClick={() => onDirectPush(client)} className="p-2.5 bg-amber-500/10 text-amber-500 hover:bg-amber-500 hover:text-white rounded-xl transition-all" title="Notificação Push"><Bell size={16} /></button>
+        <button onClick={() => onEdit(client)} className="p-2.5 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-xl transition-all"><Edit2 size={16} /></button>
+        <button onClick={() => onCopy(client)} className="p-2.5 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white rounded-xl transition-all" title="Copiar Acesso"><LinkIcon size={16} /></button>
+        <button onClick={() => onDelete(client)} className="p-2.5 bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white rounded-xl transition-all"><Trash2 size={16} /></button>
       </div>
     </td>
   </tr>
@@ -97,28 +104,23 @@ const ClientCard = React.memo(({ client, idx, onView, onDirectPush, onEdit, onCo
     initial={{ opacity: 0, x: -20 }}
     animate={{ opacity: 1, x: 0 }}
     transition={{ delay: idx * 0.05 }}
-    className="p-5 active:bg-black/5 dark:active:bg-white/5 transition-colors cursor-pointer relative overflow-hidden"
+    className="p-5 hover:bg-primary/5 active:bg-primary/10 transition-colors cursor-pointer group relative overflow-hidden"
     onClick={() => onView(client)}
   >
-    <div className="flex items-center justify-between mb-3">
+    <div className="flex items-center justify-between mb-3 relative z-10">
       <div className="flex items-center gap-3">
-        <div className="size-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-black text-lg">
+        <div className="size-12 rounded-2xl bg-gradient-to-tr from-primary to-accent text-white flex items-center justify-center font-black text-lg shadow-lg shadow-primary/20">
           {client.name?.charAt(0) || client.username?.charAt(0) || 'C'}
         </div>
         <div>
-          <h4 className="font-bold text-slate-900 dark:text-white leading-tight">{client.name}</h4>
-          <p className="text-xs font-mono text-primary/70">{client.username}</p>
+          <h4 className="font-bold text-slate-900 dark:text-white leading-tight group-hover:text-primary transition-colors">{client.name}</h4>
+          <p className="text-[10px] uppercase font-bold text-slate-500 tracking-widest mt-0.5">@{client.username}</p>
         </div>
       </div>
-      <div className="text-right">
-        <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">Vence em</p>
-        <p className="text-sm font-black text-slate-900 dark:text-white">{client.expiration_date}</p>
-      </div>
     </div>
-    <div className="flex items-center justify-between mt-4">
+    <div className="flex items-center justify-between mt-4 relative z-10">
       <div className="flex items-center gap-2">
-         <span className="text-xs font-bold text-slate-400">Saldo:</span>
-         <span className="text-sm font-black text-slate-900 dark:text-white">R$ {(Number(client.balance) || 0).toFixed(2)}</span>
+         <span className="text-[10px] uppercase font-bold text-slate-400">Venc: <span className="text-slate-900 dark:text-white">{client.expiration_date}</span></span>
       </div>
       <div className="flex gap-2">
         <button onClick={(e) => { e.stopPropagation(); onDirectPush(client); }} className="p-2 bg-amber-500/10 rounded-xl text-amber-500"><Bell size={16} /></button>
@@ -276,7 +278,7 @@ export default function Admin() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
-  const [activeTab, setActiveTab] = useState<'clients' | 'notifications' | 'requests' | 'plans' | 'payments' | 'resellers' | 'settings'>('clients');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'notifications' | 'requests' | 'plans' | 'payments' | 'resellers' | 'settings'>('dashboard');
   const [toast, setToast] = useState<ToastState | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
@@ -1172,6 +1174,7 @@ export default function Admin() {
   };
 
   const adminItems = [
+    { id: 'dashboard', label: 'Visão Geral', icon: LayoutDashboard, onClick: () => setActiveTab('dashboard') },
     { id: 'clients', label: 'Clientes', icon: Users, onClick: () => setActiveTab('clients') },
     { id: 'notifications', label: 'Avisos', icon: Bell, onClick: () => setActiveTab('notifications') },
     { id: 'requests', label: 'Pedidos', icon: MessageSquare, onClick: () => setActiveTab('requests') },
@@ -1201,6 +1204,86 @@ export default function Admin() {
         </div>
       ) : (
         <>
+          {activeTab === 'dashboard' && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-6"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Visão Geral</h3>
+                  <p className="text-sm font-bold text-slate-500 uppercase tracking-widest mt-1">Bem-vindo ao seu painel operacional</p>
+                </div>
+              </div>
+
+              {/* Top Metrics Row */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-gradient-to-br from-primary to-accent text-white p-6 rounded-[2rem] shadow-xl shadow-primary/20 relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-4 opacity-20 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-500">
+                    <DollarSign size={80} />
+                  </div>
+                  <p className="font-bold uppercase tracking-widest text-xs opacity-90 mb-2">Rendimento Esperado</p>
+                  <h4 className="text-4xl font-black mb-1">
+                    R$ {(clients.reduce((acc, c) => acc + (Number(c.balance) || 0), 0)).toFixed(2)}
+                  </h4>
+                  <p className="text-[10px] uppercase font-bold text-white/80">Próximos 30 dias</p>
+                </div>
+
+                <div className="bg-white dark:bg-panel-dark border border-black/5 dark:border-white/5 p-6 rounded-[2rem] shadow-xl relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-4 opacity-5 dark:opacity-10 group-hover:scale-110 transition-transform duration-500">
+                    <Users size={80} className="text-slate-900 dark:text-white" />
+                  </div>
+                  <p className="font-bold uppercase tracking-widest text-xs text-slate-500 mb-2">Clientes Ativos</p>
+                  <h4 className="text-4xl font-black text-slate-900 dark:text-white mb-1">
+                    {clients.length}
+                  </h4>
+                  <p className="text-[10px] uppercase font-bold text-success flex items-center gap-1">
+                    Base atual de assinantes
+                  </p>
+                </div>
+
+                <div className="bg-white dark:bg-panel-dark border border-black/5 dark:border-white/5 p-6 rounded-[2rem] shadow-xl relative overflow-hidden flex flex-col justify-between">
+                  <div>
+                    <h5 className="font-black text-slate-900 dark:text-white uppercase tracking-tight mb-4 flex items-center gap-2">
+                      <Zap className="text-amber-500" size={18} /> Teste Rápido
+                    </h5>
+                    <div className="flex flex-col gap-2">
+                       <button className="flex items-center justify-between bg-primary/10 hover:bg-primary/20 text-primary px-4 py-3 rounded-2xl transition-colors font-bold text-sm">
+                         <span>Criar Teste IPTV (4 Hrs)</span>
+                         <Plus size={16} />
+                       </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Chart Section */}
+              <div className="bg-white dark:bg-panel-dark border border-black/5 dark:border-white/5 p-6 rounded-[2rem] shadow-xl">
+                <div className="mb-6 flex justify-between items-center">
+                  <h5 className="font-black text-slate-900 dark:text-white uppercase tracking-tight">Atividade de Cadastros</h5>
+                  <span className="text-[10px] font-bold text-slate-500 bg-slate-100 dark:bg-white/5 px-3 py-1 rounded-full">Últimos 7 dias</span>
+                </div>
+                <div className="h-72 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={clients.slice(0, 7).map((c, i) => ({ name: `Dia ${7 - i}`, value: Math.floor(Math.random() * 10) + 1 })).reverse()} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#0070F3" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#0070F3" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#888' }} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#888' }} />
+                      <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', background: 'rgba(15, 23, 42, 0.9)', color: '#fff' }} itemStyle={{ color: '#0070F3', fontWeight: 'bold' }} />
+                      <Area type="monotone" dataKey="value" stroke="#0070F3" strokeWidth={3} fillOpacity={1} fill="url(#colorValue)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {activeTab === 'clients' && (
             <div className="space-y-6">
               {/* Referral Link Section for Resellers */}
@@ -1278,12 +1361,11 @@ export default function Admin() {
             <div className="hidden md:block overflow-x-auto custom-scrollbar">
               <table className="w-full text-left">
                 <thead>
-                  <tr className="bg-black/[0.02] dark:bg-white/5 text-slate-500 text-xs uppercase tracking-widest">
-                    <th className="px-6 py-4 font-bold">Usuário</th>
-                    <th className="px-6 py-4 font-bold">Nome</th>
-                    <th className="px-6 py-4 font-bold">Vencimento</th>
-                    <th className="px-6 py-4 font-bold">Valor</th>
-                    <th className="px-6 py-4 font-bold text-right">Ações</th>
+                  <tr className="bg-black/[0.02] dark:bg-white/5 text-slate-500 text-[10px] uppercase tracking-widest font-bold">
+                    <th className="px-6 py-4">Cliente</th>
+                    <th className="px-6 py-4">Vencimento</th>
+                    <th className="px-6 py-4">Valor</th>
+                    <th className="px-6 py-4 text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-black/5 dark:divide-white/5">

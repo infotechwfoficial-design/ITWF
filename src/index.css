@@ -6,14 +6,25 @@
   --font-display: "Sora", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   
-  --color-background-dark: #0a0b10;
-  --color-primary: #3b82f6;
-  --color-primary-dark: #2563eb;
+  /* Deep Dark Mode Palette */
+  --color-background-dark: #0D0F1A;
+  --color-panel-dark: #161A2B;
+  --color-panel-glass: rgba(22, 26, 43, 0.75);
+  
+  /* Brand Constants */
+  --color-primary: #0070F3;
+  --color-primary-dark: #0051B3;
+  --color-accent: #7928CA;
+  
+  /* Status Colors */
+  --color-success: #10B981;
+  --color-warning: #F5A623;
+  --color-danger: #E53E3E;
 }
 
 @layer base {
   body {
-    @apply antialiased selection:bg-primary/30 selection:text-white transition-colors duration-300;
+    @apply antialiased selection:bg-primary/30 selection:text-primary transition-colors duration-300;
   }
 }
 

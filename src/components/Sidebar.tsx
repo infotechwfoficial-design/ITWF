@@ -71,7 +71,7 @@ export default function Sidebar({ items, title = "ITWF", logoUrl = "/logo.png", 
   });
 
   return (
-    <aside className="hidden md:flex w-64 flex-col border-r border-black/5 dark:border-white/5 bg-slate-50 dark:bg-slate-900/50 backdrop-blur-sm p-4 h-full overflow-y-auto transition-colors duration-300">
+    <aside className="hidden md:flex w-64 flex-col border-r border-black/5 dark:border-white/5 bg-slate-50 dark:bg-panel-glass backdrop-blur-2xl p-4 h-full overflow-y-auto transition-colors duration-300 shadow-2xl relative z-40">
       <div className="flex items-center justify-between mb-8 px-2">
         <div className="flex items-center gap-4 text-slate-900 dark:text-white cursor-pointer" onClick={() => navigate('/dashboard')}>
           <img src={logoUrl} alt="Logo" className="w-12 h-12 object-contain" />
@@ -104,9 +104,9 @@ export default function Sidebar({ items, title = "ITWF", logoUrl = "/logo.png", 
               {item.path ? (
                 <Link
                   to={item.path}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all group ${isActive
-                    ? 'bg-primary/10 text-primary border border-primary/20'
-                    : 'text-slate-500 dark:text-slate-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
+                  className={`flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all group relative overflow-hidden ${isActive
+                    ? 'bg-primary/10 text-primary border border-primary/20 shadow-[0_0_15px_rgba(0,112,243,0.15)]'
+                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
                     }`}
                 >
                   {content}
@@ -114,9 +114,9 @@ export default function Sidebar({ items, title = "ITWF", logoUrl = "/logo.png", 
               ) : (
                 <button
                   onClick={item.onClick}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all group ${isActive
-                    ? 'bg-primary text-white shadow-lg shadow-primary/20'
-                    : 'text-slate-500 dark:text-slate-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
+                  className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all group relative overflow-hidden ${isActive
+                    ? 'bg-primary text-white shadow-[0_0_20px_rgba(0,112,243,0.4)] border border-primary/50'
+                    : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
                     }`}
                 >
                   {content}

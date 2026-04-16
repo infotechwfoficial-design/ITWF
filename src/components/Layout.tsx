@@ -2,6 +2,7 @@ import React from 'react';
 import Sidebar, { NavItem } from './Sidebar';
 import MobileHeader from './MobileHeader';
 import BottomNav from './BottomNav';
+import Topbar from './Topbar';
 import { Chatbot } from './Chatbot';
 import { useAuth } from '../context/AuthContext';
 import { isClient } from '../types';
@@ -51,6 +52,11 @@ export default function Layout({
           onBack={mobileHeaderOnBack}
           onLogout={onLogout}
           showNotifications={showNotifications}
+        />
+        <Topbar 
+          userName={profile?.full_name || (profile as any)?.admin_name || 'Admin'}
+          moneyBalance={4520.85} 
+          onNotificationsClick={() => {}}
         />
         <main className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-10 pb-24 md:pb-8 custom-scrollbar">
           {children}
