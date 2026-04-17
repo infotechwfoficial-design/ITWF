@@ -68,7 +68,8 @@ export default function Login() {
             name: baseName,
             email: email,
             expiration_date: '',
-            admin_id: finalAdminId
+            admin_id: finalAdminId,
+            onboarding_completed: false
           }]);
 
           if (insertError) {
@@ -80,7 +81,8 @@ export default function Login() {
                name: baseName,
                email: email,
                expiration_date: '',
-               admin_id: finalAdminId
+               admin_id: finalAdminId,
+               onboarding_completed: false
              }]);
           }
           

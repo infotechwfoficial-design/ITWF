@@ -325,18 +325,17 @@ async function processApprovedPayment(externalRef: string, providerName: string)
 async function startServer() {
   const app = express();
   
-  // CORS Dinâmico: Aceita Vercel oficial, subdomínios Vercel (previews) e localhost
+  // CORS Dinâmico: Suporta Vercel, Localhost e URLs personalizadas via env
+  const envOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(o => o.trim()).filter(Boolean);
+  const defaultOrigins = ['https://itwf.vercel.app', 'http://localhost:5173', 'http://localhost:3000'];
+  const allAllowedOrigins = [...defaultOrigins, ...envOrigins];
+
   app.use(cors({ 
     origin: (origin, callback) => {
-      const allowedOrigins = [
-        'https://itwf.vercel.app', 
-        'http://localhost:5173', 
-        'http://localhost:3000'
-      ];
-      if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+      if (!origin || allAllowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
         callback(null, true);
       } else {
-        callback(new Error('Not allowed by CORS'));
+        callback(new Error('CORS Policy: Origin not allowed'));
       }
     }, 
     credentials: true 

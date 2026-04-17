@@ -5,7 +5,7 @@ import { supabase } from '../utils/supabase';
 import Layout from '../components/Layout';
 
 const Sports = () => {
-  const [activeTab, setActiveTab] = React.useState<'fixtures' | 'standings' | 'agenda'>('fixtures');
+  const [activeTab, setActiveTab] = React.useState<'fixtures' | 'standings'>('fixtures');
   const [agenda, setAgenda] = React.useState<string>('');
   const [loading, setLoading] = React.useState(true);
 
@@ -71,17 +71,7 @@ const Sports = () => {
                 <Calendar size={18} />
                 Rodadas
               </button>
-              <button
-                onClick={() => setActiveTab('agenda')}
-                className={`flex-1 min-w-[120px] flex items-center justify-center gap-2 py-3 rounded-2xl transition-all font-bold text-sm ${
-                  activeTab === 'agenda' 
-                  ? 'bg-white dark:bg-slate-800 text-amber-500 shadow-sm' 
-                  : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                <Zap size={18} />
-                AGENDA
-              </button>
+
               <button
                 onClick={() => setActiveTab('standings')}
                 className={`flex-1 min-w-[120px] flex items-center justify-center gap-2 py-3 rounded-2xl transition-all font-bold text-sm ${
@@ -110,7 +100,7 @@ const Sports = () => {
                   referrerPolicy="unsafe-url"
                   sandbox="allow-scripts allow-forms allow-popups allow-top-navigation-by-user-activation allow-popups-to-escape-sandbox"
                 ></iframe>
-              ) : activeTab === 'standings' ? (
+              ) : (
                 <iframe 
                   key="standings"
                   src="https://widget.api-futebol.com.br/render/widget_b1cf3b2e31b67dd1"
@@ -123,43 +113,6 @@ const Sports = () => {
                   referrerPolicy="unsafe-url"
                   sandbox="allow-scripts allow-forms allow-popups allow-top-navigation-by-user-activation allow-popups-to-escape-sandbox"
                 ></iframe>
-              ) : (
-                <div className="h-full overflow-y-auto p-6 md:p-10 custom-scrollbar">
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="max-w-3xl mx-auto"
-                  >
-                    <div className="flex items-center gap-4 mb-8">
-                      <div className="size-14 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-lg shadow-amber-500/20">
-                        <Zap size={28} />
-                      </div>
-                      <div>
-                        <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Agenda do Dia</h3>
-                        <p className="text-slate-500 text-sm">Os principais confrontos e transmissões de hoje.</p>
-                      </div>
-                    </div>
-
-                    {agenda ? (
-                      <div className="bg-white/40 dark:bg-white/5 backdrop-blur-md rounded-[2rem] p-8 border border-black/5 dark:border-white/10 shadow-sm">
-                        <p className="text-lg text-slate-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed font-medium font-sans">
-                          {agenda}
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="py-20 text-center">
-                        {loading ? (
-                          <div className="flex flex-col items-center gap-4">
-                            <RefreshCw className="animate-spin text-primary" size={32} />
-                            <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Consultando Arena...</p>
-                          </div>
-                        ) : (
-                          <p className="text-slate-500 italic">Nenhuma agenda disponível para hoje.</p>
-                        )}
-                      </div>
-                    )}
-                  </motion.div>
-                </div>
               )}
             </div>
           </motion.div>

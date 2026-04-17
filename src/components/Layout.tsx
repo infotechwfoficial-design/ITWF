@@ -31,7 +31,7 @@ export default function Layout({
   showNotifications = true
 }: LayoutProps) {
   const { profile } = useAuth();
-  const customLogo = isClient(profile) ? profile.push_logo_url : undefined;
+  const customLogo = (profile?.push_logo_url && profile.push_logo_url.trim() !== '') ? profile.push_logo_url : '/logo.png';
   // Se o título não for passado, tenta usar o nome que injetamos no perfil via AuthContext ou ITWF
   const systemTitle = mobileHeaderTitle || (isClient(profile) && (profile as any).admin_name) || "ITWF";
 
@@ -54,8 +54,9 @@ export default function Layout({
           showNotifications={showNotifications}
         />
         <Topbar 
-          userName={profile?.full_name || (profile as any)?.admin_name || 'Admin'}
-          moneyBalance={4520.85} 
+          userName={profile?.name || (profile as any)?.admin_name || 'Admin'}
+          moneyBalance={isClient(profile) ? profile.balance : 0} 
+          hideCredits={isClient(profile)}
           onNotificationsClick={() => {}}
         />
         <main className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-10 pb-24 md:pb-8 custom-scrollbar">

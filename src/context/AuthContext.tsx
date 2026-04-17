@@ -93,7 +93,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               name: baseName,
               email: user.email,
               expiration_date: '',
-              balance: 0
+              balance: 0,
+              onboarding_completed: false
             }])
             .select()
             .maybeSingle();
@@ -109,7 +110,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                  name: baseName,
                  email: user.email,
                  expiration_date: '',
-                 balance: 0
+                 balance: 0,
+                 onboarding_completed: false
                }])
                .select()
                .maybeSingle();

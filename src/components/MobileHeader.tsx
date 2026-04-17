@@ -28,7 +28,7 @@ export default function MobileHeader({
     });
 
     return (
-        <header className="md:hidden flex items-center justify-between px-6 py-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-lg border-b border-black/5 dark:border-white/5 sticky top-0 z-40">
+        <header className="md:hidden flex items-center justify-between px-6 pt-[calc(1rem+env(safe-area-inset-top,0px))] pb-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-lg border-b border-black/5 dark:border-white/5 sticky top-0 z-40">
             <div className="flex items-center gap-3">
                 {showBackButton && (
                     <button onClick={onBack || (() => navigate(-1))} className="p-2 -ml-2 text-slate-500">

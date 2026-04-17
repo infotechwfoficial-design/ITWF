@@ -4,10 +4,11 @@ import { Search, Bell, User, MessageSquare } from 'lucide-react';
 interface TopbarProps {
   moneyBalance?: number;
   userName?: string;
+  hideCredits?: boolean;
   onNotificationsClick?: () => void;
 }
 
-export default function Topbar({ moneyBalance = 0, userName = "Admin", onNotificationsClick }: TopbarProps) {
+export default function Topbar({ moneyBalance = 0, userName = "Admin", hideCredits = false, onNotificationsClick }: TopbarProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -38,12 +39,14 @@ export default function Topbar({ moneyBalance = 0, userName = "Admin", onNotific
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-2">
           {/* Shortcuts like Teste Rapido or Add Credits could go here */}
-          <button className="hidden lg:flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary hover:bg-primary/20 transition-colors rounded-xl text-sm font-semibold">
-            Adicionar Créditos
-          </button>
+          {!hideCredits && (
+            <button className="hidden lg:flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary hover:bg-primary/20 transition-colors rounded-xl text-sm font-semibold">
+              Adicionar Créditos
+            </button>
+          )}
         </div>
 
-        <div className="h-6 w-px bg-slate-200 dark:bg-white/10" />
+        {!hideCredits && <div className="h-6 w-px bg-slate-200 dark:bg-white/10" />}
 
         <div className="flex items-center gap-3">
           <button 
@@ -66,7 +69,7 @@ export default function Topbar({ moneyBalance = 0, userName = "Admin", onNotific
         <div className="flex items-center gap-3 cursor-pointer group">
           <div className="flex flex-col items-end">
             <span className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-primary transition-colors">{userName}</span>
-            <span className="text-xs font-medium text-success">{moneyBalance.toFixed(2)} créditos</span>
+            {!hideCredits && <span className="text-xs font-medium text-success">{moneyBalance.toFixed(2)} créditos</span>}
           </div>
           <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-accent flex items-center justify-center text-white shadow-lg">
             <User size={20} />

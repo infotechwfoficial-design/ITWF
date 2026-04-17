@@ -11,6 +11,7 @@ import {
   Edit,
   Save,
   X,
+  RefreshCw,
   ArrowLeft,
   LogOut,
   Link as LinkIcon,
@@ -278,7 +279,7 @@ export default function Admin() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'notifications' | 'requests' | 'plans' | 'payments' | 'resellers' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'clients' | 'notifications' | 'requests' | 'renewals' | 'plans' | 'payments' | 'resellers' | 'settings'>('dashboard');
   const [toast, setToast] = useState<ToastState | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
@@ -786,9 +787,82 @@ export default function Admin() {
       setIsClientModalOpen(false);
       setEditingClient(null);
       setClientForm({ username: '', name: '', email: '', expiration_date: '', balance: 0, renewal_link: '', password: '' });
-      fetchClients();
+      fetchRequests();
     } catch (err: any) {
       showToast('Erro ao salvar: ' + err.message, 'error');
+    }
+  };
+
+  const approveRenewal = async (reqId: string | number, userId: string, days: number = 30) => {
+    try {
+      setSubmitting(true);
+      
+      const { data: clientData, error: clientErr } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+        
+      if (clientErr || !clientData) throw new Error('Cliente não encontrado');
+      
+      // Calcular nova data
+      const now = new Date();
+      let currentExp: Date;
+      
+      if (clientData.expiration_date && clientData.expiration_date.includes('/')) {
+        const [d, m, y] = clientData.expiration_date.split('/').map((p: string) => parseInt(p));
+        currentExp = new Date(y, m - 1, d);
+      } else if (clientData.expiration_date && clientData.expiration_date.includes('-')) {
+        currentExp = new Date(clientData.expiration_date);
+        currentExp = new Date(currentExp.getFullYear(), currentExp.getMonth(), currentExp.getDate() + 1);
+      } else {
+        currentExp = now;
+      }
+
+      const baseDate = isNaN(currentExp.getTime()) || currentExp < now ? now : currentExp;
+      
+      const newDate = new Date(baseDate);
+      newDate.setDate(newDate.getDate() + days);
+      
+      // Salvar no formato DD/MM/AAAA para garantir compatibilidade total com o Dashboard
+      const formattedDate = `${String(newDate.getDate()).padStart(2, '0')}/${String(newDate.getMonth() + 1).padStart(2, '0')}/${newDate.getFullYear()}`;
+      
+      // Atualizar cliente
+      const { error: updateClientErr } = await supabase
+        .from('clients')
+        .update({ expiration_date: formattedDate })
+        .eq('user_id', userId);
+        
+      if (updateClientErr) throw updateClientErr;
+      
+      // Atualizar pedido
+      const { error: updateReqErr } = await supabase
+        .from('requests')
+        .update({ status: 'RENOVAÇÃO APROVADA' })
+        .eq('id', reqId);
+        
+      if (updateReqErr) throw updateReqErr;
+      
+      // Notificar Push
+      const apiUrl = import.meta.env.VITE_API_URL || '';
+      fetch(`${apiUrl}/api/send-push`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: '✅ Renovação Aprovada!',
+          message: `Sua assinatura foi renovada com sucesso até ${formattedDate}. Obrigado!`,
+          email: clientData.email,
+          username: clientData.username,
+          adminId: currentAdmin?.user_id
+        })
+      }).catch(err => console.error('Erro ao disparar push renovação:', err));
+      
+      showToast(`Renovação aprovada para ${clientData.name}! Nova validade: ${formattedDate}`, 'success');
+      
+      fetchClients();
+      fetchRequests();
+    } catch (err: any) {
+      showToast('Erro ao aprovar renovação: ' + err.message, 'error');
     } finally {
       setSubmitting(false);
     }
@@ -1178,6 +1252,7 @@ export default function Admin() {
     { id: 'clients', label: 'Clientes', icon: Users, onClick: () => setActiveTab('clients') },
     { id: 'notifications', label: 'Avisos', icon: Bell, onClick: () => setActiveTab('notifications') },
     { id: 'requests', label: 'Pedidos', icon: MessageSquare, onClick: () => setActiveTab('requests') },
+    { id: 'renewals', label: 'Renovações', icon: RefreshCw, onClick: () => setActiveTab('renewals') },
     { id: 'plans', label: 'Planos', icon: DollarSign, onClick: () => setActiveTab('plans') },
     { id: 'payments', label: 'Pagamentos', icon: CreditCard, onClick: () => setActiveTab('payments') },
     { id: 'settings', label: 'Configurações', icon: SettingsIcon, onClick: () => setActiveTab('settings') },
@@ -1528,9 +1603,10 @@ export default function Admin() {
                 <tbody className="divide-y divide-black/5 dark:divide-white/5">
                   {requests.filter(req => {
                     const reqClient = clients.find(c => c.user_id === req.user_id);
+                    const isContentRequest = req.content_type !== 'RENOVAÇÃO';
                     const matchTitle = (req.content_title?.toLowerCase() || '').includes(debouncedSearchTerm.toLowerCase());
                     const matchUser = (reqClient?.name?.toLowerCase() || '').includes(debouncedSearchTerm.toLowerCase()) || (reqClient?.username?.toLowerCase() || '').includes(debouncedSearchTerm.toLowerCase());
-                    return matchTitle || matchUser;
+                    return isContentRequest && (matchTitle || matchUser);
                   }).map((req) => {
                     const reqClient = clients.find(c => c.user_id === req.user_id);
                     return (
@@ -1580,9 +1656,10 @@ export default function Admin() {
             <div className="md:hidden divide-y divide-black/5 dark:divide-white/5">
               {requests.filter(req => {
                 const reqClient = clients.find(c => c.user_id === req.user_id);
+                const isContentRequest = req.content_type !== 'RENOVAÇÃO';
                 const matchTitle = (req.content_title?.toLowerCase() || '').includes(debouncedSearchTerm.toLowerCase());
                 const matchUser = (reqClient?.name?.toLowerCase() || '').includes(debouncedSearchTerm.toLowerCase()) || (reqClient?.username?.toLowerCase() || '').includes(debouncedSearchTerm.toLowerCase());
-                return matchTitle || matchUser;
+                return isContentRequest && (matchTitle || matchUser);
               }).map((request, idx) => {
                 const reqClient = clients.find(c => c.user_id === request.user_id);
                 return (
@@ -1643,6 +1720,76 @@ export default function Admin() {
             {requests.length === 0 && (
               <div className="px-6 py-12 text-center text-slate-500 italic">
                 Nenhum pedido encontrado.
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {activeTab === 'renewals' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-black/5 dark:border-white/5 rounded-[2rem] overflow-hidden shadow-sm dark:shadow-xl"
+          >
+            <div className="p-6 md:p-8 border-b border-black/5 dark:border-white/5 bg-white/20 dark:bg-white/5">
+              <h3 className="text-xl font-bold tracking-tight font-display">Solicitações de Renovação</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Clientes que notificaram pagamento e aguardam liberação.</p>
+            </div>
+            
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-black/[0.02] dark:bg-white/5 text-slate-500 text-xs uppercase tracking-widest">
+                    <th className="px-6 py-4 font-bold">Cliente</th>
+                    <th className="px-6 py-4 font-bold">Data Solicitação</th>
+                    <th className="px-6 py-4 font-bold">Status</th>
+                    <th className="px-6 py-4 font-bold text-right">Ação</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-black/5 dark:divide-white/5">
+                  {requests.filter(req => req.content_type === 'RENOVAÇÃO').map((req) => {
+                    const reqClient = clients.find(c => c.user_id === req.user_id);
+                    return (
+                      <tr key={req.id} className="hover:bg-black/[0.01] dark:hover:bg-white/[0.01] transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="font-bold">{reqClient?.name || 'Cliente'}</div>
+                          <div className="text-xs text-slate-500">@{reqClient?.username}</div>
+                        </td>
+                        <td className="px-6 py-4 text-xs text-slate-500">
+                          {new Date(req.created_at).toLocaleString('pt-BR')}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase ${
+                            req.status === 'RENOVAÇÃO APROVADA' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'
+                          }`}>
+                            {req.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          {req.status !== 'RENOVAÇÃO APROVADA' ? (
+                            <button
+                              onClick={() => approveRenewal(req.id, req.user_id)}
+                              disabled={submitting}
+                              className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+                            >
+                              Baixar Renovação
+                            </button>
+                          ) : (
+                            <span className="text-emerald-500 font-bold text-xs flex items-center justify-end gap-1">
+                              <Check size={14} /> Concluído
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            
+            {requests.filter(req => req.content_type === 'RENOVAÇÃO').length === 0 && (
+              <div className="px-6 py-12 text-center text-slate-500 italic">
+                Nenhuma solicitação de renovação pendente.
               </div>
             )}
           </motion.div>

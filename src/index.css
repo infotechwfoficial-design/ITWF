@@ -22,9 +22,39 @@
   --color-danger: #E53E3E;
 }
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  .dark {
+    color-scheme: dark;
+  }
+
   body {
-    @apply antialiased selection:bg-primary/30 selection:text-primary transition-colors duration-300;
+    @apply antialiased selection:bg-primary/30 selection:text-primary transition-colors duration-300 overflow-x-hidden;
+    /* Suporte para PWA standalone */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    @apply bg-white dark:bg-background-dark text-slate-900 dark:text-slate-100;
+  }
+}
+
+@layer utilities {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .px-safe {
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+  .min-h-screen-safe {
+    min-height: calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   }
 }
 

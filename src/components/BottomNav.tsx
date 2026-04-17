@@ -38,7 +38,7 @@ export default function BottomNav({ items, activeId }: BottomNavProps) {
     const currentItems = items || defaultItems;
 
     return (
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-black/5 dark:border-white/10 pb-safe pt-2">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-black/5 dark:border-white/10 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))]">
             <ul className="flex items-center gap-6 overflow-x-auto custom-scrollbar px-6 pb-2">
                 {currentItems.map((item, idx) => {
                     const isActive = item.path ? location.pathname === item.path : activeId === item.id;

@@ -51,32 +51,29 @@ import { formatCurrency } from '../utils/format';
 function getDaysRemaining(expirationDate: string): number {
   if (!expirationDate) return 0;
   try {
-    const parts = expirationDate.split('/');
-    if (parts.length !== 3) return 0;
-    
-    const [dayStr, monthStr, yearStr] = parts;
-    const day = parseInt(dayStr);
-    const month = parseInt(monthStr);
-    const year = parseInt(yearStr);
+    let expDate: Date;
 
-    if (isNaN(day) || isNaN(month) || isNaN(year)) {
-      console.warn('Dashboard: Data de expiração inválida detectada:', expirationDate);
+    if (expirationDate.includes('-')) {
+      // Formato ISO: AAAA-MM-DD
+      expDate = new Date(expirationDate);
+      // Ajustar para interpretar como início do dia local, não UTC
+      expDate = new Date(expDate.getFullYear(), expDate.getMonth(), expDate.getDate() + 1);
+    } else if (expirationDate.includes('/')) {
+      // Formato Brasileiro: DD/MM/AAAA
+      const parts = expirationDate.split('/');
+      if (parts.length !== 3) return 0;
+      const [day, month, year] = parts.map(p => parseInt(p));
+      expDate = new Date(year, month - 1, day);
+    } else {
       return 0;
     }
 
-    const expDate = new Date(year, month - 1, day);
-    
-    // Verifica se a data gerada é válida
     if (isNaN(expDate.getTime())) return 0;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const diff = expDate.getTime() - today.getTime();
-    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-    
-    // Se a data é hoje e já passou do horário ou se é anterior a hoje,
-    // retornamos 0 ou negativo para o status lidar, mas a interface mostrará 0.
-    return days;
+    return Math.ceil(diff / (1000 * 60 * 60 * 24));
   } catch (e) {
     console.error('Erro ao calcular dias restantes:', e);
     return 0;
@@ -164,6 +161,7 @@ export default function Dashboard() {
   const [toastConfig, setToastConfig] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [showPushBanner, setShowPushBanner] = useState(false);
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+  const [isSubmittingRenewal, setIsSubmittingRenewal] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
@@ -238,20 +236,48 @@ export default function Dashboard() {
       subscribeUserToPush(contextProfile.email, contextProfile.username, contextProfile.admin_id);
     }
 
-    // Onboarding
+    // Onboarding - Prioriza o Banco de Dados. Se estiver como 'false' no DB, mostra sempre.
+    // O localStorage serve apenas como uma trava secundária de performance.
     const hasSeenTutorialLocal = localStorage.getItem('pwa_tutorial_seen') === 'true';
-    if (!contextProfile.onboarding_completed && !hasSeenTutorialLocal) {
+    if (contextProfile.onboarding_completed === false || (!contextProfile.onboarding_completed && !hasSeenTutorialLocal)) {
       setShowWelcomeModal(true);
     }
 
   }, [contextProfile, authLoading, navigate, fetchDashboardData]);
 
-  // Realtime para notificações apenas
+  // Solicitar Renovação (Notificar Pagamento)
+  const handleRenewalNotification = async () => {
+    if (!client || isSubmittingRenewal) return;
+    
+    setIsSubmittingRenewal(true);
+    try {
+      const { error } = await supabase.from('requests').insert([{
+        user_id: client.user_id,
+        admin_id: client.admin_id,
+        content_title: 'SOLICITAÇÃO DE RENOVAÇÃO',
+        content_type: 'RENOVAÇÃO',
+        content_year: new Date().getFullYear().toString(),
+        tmdb_link: client.renewal_link || 'Link não informado',
+        status: 'AGUARDE'
+      }]);
+
+      if (error) throw error;
+      
+      showToast('Notificação de pagamento enviada com sucesso! Aguarde a aprovação do administrador.', 'success');
+    } catch (err: any) {
+      showToast('Erro ao enviar notificação: ' + err.message, 'error');
+    } finally {
+      setIsSubmittingRenewal(false);
+    }
+  };
+
+  // Realtime para Sincronização Geral (Notificações, Perfil e Pedidos)
   useEffect(() => {
     if (!contextProfile?.id) return;
 
     const channel = supabase
-      .channel(`notifs_${contextProfile.id}`)
+      .channel(`db_sync_${contextProfile.id}`)
+      // Notificações
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'notifications' },
@@ -262,12 +288,28 @@ export default function Dashboard() {
           }
         }
       )
+      // Perfil (Para atualizar validade/status em tempo real)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'clients', filter: `user_id=eq.${contextProfile.user_id}` },
+        async () => {
+          await refreshProfile();
+        }
+      )
+      // Pedidos (Para atualizar lista de pedidos em tempo real)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'requests', filter: `user_id=eq.${contextProfile.user_id}` },
+        () => {
+          fetchDashboardData(contextProfile);
+        }
+      )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [contextProfile]);
+  }, [contextProfile, refreshProfile, fetchDashboardData]);
 
   const handleUpdateName = async () => {
     if (!client || !newName.trim()) return;
@@ -387,6 +429,34 @@ export default function Dashboard() {
     <Layout>
       <div className="flex flex-col gap-6 max-w-7xl mx-auto">
         
+        {/* PWA/Support Banner (Movido para o Topo) */}
+        {showPushBanner && (
+           <motion.div 
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            className="bg-primary text-white rounded-[2rem] p-5 overflow-hidden relative shadow-lg shadow-primary/20 mb-2"
+          >
+             <button onClick={() => setShowPushBanner(false)} className="absolute top-4 right-4 text-white/50 hover:text-white">
+               <X size={16} />
+             </button>
+             <div className="flex flex-col md:flex-row items-center gap-6">
+                <div className="size-12 rounded-xl bg-white/20 text-white flex items-center justify-center shrink-0">
+                  <Bell size={20} className="animate-swing" />
+                </div>
+                <div className="flex-1 text-center md:text-left">
+                  <h4 className="font-black uppercase text-sm">Notificações Ativas</h4>
+                  <p className="text-xs text-white/80 font-medium">Receba avisos de manutenção e prazos diretamente no seu aparelho.</p>
+                </div>
+                <button 
+                  onClick={handleEnablePush}
+                  className="px-6 py-2 bg-white text-primary rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all"
+                >
+                  Ativar
+                </button>
+             </div>
+          </motion.div>
+        )}
+        
         {/* NOVO CABEÇALHO UNIFICADO E COMPACTO (Sugestão 1) */}
         <section className="relative bg-white dark:bg-slate-900 rounded-[2rem] p-5 shadow-xl border border-black/5 dark:border-white/5 overflow-hidden transition-all">
           <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-16 -mt-16" />
@@ -415,12 +485,36 @@ export default function Dashboard() {
 
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-black text-slate-900 dark:text-white uppercase truncate">
-                    {client.name}
-                  </h1>
-                  <button onClick={() => setIsEditingName(true)} className="text-slate-400 hover:text-primary transition-colors">
-                    <Edit3 size={14} />
-                  </button>
+                  {isEditingName ? (
+                    <div className="flex items-center gap-2 w-full">
+                      <input
+                        type="text"
+                        value={newName}
+                        onChange={(e) => setNewName(e.target.value)}
+                        className="bg-slate-50 dark:bg-white/5 border border-primary/30 rounded-xl px-3 py-1 text-sm font-black text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary/50 w-full"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleUpdateName();
+                          if (e.key === 'Escape') setIsEditingName(false);
+                        }}
+                      />
+                      <button onClick={handleUpdateName} className="p-2 bg-emerald-500/10 text-emerald-500 rounded-lg hover:bg-emerald-500/20 transition-colors">
+                        <Check size={14} />
+                      </button>
+                      <button onClick={() => setIsEditingName(false)} className="p-2 bg-rose-500/10 text-rose-500 rounded-lg hover:bg-rose-500/20 transition-colors">
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <h1 className="text-xl font-black text-slate-900 dark:text-white uppercase truncate">
+                        {client.name}
+                      </h1>
+                      <button onClick={() => setIsEditingName(true)} className="text-slate-400 hover:text-primary transition-colors">
+                        <Edit3 size={14} />
+                      </button>
+                    </>
+                  )}
                 </div>
                 <p className="text-[10px] font-bold text-slate-500 flex items-center gap-1 uppercase tracking-tight">
                   <Cloud size={12} className="text-primary" />
@@ -442,6 +536,16 @@ export default function Dashboard() {
                   </p>
                 </div>
               </div>
+
+              {client?.renewal_link && (
+                <button 
+                  onClick={handleRenewalNotification}
+                  disabled={isSubmittingRenewal}
+                  className="px-6 py-3 bg-emerald-500/10 text-emerald-600 rounded-2xl font-black text-[10px] uppercase tracking-widest border border-emerald-500/20 hover:bg-emerald-500 hover:text-white transition-all disabled:opacity-50"
+                >
+                  {isSubmittingRenewal ? 'Enviando...' : 'Já realizei o pagamento'}
+                </button>
+              )}
 
               <div className="px-4 py-3 rounded-2xl bg-slate-50 dark:bg-white/5 border border-black/5 flex items-center gap-3">
                 <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
@@ -494,46 +598,10 @@ export default function Dashboard() {
 
 
         {/* Main Content Area */}
-        {/* Área de Conteúdo Principal */}
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          
-          {/* Coluna Lateral: Agenda Esportiva (Mais estreita e compacta) */}
-          <div className="lg:col-span-1 space-y-6">
-             <section className="bg-gradient-to-br from-indigo-600 to-primary rounded-[2rem] p-5 shadow-xl shadow-primary/20 text-white relative overflow-hidden group h-full max-h-[500px]">
-              <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:scale-110 transition-transform">
-                 <RefreshCw size={80} className="animate-spin-slow" />
-              </div>
-              
-              <h2 className="text-sm font-black uppercase tracking-tight mb-4 flex items-center gap-2">
-                <LayoutDashboard size={18} />
-                Jogos Hoje
-              </h2>
-              
-              {loadingExtras ? (
-                <div className="h-24 flex items-center justify-center">
-                  <RefreshCw className="animate-spin" size={24} />
-                </div>
-              ) : sportsAgenda ? (
-                <div className="space-y-3 bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/20 h-[calc(100%-4rem)] overflow-y-auto custom-scrollbar">
-                  <p className="text-[11px] font-bold leading-relaxed whitespace-pre-wrap">{sportsAgenda}</p>
-                </div>
-              ) : (
-                <div className="text-center py-12 px-4 space-y-4 bg-white/5 rounded-3xl border border-white/10 animate-pulse-slow">
-                  <div className="size-12 bg-white/10 rounded-full flex items-center justify-center mx-auto mb-2">
-                    <Trophy className="text-white/40" size={20} />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-white">Agenda Livre</p>
-                    <p className="text-[9px] text-white/50 font-medium leading-tight">Não há grandes jogos programados para as próximas horas. Aproveite para organizar seus outros conteúdos!</p>
-                  </div>
-                </div>
-              )}
-            </section>
-          </div>
-
-          {/* Coluna Principal: Meus Pedidos (Expandida para ocupar o resto) */}
-          <div className="lg:col-span-3 space-y-6">
-            <section className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 shadow-xl border border-black/5 dark:border-white/5 min-h-fit relative overflow-hidden h-full">
+        <div className="grid grid-cols-1 gap-6">
+          {/* Coluna Principal: Meus Pedidos (Expandida para largura total) */}
+          <div className="w-full space-y-6">
+            <section className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 shadow-xl border border-black/5 dark:border-white/5 min-h-fit relative overflow-hidden">
                <div className="absolute -top-10 -right-10 size-40 bg-primary/5 rounded-full blur-3xl" />
                
                <div className="flex items-center justify-between mb-6 relative z-10">
@@ -567,10 +635,16 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {requests.map(req => (
-                    <RequestCard key={req.id} req={req} />
-                  ))}
-                </div>
+                {requests.filter(r => r.content_type !== 'RENOVAÇÃO').length > 0 ? (
+                  requests.filter(r => r.content_type !== 'RENOVAÇÃO').map((req, idx) => (
+                    <RequestCard key={req.id} req={req} idx={idx} />
+                  ))
+                ) : (
+                  <div className="md:col-span-2 py-10 text-center text-slate-500 italic">
+                    Nenhum pedido de conteúdo solicitado.
+                  </div>
+                )}
+              </div>
               )}
               
               {requests.length > 0 && (
@@ -584,66 +658,8 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Links de Acesso Rápido / Suporte (Fila única compacta) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <motion.div whileHover={{ scale: 1.01 }} className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-[2rem] p-5 text-white shadow-xl shadow-black/10 flex items-center justify-between group">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-primary font-black uppercase text-[10px] tracking-tighter">
-                    <Zap size={12} fill="currentColor" /> Atendimento VIP
-                </div>
-                <h4 className="text-lg font-black uppercase tracking-tight">Suporte 24h</h4>
-                <Link to="/support" className="flex items-center gap-2 text-[10px] font-bold text-slate-400 group-hover:text-white transition-colors">
-                  Falar com atendente <ArrowRight size={10} />
-                </Link>
-              </div>
-              <div className="size-14 rounded-2xl bg-white/5 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                  <MessageSquare size={24} />
-              </div>
-            </motion.div>
 
-            <motion.div whileHover={{ scale: 1.01 }} className="bg-white dark:bg-slate-900 rounded-[2rem] p-5 shadow-xl border border-black/5 dark:border-white/5 flex items-center justify-between group">
-              <div className="space-y-2 text-slate-900 dark:text-white">
-                  <div className="flex items-center gap-2 text-amber-500 font-black uppercase text-[10px] tracking-tighter">
-                    <Star size={12} fill="currentColor" /> Aprenda Mais
-                </div>
-                <h4 className="text-lg font-black uppercase tracking-tight">Tutoriais</h4>
-                <Link to="/tutorials" className="flex items-center gap-2 text-[10px] font-bold text-slate-400 hover:text-primary transition-colors">
-                  Ver guias em vídeo <ArrowRight size={10} />
-                </Link>
-              </div>
-                <div className="size-14 rounded-2xl bg-slate-50 dark:bg-white/5 flex items-center justify-center group-hover:bg-amber-500/10 transition-colors">
-                  <HelpCircle size={24} className="text-amber-500" />
-              </div>
-            </motion.div>
-        </div>
 
-        {/* PWA/Support Banner (Mais minimalista) */}
-        {showPushBanner && (
-           <motion.div 
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            className="bg-primary/5 border border-primary/10 rounded-[2rem] p-5 overflow-hidden relative"
-          >
-             <button onClick={() => setShowPushBanner(false)} className="absolute top-4 right-4 text-primary/30 hover:text-primary">
-               <X size={16} />
-             </button>
-             <div className="flex flex-col md:flex-row items-center gap-6">
-                <div className="size-12 rounded-xl bg-primary text-white flex items-center justify-center shrink-0">
-                  <Bell size={20} className="animate-swing" />
-                </div>
-                <div className="flex-1 text-center md:text-left">
-                  <h4 className="font-black text-primary uppercase text-sm">Notificações Ativas</h4>
-                  <p className="text-xs text-primary/70 font-medium">Receba avisos de manutenção e prazos diretamente no seu aparelho.</p>
-                </div>
-                <button 
-                  onClick={handleEnablePush}
-                  className="px-6 py-2 bg-primary text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
-                >
-                  Ativar
-                </button>
-             </div>
-          </motion.div>
-        )}
       </div>
 
       <AnimatePresence>

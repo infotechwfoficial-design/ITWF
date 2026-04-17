@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../utils/supabase';
 import {
   Search,
@@ -22,6 +22,44 @@ export default function Invoices() {
   const [loading, setLoading] = useState(true);
   const [client, setClient] = useState<any>(null);
 
+  // Estados de Filtro
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [showMonthDropdown, setShowMonthDropdown] = useState(false);
+  const [showYearDropdown, setShowYearDropdown] = useState(false);
+
+  const months = [
+    { label: 'Todos os Meses', value: null },
+    { label: 'Janeiro', value: 0 },
+    { label: 'Fevereiro', value: 1 },
+    { label: 'Março', value: 2 },
+    { label: 'Abril', value: 3 },
+    { label: 'Maio', value: 4 },
+    { label: 'Junho', value: 5 },
+    { label: 'Julho', value: 6 },
+    { label: 'Agosto', value: 7 },
+    { label: 'Setembro', value: 8 },
+    { label: 'Outubro', value: 9 },
+    { label: 'Novembro', value: 10 },
+    { label: 'Dezembro', value: 11 }
+  ];
+
+  const availableYears = Array.from(new Set(
+    invoices.map(inv => new Date(inv.created_at).getFullYear())
+  )).sort((a, b) => b - a);
+
+  const filteredInvoices = invoices.filter(inv => {
+    const invDate = new Date(inv.created_at);
+    const matchesSearch = 
+      inv.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (inv.sub || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesMonth = selectedMonth === null || invDate.getMonth() === selectedMonth;
+    const matchesYear = selectedYear === null || invDate.getFullYear() === selectedYear;
+    
+    return matchesSearch && matchesMonth && matchesYear;
+  });
+
   useEffect(() => {
     let mounted = true;
     const fetchData = async () => {
@@ -29,14 +67,46 @@ export default function Invoices() {
         const { data: { user } } = await supabase.auth.getUser();
 
         if (user && mounted) {
-          const [clientRes, invoicesRes] = await Promise.allSettled([
+          const [clientRes, invoicesRes, renewalsRes] = await Promise.allSettled([
             supabase.from('clients').select('*').eq('user_id', user.id).single(),
-            supabase.from('invoices').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
+            supabase.from('invoices').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+            supabase.from('requests').select('*').eq('user_id', user.id).eq('content_type', 'RENOVAÇÃO').order('created_at', { ascending: false })
           ]);
 
           if (mounted) {
-            if (clientRes.status === 'fulfilled' && clientRes.value.data) setClient(clientRes.value.data);
-            if (invoicesRes.status === 'fulfilled' && invoicesRes.value.data) setInvoices(invoicesRes.value.data);
+            let clientData = null;
+            let invoicesData: any[] = [];
+            let renewalsData: any[] = [];
+
+            if (clientRes.status === 'fulfilled' && clientRes.value.data) {
+              clientData = clientRes.value.data;
+              setClient(clientData);
+            }
+
+            if (invoicesRes.status === 'fulfilled' && invoicesRes.value.data) {
+              invoicesData = invoicesRes.value.data;
+            }
+
+            if (renewalsRes.status === 'fulfilled' && renewalsRes.value.data) {
+              renewalsData = renewalsRes.value.data;
+            }
+
+            // Combinar e mapear renovações para o formato de faturas
+            const combined = [
+              ...invoicesData,
+              ...renewalsData.map(r => ({
+                id: `ren_${r.id}`,
+                date: new Date(r.created_at).toLocaleDateString(),
+                description: 'Renovação de Assinatura',
+                sub: r.status === 'RENOVAÇÃO APROVADA' ? 'Pagamento Confirmado' : 'Aguardando Aprovação',
+                value: clientData?.balance ? `R$ ${Number(clientData.balance).toFixed(2)}` : 'R$ 25,00',
+                status: r.status === 'RENOVAÇÃO APROVADA' ? 'Pago' : 'Pendente',
+                type: 'premium',
+                created_at: r.created_at
+              }))
+            ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+            setInvoices(combined);
           }
         }
       } catch (err) {
@@ -91,19 +161,97 @@ export default function Invoices() {
               </div>
               <input
                 type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Pesquisar faturas por descrição..."
                 className="w-full pl-10 pr-3 py-2 border border-black/5 dark:border-white/10 rounded-xl bg-white dark:bg-slate-900/50 text-slate-900 dark:text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-sm transition-colors"
               />
             </div>
-            <div className="flex gap-3 w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 scrollbar-hide">
-              <button className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-white/5 border border-black/5 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/10 text-slate-900 dark:text-slate-200 text-sm font-bold transition-colors whitespace-nowrap">
-                Mês Atual
-                <ChevronDown size={18} />
-              </button>
-              <button className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-white/5 border border-black/5 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/10 text-slate-900 dark:text-slate-200 text-sm font-bold transition-colors whitespace-nowrap">
-                2023
-                <ChevronDown size={18} />
-              </button>
+            <div className="flex gap-3 w-full sm:w-auto overflow-x-visible pb-2 sm:pb-0 scrollbar-hide">
+              {/* Month Selector */}
+              <div className="relative">
+                <button 
+                  onClick={() => setShowMonthDropdown(!showMonthDropdown)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-white/5 border border-black/5 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/10 text-slate-900 dark:text-slate-200 text-sm font-bold transition-colors whitespace-nowrap"
+                >
+                  {selectedMonth === null ? 'Todos os Meses' : months.find(m => m.value === selectedMonth)?.label}
+                  <ChevronDown size={18} className={`transition-transform ${showMonthDropdown ? 'rotate-180' : ''}`} />
+                </button>
+                <AnimatePresence>
+                  {showMonthDropdown && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setShowMonthDropdown(false)} />
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-900 border border-black/5 dark:border-white/10 rounded-2xl shadow-xl z-20 overflow-hidden"
+                      >
+                        <div className="max-h-64 overflow-y-auto custom-scrollbar">
+                          {months.map((m) => (
+                            <button
+                              key={m.label}
+                              onClick={() => {
+                                setSelectedMonth(m.value);
+                                setShowMonthDropdown(false);
+                              }}
+                              className={`w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-black/5 dark:hover:bg-white/5 ${selectedMonth === m.value ? 'text-primary font-bold bg-primary/5' : 'text-slate-600 dark:text-slate-400'}`}
+                            >
+                              {m.label}
+                            </button>
+                          ))}
+                        </div>
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Year Selector */}
+              <div className="relative">
+                <button 
+                  onClick={() => setShowYearDropdown(!showYearDropdown)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-white/5 border border-black/5 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/10 text-slate-900 dark:text-slate-200 text-sm font-bold transition-colors whitespace-nowrap"
+                >
+                  {selectedYear === null ? 'Todos os Anos' : selectedYear}
+                  <ChevronDown size={18} className={`transition-transform ${showYearDropdown ? 'rotate-180' : ''}`} />
+                </button>
+                <AnimatePresence>
+                  {showYearDropdown && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setShowYearDropdown(false)} />
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        className="absolute right-0 top-full mt-2 w-40 bg-white dark:bg-slate-900 border border-black/5 dark:border-white/10 rounded-2xl shadow-xl z-20 overflow-hidden"
+                      >
+                        <button
+                          onClick={() => {
+                            setSelectedYear(null);
+                            setShowYearDropdown(false);
+                          }}
+                          className={`w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-black/5 dark:hover:bg-white/5 ${selectedYear === null ? 'text-primary font-bold bg-primary/5' : 'text-slate-600 dark:text-slate-400'}`}
+                        >
+                          Todos os Anos
+                        </button>
+                        {availableYears.map((y) => (
+                          <button
+                            key={y}
+                            onClick={() => {
+                              setSelectedYear(y);
+                              setShowYearDropdown(false);
+                            }}
+                            className={`w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-black/5 dark:hover:bg-white/5 ${selectedYear === y ? 'text-primary font-bold bg-primary/5' : 'text-slate-600 dark:text-slate-400'}`}
+                          >
+                            {y}
+                          </button>
+                        ))}
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
           </div>
 
@@ -122,10 +270,10 @@ export default function Invoices() {
               <tbody className="divide-y divide-black/5 dark:divide-white/5">
                 {loading ? (
                   <tr><td colSpan={5} className="px-8 py-5 text-center text-slate-500">Carregando faturas...</td></tr>
-                ) : invoices.length === 0 ? (
+                ) : filteredInvoices.length === 0 ? (
                   <tr><td colSpan={5} className="px-8 py-10 text-center text-slate-500 italic">Nenhuma fatura encontrada.</td></tr>
                 ) : (
-                  invoices.map((inv) => (
+                  filteredInvoices.map((inv) => (
                     <tr key={inv.id} className="hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors group">
                       <td className="px-8 py-5 text-sm text-slate-600 dark:text-slate-300 font-medium">{inv.date}</td>
                       <td className="px-8 py-5">
@@ -168,10 +316,10 @@ export default function Invoices() {
           <div className="md:hidden divide-y divide-black/5 dark:divide-white/5">
             {loading ? (
               <div className="p-8 text-center text-slate-500">Carregando faturas...</div>
-            ) : invoices.length === 0 ? (
+            ) : filteredInvoices.length === 0 ? (
               <div className="p-10 text-center text-slate-500 italic">Nenhuma fatura encontrada.</div>
             ) : (
-              invoices.map((inv, idx) => (
+              filteredInvoices.map((inv, idx) => (
                 <motion.div
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -220,7 +368,7 @@ export default function Invoices() {
 
           {/* Pagination */}
           <div className="p-4 border-t border-black/5 dark:border-white/5 bg-black/[0.01] dark:bg-white/[0.01] flex items-center justify-between">
-            <span className="text-xs text-slate-500">Mostrando {invoices.length} faturas</span>
+            <span className="text-xs text-slate-500">Mostrando {filteredInvoices.length} faturas</span>
             <div className="flex gap-1">
               <button className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-black/5 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white transition-colors disabled:opacity-50">
                 <ChevronLeft size={16} />
