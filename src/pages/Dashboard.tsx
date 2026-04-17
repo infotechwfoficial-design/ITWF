@@ -21,7 +21,7 @@ import {
   Settings as SettingsIcon,
   Plus,
   LayoutDashboard,
-  Trophy,
+
   ArrowRight,
   Star,
   HelpCircle,
@@ -149,7 +149,6 @@ export default function Dashboard() {
   const [requests, setRequests] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<NotificationType[]>([]);
   const [loadingExtras, setLoadingExtras] = useState(true);
-  const [sportsAgenda, setSportsAgenda] = useState<string | null>(null);
   
   // O perfil do contexto já é o nosso 'client'
   const client = isClient(contextProfile) ? contextProfile : null;
@@ -176,7 +175,7 @@ export default function Dashboard() {
         ? `client_id.eq.${profile.id},is_global.eq.true`
         : `is_global.eq.true`;
 
-      const [reqsRes, notifsRes, agendaRes] = await Promise.allSettled([
+      const [reqsRes, notifsRes] = await Promise.allSettled([
         // Pedidos
         supabase
           .from('requests')
@@ -191,19 +190,10 @@ export default function Dashboard() {
           .or(notifFilter)
           .order('created_at', { ascending: false })
           .limit(10),
-        // Agenda
-        supabase
-          .from('notifications')
-          .select('message')
-          .eq('title', '⚽ Agenda Esportiva')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
       ]);
 
       if (reqsRes.status === 'fulfilled' && reqsRes.value.data) setRequests(reqsRes.value.data);
       if (notifsRes.status === 'fulfilled' && notifsRes.value.data) setNotifications(notifsRes.value.data);
-      if (agendaRes.status === 'fulfilled' && agendaRes.value.data) setSportsAgenda(agendaRes.value.data.message);
 
     } catch (err) {
       console.error('Dashboard: Erro ao carregar dados:', err);

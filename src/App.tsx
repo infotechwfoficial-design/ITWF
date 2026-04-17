@@ -12,7 +12,7 @@ import Login from './pages/Login';
 import AdminLogin from './pages/AdminLogin';
 import Dashboard from './pages/Dashboard';
 import Plans from './pages/Plans';
-import Sports from './pages/Sports';
+
 import Checkout from './pages/Checkout';
 import Success from './pages/Success';
 import Invoices from './pages/Invoices';
@@ -30,9 +30,8 @@ import SaaS from './pages/SaaS';
 import DebugPage from './pages/DebugPage';
 
 const LoadingFallback = () => (
-  <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 gap-6">
+  <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
     <img src="/logo.png" alt="Logo" className="w-24 h-24 object-contain animate-pulse" />
-    <p className="text-primary font-bold animate-pulse uppercase tracking-widest text-sm">Carregando Experiência...</p>
   </div>
 );
 
@@ -98,7 +97,7 @@ function AppContent() {
                 } />
                 <Route path="/dashboard" element={user ? <Dashboard /> : <Navigate to="/" replace />} />
                 <Route path="/plans" element={user ? <Plans /> : <Navigate to="/" replace />} />
-                <Route path="/sports" element={user ? <Sports /> : <Navigate to="/" replace />} />
+
                 <Route path="/checkout" element={user ? <Checkout /> : <Navigate to="/" replace />} />
                 <Route path="/success" element={user ? <Success /> : <Navigate to="/" replace />} />
                 <Route path="/invoices" element={user ? <Invoices /> : <Navigate to="/" replace />} />
